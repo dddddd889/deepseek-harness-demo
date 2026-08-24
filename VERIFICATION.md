@@ -1,16 +1,16 @@
 # DeepSeek Harness 从零构建验收矩阵
 
-每一阶段都保留独立 demo、可下断点的 test，以及最终的统一验收入口。以下命令均在 `harness-lab/` 中执行。
+每一阶段都保留独立 demo、可下断点的 test，以及最终的统一验收入口。调试统一从 VS Code Run and Debug 启动，完整映射见 [DEBUGGING.md](DEBUGGING.md)。
 
 | 阶段 | 能力边界 | 可运行入口 | 主要断点/测试 |
 |---|---|---|---|
-| 0–3 | 基线、插件内核、协议、Session 投影 | `bun run demo`, `demo:protocol` | `debug:test`, `debug:protocol`, `debug:projection` |
-| 4–6 | 流式 LLM、Agent loop、Tool pipeline | `demo:llm`, `demo:agent`, `demo:tools` | `debug:llm`, `debug:agent`, `debug:tools` |
-| 7–8 | FS/process/shell/PTY、权限与 sandbox | `demo:local`, `demo:permissions` | `debug:fs`, `debug:process`, `debug:permissions` |
-| 9–10 | JSONL 恢复/fork、token/compaction/spill | `demo:persistence`, `demo:context` | `debug:persistence`, `debug:context` |
-| 11–12 | Skill/MCP/Web/LSP/附件、Job/Subagent/Workflow | `demo:capabilities`, `demo:orchestration` | `debug:capabilities`, `debug:jobs`, `debug:subagents`, `debug:workflow` |
-| 13–15 | Profile/Bundle/CLI、Agent Server、Web Client | `demo:headless`, `demo:server`, `demo:web` | `debug:headless`, `debug:server`, `debug:web` |
-| 16 | OTel Logs 语义、Cost、HMR、故障与发布 | `demo:observability`, `demo:hardening` | `debug:observability`, `debug:hardening` |
+| 0–3 | 基线、插件内核、协议、Session 投影 | `bun run demo`, `demo:protocol` | VS Code `01`–`03` |
+| 4–6 | 流式 LLM、Agent loop、Tool pipeline | `demo:llm`, `demo:agent`, `demo:tools` | VS Code `04`–`06` |
+| 7–8 | FS/process/shell/PTY、权限与 sandbox | `demo:local`, `demo:permissions` | VS Code `07a`–`08` |
+| 9–10 | JSONL 恢复/fork、token/compaction/spill | `demo:persistence`, `demo:context` | VS Code `09`–`10` |
+| 11–12 | Skill/MCP/Web/LSP/附件、Job/Subagent/Workflow | `demo:capabilities`, `demo:orchestration` | VS Code `11`–`12c` |
+| 13–15 | Profile/Bundle/CLI、Agent Server、Web Client | `demo:headless`, `demo:server`, `demo:web` | VS Code `13`–`15` |
+| 16 | OTel Logs 语义、Cost、HMR、故障与发布 | `demo:observability`, `demo:hardening` | VS Code `16a`–`16c` |
 
 ## 一键验收
 

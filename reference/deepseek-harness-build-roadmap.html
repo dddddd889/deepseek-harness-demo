@@ -40,7 +40,7 @@
   <ol>
     <li><strong>单元层：</strong>每个状态机或 fold 使用 <code>bun:test</code> 固定输入和精确输出。</li>
     <li><strong>协议层：</strong>所有跨边界对象可 JSON 序列化，并保存 fixture。</li>
-    <li><strong>运行层：</strong>用 <code>bun --inspect-brk</code> 启动当前阶段入口。</li>
+    <li><strong>运行层：</strong>在 VS Code Run and Debug 中选择阶段配置并按 <code>F5</code>。</li>
     <li><strong>事件层：</strong>每个 Turn 输出连续 seq 的事件日志，禁止仅靠 console 文本猜测。</li>
     <li><strong>故障层：</strong>至少覆盖取消、超时、进程中断和重复请求。</li>
     <li><strong>回归层：</strong>每阶段保留 smoke test，最终形成 0→16 的累积测试梯。</li>

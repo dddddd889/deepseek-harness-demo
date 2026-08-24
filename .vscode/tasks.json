@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Harness · Bun install",
+      "type": "shell",
+      "command": "bun install",
+      "options": { "cwd": "${workspaceFolder}/harness-lab" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Harness · Typecheck",
+      "type": "shell",
+      "command": "bun run typecheck",
+      "options": { "cwd": "${workspaceFolder}/harness-lab" },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Harness · All tests",
+      "type": "shell",
+      "command": "bun test --max-concurrency=1",
+      "options": { "cwd": "${workspaceFolder}/harness-lab" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Harness · Verify release",
+      "type": "shell",
+      "command": "bun run verify",
+      "options": { "cwd": "${workspaceFolder}/harness-lab" },
+      "problemMatcher": ["$tsc"],
+      "group": { "kind": "test", "isDefault": true }
+    }
+  ]
+}
