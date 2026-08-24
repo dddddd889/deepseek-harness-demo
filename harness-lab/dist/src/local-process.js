@@ -2,9 +2,9 @@ import { spawn } from 'node:child_process';
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-/** Harness 子进程同款敏感环境名启发式：默认绝不向孩子泄漏凭证或 DSH_*。 */
+/** 框架子进程同款敏感环境名启发式：默认绝不向孩子泄漏凭证或 DSH_*。 */
 export const SENSITIVE_ENV_PATTERN = /KEY|PASSWORD|SECRET|TOKEN/i;
-/** 本地受管进程运行时：拥有所有进程树与 spill 文件的生命周期。 */
+/** 本地受管进程运行时：拥有所有进程树与溢出文件的生命周期。 */
 export class LocalProcessRuntime {
     #tempRoot;
     #live = new Set();
@@ -16,7 +16,7 @@ export class LocalProcessRuntime {
     spawn(spec) {
         const command = spec.argv[0];
         if (!command)
-            throw new Error('argv 必须包含可执行文件');
+            throw new Error('参数列表必须包含可执行文件');
         spec.signal?.throwIfAborted();
         const startedAt = Date.now();
         const maximum = spec.maxOutputBytes ?? 64_000;
@@ -78,11 +78,11 @@ export class LocalProcessRuntime {
         return handle;
     }
     run(spec) { return this.spawn(spec).done; }
-    /** 使用 Bun 原生 Terminal 分配真实 PTY，不再加载 node-pty 原生扩展。 */
+    /** 使用 Bun 原生终端分配真实伪终端，不再加载第三方伪终端扩展。 */
     async spawnTerminal(spec) {
         const command = spec.argv[0];
         if (!command)
-            throw new Error('PTY argv 必须包含可执行文件');
+            throw new Error('伪终端参数列表必须包含可执行文件');
         spec.signal?.throwIfAborted();
         const listeners = new Set();
         const decoder = new TextDecoder();
@@ -100,7 +100,7 @@ export class LocalProcessRuntime {
         });
         const terminal = processHandle.terminal;
         if (terminal === undefined)
-            throw new Error('Bun Terminal 创建失败');
+            throw new Error('Bun 终端创建失败');
         let settled = false;
         const done = processHandle.exited.then(exitCode => {
             settled = true;
@@ -129,7 +129,7 @@ export class LocalProcessRuntime {
         });
         return handle;
     }
-    /** 组合卸载时停止并等待全部孩子，之后删除运行时拥有的 spill。 */
+    /** 组合卸载时停止并等待全部孩子，之后删除运行时拥有的溢出文件。 */
     async dispose() {
         for (const processHandle of this.#live)
             processHandle.terminate();
@@ -138,7 +138,7 @@ export class LocalProcessRuntime {
         await rm(this.#tempRoot, { recursive: true, force: true });
     }
 }
-/** 有限内存保留前缀，完整字节持续写入 spill 文件。 */
+/** 有限内存保留前缀，完整字节持续写入溢出文件。 */
 class OutputCollector {
     #path;
     #maximum;
@@ -148,7 +148,7 @@ class OutputCollector {
     #writes = Promise.resolve();
     constructor(path, maximum) {
         if (!Number.isSafeInteger(maximum) || maximum < 0)
-            throw new Error('maxOutputBytes 必须是非负安全整数');
+            throw new Error('最大输出字节数必须是非负安全整数');
         this.#path = path;
         this.#maximum = maximum;
     }
@@ -173,7 +173,7 @@ class OutputCollector {
         };
     }
 }
-/** 生成清洗后的子进程环境，显式 env 最后覆盖。 */
+/** 生成清洗后的子进程环境，显式环境变量 最后覆盖。 */
 export function childEnvironment(explicit = {}) {
     const environment = {};
     for (const [name, value] of Object.entries(process.env)) {
@@ -182,7 +182,7 @@ export function childEnvironment(explicit = {}) {
     }
     return { ...environment, ...explicit };
 }
-/** POSIX 向整个 detached process group 发信号；Windows 退化为直接子进程。 */
+/** POSIX 系统向整个独立进程组发信号；Windows 系统退化为直接子进程。 */
 function signalTree(child, signal) {
     if (child.pid === undefined)
         return;
@@ -197,7 +197,7 @@ function signalTree(child, signal) {
             throw error;
     }
 }
-/** 教学/测试辅助：读取发生截断时的完整 spill。 */
+/** 教学/测试辅助：读取发生截断时的完整 溢出。 */
 export async function readSpill(output) {
     return output.spillPath === undefined ? undefined : readFile(output.spillPath, 'utf8');
 }

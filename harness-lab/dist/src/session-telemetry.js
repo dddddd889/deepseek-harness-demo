@@ -1,6 +1,6 @@
 /**
- * 将权威 Session Log 投影成 OTel Logs 风格记录。
- * 它只维护“已交给 sink”的游标，不承诺远端已经收到，因此不能承担恢复职责。
+ * 将权威 会话日志 投影成 开放遥测日志风格记录。
+ * 它只维护“已交给 日志接收端”的游标，不承诺远端已经收到，因此不能承担恢复职责。
  */
 export class SessionTelemetry {
     #seenChunks = new Set();

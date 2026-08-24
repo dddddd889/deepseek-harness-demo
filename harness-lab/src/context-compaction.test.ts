@@ -22,7 +22,7 @@ function assistant(text: string) {
   })
 }
 
-test('token meter 分开累计 usage、surface 估算与下一请求压力', () => {
+test('词元计量器分别累计用量、模型可见面估算与下一请求压力', () => {
   const session = new Session()
   session.append('user/message', user('旧问题'))
   session.append('assistant/message', {
@@ -41,7 +41,7 @@ test('token meter 分开累计 usage、surface 估算与下一请求压力', () 
   assert.equal(measured.nodes.length, 3)
 })
 
-test('选择压缩区间不会切开 tool-call/result 原子组', () => {
+test('选择压缩区间不会切开工具调用与结果的原子组', () => {
   const session = new Session()
   session.append('user/message', user('a'.repeat(120)))
   session.append('assistant/message', {
@@ -69,7 +69,7 @@ test('选择压缩区间不会切开 tool-call/result 原子组', () => {
   assert.deepEqual(range, { start: 0, end: 2 })
 })
 
-test('compaction 只替换 surface，原日志保留且冷重放一致', async () => {
+test('压缩只替换模型可见面，原日志保留且冷重放一致', async () => {
   const session = new Session()
   session.append('user/message', user('历史问题 '.repeat(40)))
   session.append('assistant/message', { turn: 1, step: 1, message: assistant('历史答案 '.repeat(40)) })
@@ -89,7 +89,7 @@ test('compaction 只替换 surface，原日志保留且冷重放一致', async (
   assert.deepEqual(deriveMessages(replayed.events), deriveMessages(session.events))
 })
 
-test('replacement 可以继续替换旧摘要，形成可重放压缩链', async () => {
+test('替换记录可以继续替换旧摘要，形成可重放压缩链', async () => {
   const session = new Session()
   session.append('user/message', user('第一段 '.repeat(50)))
   session.append('assistant/message', { turn: 1, step: 1, message: assistant('第二段 '.repeat(50)) })
@@ -105,7 +105,7 @@ test('replacement 可以继续替换旧摘要，形成可重放压缩链', async
   assert.match(block?.type === 'text' ? block.text : '', /二次摘要/)
 })
 
-test('compaction 降低下一请求 projected pressure，但不改历史 usage', async () => {
+test('压缩降低下一请求预计压力，但不改变历史用量', async () => {
   const session = new Session()
   session.append('user/message', user('旧输入 '.repeat(100)))
   session.append('assistant/message', {
@@ -121,18 +121,18 @@ test('compaction 降低下一请求 projected pressure，但不改历史 usage',
   assert.ok((after.projectedTokens ?? Infinity) < (before.projectedTokens ?? 0))
 })
 
-test('摘要失败只留下闭合审计 bracket，不改变 surface', async () => {
+test('摘要失败只留下闭合的审计记录，不改变模型可见面', async () => {
   const session = new Session()
   session.append('user/message', user('很长内容 '.repeat(30)))
   const before = deriveMessages(session.events)
   await assert.rejects(compactRange(session, { start: 0, end: 0 }, {
-    summarize: async () => { throw new Error('summarizer down') },
-  }), /summarizer down/)
+    summarize: async () => { throw new Error('摘要器不可用') },
+  }), /摘要器不可用/)
   assert.deepEqual(deriveMessages(session.events), before)
   assert.deepEqual(session.events.slice(-2).map(event => event.type), ['compaction/start', 'compaction/end'])
 })
 
-test('摘要不够小则拒绝 replacement', async () => {
+test('摘要不够小时拒绝写入替换记录', async () => {
   const session = new Session()
   session.append('user/message', user('short'))
   await assert.rejects(compactRange(session, { start: 0, end: 0 }, {
@@ -141,7 +141,7 @@ test('摘要不够小则拒绝 replacement', async () => {
   assert.equal(deriveSurface(session.events)[0]?.seq, 0)
 })
 
-test('spill 对大文本使用私有随机文件并在读取时校验完整性', async () => {
+test('溢出存储为大文本使用私有随机文件，并在读取时校验完整性', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-spill-'))
   const store = new LocalSpillStore(root)
   const result = await spillIfNeeded(store, {

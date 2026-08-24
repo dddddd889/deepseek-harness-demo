@@ -10,7 +10,7 @@ export interface ShellRequest {
     readonly signal?: AbortSignal;
     readonly sandboxMode?: SandboxMode;
 }
-/** Shell 只决定解释器与默认值；进程树、输出和终止仍由 LocalProcessRuntime 拥有。 */
+/** 终端解释器只决定解释器与默认值；进程树、输出和终止仍由 本地进程运行时 拥有。 */
 export declare class LocalShell {
     #private;
     constructor(runtime: LocalProcessRuntime, cwd: string, sandbox?: LocalSandbox);
@@ -19,5 +19,5 @@ export declare class LocalShell {
     spawnTerminal(signal?: AbortSignal, sandboxMode?: SandboxMode): Promise<TerminalHandle>;
     private spec;
 }
-/** 将前台 Shell 暴露为工具；后台任务归 Jobs 阶段统一分配 id 和轮询语义。 */
+/** 将前台终端解释器 暴露为工具；后台任务由后台任务阶段统一分配标识 和轮询语义。 */
 export declare function createShellTool(shell: LocalShell): ToolDefinition;

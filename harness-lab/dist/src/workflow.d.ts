@@ -63,7 +63,7 @@ export type WorkflowEvent = {
     readonly id: string;
     readonly result: Omit<WorkflowResult, 'value'>;
 };
-/** Worker-thread Workflow：脚本动态 fan-out，Host 掌握子 Agent 与预算。 */
+/** 工作线程中的工作流：脚本动态扇出，宿主掌握子智能体 与预算。 */
 export declare class WorkflowEngine {
     #private;
     constructor(subagents: SubagentRuntime);

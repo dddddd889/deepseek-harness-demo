@@ -35,7 +35,7 @@ const allowed = new Set([
   'maxSteps', 'sandboxMode', 'approvalPolicy', 'scriptedResponse',
 ])
 
-/** file < environment < CLI；所有层最终走同一严格校验函数。 */
+/** 文件 < 环境变量 < 命令行；所有层最终走同一严格校验函数。 */
 export async function loadProfile(
   path: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
@@ -45,7 +45,7 @@ export async function loadProfile(
   if (path !== undefined) {
     const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
     assertJsonValue(parsed)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new TypeError('Profile 根必须是对象')
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new TypeError('配置文件根节点必须是对象')
     file = parsed
   }
   for (const key of Object.keys(file)) if (!allowed.has(key)) throw new TypeError(`Profile 未知字段：${key}`)
@@ -70,15 +70,15 @@ export function validateProfile(value: Record<string, unknown>): HarnessProfile 
     return candidate
   }
   const provider = text('provider')
-  if (provider !== 'deepseek' && provider !== 'scripted') throw new TypeError(`Profile provider 无效：${provider}`)
+  if (provider !== 'deepseek' && provider !== 'scripted') throw new TypeError(`配置中的模型提供方无效：${provider}`)
   const sandboxMode = text('sandboxMode')
-  if (!['read-only', 'workspace-write', 'danger-full-access'].includes(sandboxMode)) throw new TypeError(`Profile sandboxMode 无效：${sandboxMode}`)
+  if (!['read-only', 'workspace-write', 'danger-full-access'].includes(sandboxMode)) throw new TypeError(`配置中的沙箱模式无效：${sandboxMode}`)
   const approvalPolicy = text('approvalPolicy')
   if (approvalPolicy !== 'ask' && approvalPolicy !== 'never') throw new TypeError(`Profile approvalPolicy 无效：${approvalPolicy}`)
   const maxSteps = value.maxSteps
-  if (!Number.isSafeInteger(maxSteps) || (maxSteps as number) <= 0) throw new TypeError('Profile maxSteps 必须为正整数')
+  if (!Number.isSafeInteger(maxSteps) || (maxSteps as number) <= 0) throw new TypeError('配置中的最大步骤数必须为正整数')
   const apiKeyEnv = text('apiKeyEnv')
-  if (!/^[A-Z_][A-Z0-9_]*$/.test(apiKeyEnv)) throw new TypeError('Profile apiKeyEnv 不是合法环境变量名')
+  if (!/^[A-Z_][A-Z0-9_]*$/.test(apiKeyEnv)) throw new TypeError('配置中的密钥环境变量名称不合法')
   const optional = (key: string): string | undefined => value[key] === undefined ? undefined : text(key)
   const profile: HarnessProfile = {
     name: text('name'), provider, model: text('model'),
@@ -90,6 +90,6 @@ export function validateProfile(value: Record<string, unknown>): HarnessProfile 
     ...optional('system') === undefined ? {} : { system: optional('system') as string },
     ...optional('scriptedResponse') === undefined ? {} : { scriptedResponse: optional('scriptedResponse') as string },
   }
-  if (profile.provider === 'scripted' && profile.scriptedResponse === undefined) throw new TypeError('scripted provider 需要 scriptedResponse')
+  if (profile.provider === 'scripted' && profile.scriptedResponse === undefined) throw new TypeError('脚本模型提供方需要配置脚本响应')
   return snapshotJson(profile)
 }

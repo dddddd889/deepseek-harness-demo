@@ -15,7 +15,7 @@ export declare class WorkspaceFsError extends Error {
     readonly code: string;
     constructor(message: string, code: string);
 }
-/** 只允许访问一个 canonical workspace；所有返回路径均为相对路径。 */
+/** 只允许访问一个 规范化工作区；所有返回路径均为相对路径。 */
 export declare class WorkspaceFs {
     #private;
     readonly root: string;
@@ -41,13 +41,13 @@ export declare class WorkspaceFs {
         matches: SearchMatch[];
         truncated: boolean;
     }>;
-    /** 词法检查拒绝绝对路径和 ..；真实路径检查另行阻断 symlink 逃逸。 */
+    /** 词法检查拒绝绝对路径和 ..；真实路径检查另行阻断符号链接逃逸。 */
     private resolveLexical;
     private resolveExisting;
-    /** 创建缺失目录前先验证最近存在祖先的 realpath，防止父级 symlink 逃逸。 */
+    /** 创建缺失目录前先验证最近存在祖先的真实路径，防止父级符号链接逃逸。 */
     private ensureWritableParent;
     private assertInside;
     private display;
 }
-/** 将 WorkspaceFs 能力包装成四个普通工具，不让 Agent Loop 依赖本地文件 API。 */
+/** 将工作区文件系统能力包装成四个普通工具，不让智能体循环依赖本地文件接口。 */
 export declare function createWorkspaceFsTools(fs: WorkspaceFs): readonly ToolDefinition[];

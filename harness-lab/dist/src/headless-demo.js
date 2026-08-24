@@ -12,14 +12,14 @@ try {
         maxSteps: 3, sandboxMode: 'read-only', approvalPolicy: 'never',
     });
     const firstHost = await HeadlessHost.open(profile);
-    console.log('bundle:', firstHost.bundle.context.inspect());
+    console.log('插件包：', firstHost.bundle.context.inspect());
     const first = await firstHost.create('demo-session');
-    console.log('first:', await first.run('第一轮'));
+    console.log('第一轮：', await first.run('第一轮'));
     await first.close();
     await firstHost.dispose();
     const resumedHost = await HeadlessHost.open(profile);
     const resumed = await resumedHost.resume('demo-session');
-    console.log('resumed:', await resumed.run('第二轮'));
+    console.log('恢复后：', await resumed.run('第二轮'));
     await resumed.close();
     await resumedHost.dispose();
 }

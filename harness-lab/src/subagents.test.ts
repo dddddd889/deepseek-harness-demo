@@ -9,7 +9,7 @@ const baseRequest = (signal = new AbortController().signal) => ({
   parentSession: 'parent-1', parentDepth: 0, signal,
 })
 
-test('发布成功后 start/end 按 runId 唯一配对', async () => {
+test('发布成功后，开始与结束事件按运行标识唯一配对', async () => {
   const runtime = new SubagentRuntime()
   runtime.register(new InProcessSubagentProvider('inproc', async request => ({
     output: [{ type: 'text', text: `depth=${request.depth}` }], stopReason: 'completed',
@@ -24,7 +24,7 @@ test('发布成功后 start/end 按 runId 唯一配对', async () => {
   assert.equal(runtime.active().length, 0)
 })
 
-test('能力和深度在 provider.start 前 fail loud', async () => {
+test('能力和深度校验在提供方启动前明确失败', async () => {
   const runtime = new SubagentRuntime()
   let starts = 0
   const provider: SubagentProvider = {
@@ -41,7 +41,7 @@ test('能力和深度在 provider.start 前 fail loud', async () => {
   assert.equal(starts, 0)
 })
 
-test('取消传播到 child，result reject 被归一并仍产生 end', async () => {
+test('取消传播到子智能体，结果拒绝被归一化且仍产生结束事件', async () => {
   const runtime = new SubagentRuntime()
   runtime.register(new InProcessSubagentProvider('inproc', async (_request, signal) => {
     await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
@@ -56,19 +56,19 @@ test('取消传播到 child，result reject 被归一并仍产生 end', async ()
   assert.deepEqual(events, ['start:', 'end:aborted'])
 })
 
-test('provider publication 失败不伪造 lifecycle start', async () => {
+test('提供方发布失败时不伪造生命周期开始事件', async () => {
   const runtime = new SubagentRuntime()
   runtime.register({
     name: 'broken', capabilities: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
-    available: () => true, start: async () => { throw new Error('handshake failed') },
+    available: () => true, start: async () => { throw new Error('握手失败') },
   })
   const events: string[] = []
   runtime.onLifecycle(event => events.push(event.type))
-  await assert.rejects(runtime.start('broken', baseRequest()), /handshake failed/)
+  await assert.rejects(runtime.start('broken', baseRequest()), /握手失败/)
   assert.deepEqual(events, [])
 })
 
-test('Subagent 可作为 owner-private Job 启动、汇合并读取最终输出', async () => {
+test('子智能体可作为所有者私有后台任务启动、汇合并读取最终输出', async () => {
   const runtime = new SubagentRuntime()
   runtime.register(new InProcessSubagentProvider('inproc', async () => ({
     output: [{ type: 'text', text: 'child answer' }], stopReason: 'completed',

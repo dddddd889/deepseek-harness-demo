@@ -19,7 +19,7 @@ export declare class AgentServerError extends Error {
     readonly details: unknown;
     constructor(message: string, code: string, status?: number, details?: unknown);
 }
-/** 真正的 Agent Server：HTTP RPC 控制面 + SSE Session Event 数据面。 */
+/** 真正的智能体服务：HTTP RPC 控制面 + SSE 会话事件数据面。 */
 export declare class AgentServer {
     #private;
     constructor(host: HeadlessHost, options: AgentServerOptions);

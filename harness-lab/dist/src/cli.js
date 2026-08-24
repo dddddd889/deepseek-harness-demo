@@ -1,7 +1,7 @@
 import { createInterface } from 'node:readline/promises';
 import { HeadlessHost } from "./headless-host.js";
 import { loadProfile } from "./profile.js";
-/** CLI 只解析进程协议；create/resume/run 全部委托同一个 HeadlessHost API。 */
+/** 命令行只解析进程协议；创建、恢复与运行 全部委托同一个 无界面宿主接口。 */
 export async function runCli(argv, io = process) {
     let options;
     try {
@@ -37,7 +37,7 @@ export async function runCli(argv, io = process) {
             return 0;
         }
         if (options.task.trim() === '')
-            throw new TypeError('缺少 task；使用 --interactive 或提供任务文本');
+            throw new TypeError('缺少任务；请使用 --interactive 或提供任务文本');
         const turn = await conversation.run(options.task, controller.signal);
         writeTurn(io.stdout, turn, options.json);
         return turn.reason.kind === 'completed' ? 0 : 1;
@@ -128,6 +128,6 @@ function writeTurn(stdout, turn, json) {
     stdout.write(json ? `${JSON.stringify(turn)}\n` : `${turn.text}\n`);
 }
 function help() {
-    return `Usage: bun src/cli-entry.ts [options] <task...>\n\nOptions:\n  --profile FILE       JSON profile\n  --session ID         create named session\n  --resume ID          resume durable session\n  --interactive        read one task per stdin line\n  --json               emit JSON Lines\n  --provider ID        override profile provider\n  --model ID           override profile model\n  --sandbox MODE       override sandbox mode\n`;
+    return `用法：bun src/cli-entry.ts [选项] <任务...>\n\n选项：\n  --profile 文件       JSON 配置文件\n  --session 标识       创建指定名称的会话\n  --resume 标识        恢复持久化会话\n  --interactive        从标准输入逐行读取任务\n  --json               输出 JSON Lines\n  --provider 标识      覆盖模型提供方\n  --model 标识         覆盖模型名称\n  --sandbox 模式       覆盖沙箱模式\n`;
 }
 //# sourceMappingURL=cli.js.map

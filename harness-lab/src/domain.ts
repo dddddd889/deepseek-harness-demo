@@ -72,7 +72,7 @@ export interface Message {
 }
 
 export interface TokenUsage {
-  /** 未命中缓存的输入 token；缓存桶与它互斥，不能重复相加。 */
+  /** 未命中缓存的输入词元；缓存桶与它互斥，不能重复相加。 */
   readonly inputTokens: number
   readonly outputTokens: number
   readonly cacheReadTokens?: number
@@ -115,7 +115,7 @@ export interface ToolDefinition extends ToolSchema {
   isConcurrencySafe?(args: JsonValue): boolean
   /** 将规范 JSON 输出投影成模型内容；省略时使用文本 JSON。 */
   render?(value: JsonValue): readonly ContentBlock[]
-  /** 声明调用的最小文件权限；PermissionService 在 execute 之前判断。 */
+  /** 声明调用的最小文件权限；权限服务在执行之前判断。 */
   effect?(args: JsonValue): ToolEffect
 }
 
@@ -126,7 +126,7 @@ export interface RequestHeader {
   readonly tools?: readonly ToolSchema[]
 }
 
-/** 事件如何改变模型可见 surface；replace 只遮蔽历史，不删除事实日志。 */
+/** 事件如何改变模型可见面；替换只遮蔽历史，不删除事实日志。 */
 export type SurfaceOp = 'append' | { readonly op: 'replace'; readonly start: number; readonly end: number }
 
 export type TurnEndReason =
@@ -160,7 +160,7 @@ export interface SessionEventMap {
 
 export type SessionEventType = keyof SessionEventMap
 
-/** 根据 type 生成真正的可辨识联合，switch 后 data 会同步收窄。 */
+/** 根据事件类型生成真正的可辨识联合，分支判断后事件数据会同步收窄。 */
 export type SessionEvent<T extends SessionEventType = SessionEventType> = {
   [K in T]: {
     readonly type: K
@@ -178,7 +178,7 @@ export function createMessage(input: Omit<Message, 'id'>): Message {
   return snapshotJson({ ...input, id: crypto.randomUUID() })
 }
 
-/** 生成可预测的穷尽检查错误，供协议消费者的 default 分支使用。 */
+/** 生成可预测的穷尽检查错误，供协议消费者的 默认分支使用。 */
 export function assertNever(value: never): never {
   throw new Error(`未处理的协议变体：${JSON.stringify(value)}`)
 }

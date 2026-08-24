@@ -1,5 +1,5 @@
 import { deriveMessages, foldTokenUsage, inspectLifecycle } from "./projections.js";
-/** 浏览器/SDK 共用投影：严格连续 seq，绝不靠 UI 本地猜测补洞。 */
+/** 浏览器/SDK 共用投影：严格连续序号，绝不靠 界面 本地猜测补洞。 */
 export class ClientProjection {
     #sessionId;
     #events = [];
@@ -16,7 +16,7 @@ export class ClientProjection {
     apply(event) {
         const expected = this.lastSeq + 1;
         if (event.seq < expected)
-            return; // SSE replay 与 snapshot 重叠时幂等忽略。
+            return; // SSE 重放与快照重叠时幂等忽略。
         if (event.seq !== expected)
             throw new Error(`CLIENT_EVENT_GAP：期望 seq=${expected}，收到 ${event.seq}`);
         this.#events.push(event);
@@ -48,7 +48,7 @@ export class AgentClientError extends Error {
     status;
     constructor(message, code, status) { super(message); this.code = code; this.status = status; }
 }
-/** 网络 Client：RPC request id 由调用方稳定持有，断线后 SSE 从 lastSeq 继续。 */
+/** 网络客户端：RPC 请求标识由调用方稳定持有，断线后 SSE 从最后序号继续。 */
 export class AgentClient {
     #baseURL;
     #token;
@@ -68,14 +68,14 @@ export class AgentClient {
         if (envelope.error !== undefined)
             throw new AgentClientError(envelope.error.message, envelope.error.code, response.status);
         if (envelope.result === undefined)
-            throw new AgentClientError('RPC 缺少 result', 'INVALID_RESPONSE', response.status);
+            throw new AgentClientError('RPC 响应缺少结果字段', 'INVALID_RESPONSE', response.status);
         return envelope.result;
     }
     async snapshot(sessionId, signal) {
         const result = await this.rpc('session.snapshot', { sessionId }, crypto.randomUUID(), signal);
         return result.events;
     }
-    /** 一直追随到 signal 取消；网络断开指数退避，协议 gap 先重新 snapshot。 */
+    /** 一直追随到 取消信号触发；网络断开指数退避，协议缺口 先重新获取快照。 */
     async follow(sessionId, projection, signal, callbacks = {}) {
         callbacks.onConnection?.('connecting');
         projection.reset(await this.snapshot(sessionId, signal));
@@ -113,7 +113,7 @@ export class AgentClient {
             headers: { authorization: `Bearer ${this.#token()}` }, ...(signal === undefined ? {} : { signal }),
         });
         if (!response.ok || response.body === null)
-            throw new AgentClientError(`SSE HTTP ${response.status}`, 'EVENT_STREAM_FAILED', response.status);
+            throw new AgentClientError(`SSE 请求失败，HTTP 状态码 ${response.status}`, 'EVENT_STREAM_FAILED', response.status);
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -136,7 +136,7 @@ export class AgentClient {
             }
         }
         finally {
-            // fetch Abort 已拥有底层连接关闭；不能让某些实现迟缓的 cancel() 阻塞重连/退出。
+            // 网络请求取消 已拥有底层连接关闭；不能让某些实现迟缓的 取消操作 阻塞重连/退出。
             void reader.cancel().catch(() => undefined);
         }
     }

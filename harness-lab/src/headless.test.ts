@@ -35,7 +35,7 @@ async function profile(root: string) {
   return path
 }
 
-test('Profile 严格拒绝未知字段，并按 file < env < CLI 覆盖', async () => {
+test('配置严格拒绝未知字段，并按文件、环境变量、命令行依次覆盖', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-profile-'))
   const path = await profile(root)
   const resolved = await loadProfile(path, { DSH_LAB_MODEL: 'env-model', DSH_LAB_SANDBOX: 'workspace-write' }, { model: 'cli-model' })
@@ -45,23 +45,23 @@ test('Profile 严格拒绝未知字段，并按 file < env < CLI 覆盖', async 
   await assert.rejects(loadProfile(path, {}), /未知字段：unknown/)
 })
 
-test('Bundle 某 row 失败会逆序回滚此前插件', async () => {
+test('插件包某条目失败时会逆序回滚此前插件', async () => {
   const bundle = new HarnessBundle()
   const disposed: string[] = []
   const plugin = (name: string, fail = false): Plugin => ({
     name,
     apply: async context => {
       await context.effect(() => () => { disposed.push(name) })
-      if (fail) throw new Error(`${name} failed`)
+      if (fail) throw new Error(`${name} 失败`)
       await context.provide(name, name)
     },
   })
-  await assert.rejects(bundle.mount([plugin('a'), plugin('b'), plugin('c', true)]), /c failed/)
+  await assert.rejects(bundle.mount([plugin('a'), plugin('b'), plugin('c', true)]), /c 失败/)
   assert.deepEqual(disposed, ['c', 'b', 'a'])
   assert.deepEqual(bundle.context.inspect(), { services: [], plugins: [], listeners: {} })
 })
 
-test('HeadlessHost create/close/cold resume 复用同一 Agent 与 Store 语义', async () => {
+test('无界面宿主的创建、关闭与冷恢复复用同一智能体和存储语义', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-headless-'))
   const resolved = await loadProfile(await profile(root), {})
   const firstHost = await HeadlessHost.open(resolved)
@@ -77,7 +77,7 @@ test('HeadlessHost create/close/cold resume 复用同一 Agent 与 Store 语义'
   await second.close(); await secondHost.dispose()
 })
 
-test('CLI 独立进程 create 后可 resume，JSONL 输出携带连续 turn', async () => {
+test('命令行独立进程创建后可以恢复，JSONL 输出携带连续轮次', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-cli-'))
   const path = await profile(root)
   const entry = join(import.meta.dirname, 'cli-entry.ts')
@@ -88,7 +88,7 @@ test('CLI 独立进程 create 后可 resume，JSONL 输出携带连续 turn', as
   assert.equal(JSON.parse(second.stdout).sessionId, 'cli-stable')
 })
 
-test('CLI interactive 在一个 conversation 内逐行运行', async () => {
+test('命令行交互模式在一个对话内逐行运行', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-cli-interactive-'))
   const path = await profile(root)
   const entry = join(import.meta.dirname, 'cli-entry.ts')

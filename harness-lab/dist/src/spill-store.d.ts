@@ -6,7 +6,7 @@ export interface SpillRef {
 }
 /** 把任意建议名编码为单个安全路径段。 */
 export declare function encodeSegment(raw: string): string;
-/** 本地 spill：session 隔离、随机文件名、0600 独占写，并记录摘要校验。 */
+/** 本地溢出存储：会话隔离、随机文件名、0600 独占写，并记录摘要校验。 */
 export declare class LocalSpillStore {
     #private;
     constructor(root: string);
@@ -14,7 +14,7 @@ export declare class LocalSpillStore {
     /** 读取时复验摘要，避免把损坏文件静默喂给模型。 */
     readText(ref: SpillRef): Promise<string>;
 }
-/** 超阈值时只向模型返回短引用，完整文本进入 spill store。 */
+/** 超阈值时只向模型返回短引用，完整文本进入 溢出存储。 */
 export declare function spillIfNeeded(store: LocalSpillStore, input: {
     readonly sessionId: string;
     readonly suggestedName: string;

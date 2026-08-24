@@ -31,12 +31,12 @@ export class PluginContext {
     await this.effect(() => this.#root.provide(this.#pluginName, key, value))
   }
 
-  /** 订阅事件；底层订阅会自动转成当前插件的 Effect。 */
+  /** 订阅事件；底层订阅会自动转成当前插件的副作用。 */
   async on(event: string, listener: EventListener): Promise<void> {
     await this.effect(() => this.#root.subscribe(event, listener))
   }
 
-  /** 获取已发布服务；调用方通过稳定 key，而不是具体实现类耦合。 */
+  /** 获取已发布服务；调用方通过稳定键，而不是具体实现类耦合。 */
   get<T>(key: string): T {
     this.#assertActive()
     return this.#root.get<T>(key)
@@ -64,13 +64,13 @@ export class PluginContext {
   }
 }
 
-/** 最小 Harness 容器：管理服务、事件和插件生命周期。 */
+/** 最小框架容器：管理服务、事件和插件生命周期。 */
 export class HarnessContext {
   readonly #services = new Map<string, { owner: string; value: unknown }>()
   readonly #listeners = new Map<string, Set<EventListener>>()
   readonly #plugins = new Map<string, PluginContext>()
 
-  /** 挂载插件；启动失败时回滚已经注册的全部 Effect。 */
+  /** 挂载插件；启动失败时回滚已经注册的全部副作用。 */
   async mount(plugin: Plugin): Promise<Disposer> {
     if (this.#plugins.has(plugin.name)) throw new Error(`插件 ${plugin.name} 已挂载`)
     const pluginContext = new PluginContext(this, plugin.name)

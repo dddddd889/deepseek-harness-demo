@@ -7,8 +7,8 @@
   <link rel="stylesheet" href="../assets/course.css">
 </head>
 <body><main>
-  <h1>DeepSeek Harness：16 个可调试阶段</h1>
-  <p class="lead">目标不是一次复制整个 monorepo，而是按依赖顺序构建 16 个始终可运行的垂直切片。第 0 阶段是环境基线，不计入能力阶段。</p>
+  <h1>DeepSeek Harness：17 个可调试阶段</h1>
+  <p class="lead">目标不是一次复制整个 monorepo，而是按依赖顺序构建 17 个始终可运行的垂直切片。</p>
 
   <div class="callout"><strong>每阶段统一完成定义：</strong>有一个可执行入口、一个最小自动测试、一组断点位置、一份可检查状态产物；上一阶段保持通过后才能进入下一阶段。</div>
 
@@ -16,23 +16,23 @@
   <table>
     <thead><tr><th>阶段</th><th>新增能力</th><th>最小演示</th><th>主要调试证据</th></tr></thead>
     <tbody>
-      <tr><td class="phase">0. 基线</td><td>Bun、TypeScript、bun:test</td><td>Hello + 单测</td><td>版本输出、测试报告、源码断点</td></tr>
-      <tr><td class="phase">1. 插件内核</td><td>Context、Service、Plugin、Effect、dispose</td><td>动态挂载/卸载插件</td><td>服务表、事件监听数、卸载日志</td></tr>
-      <tr><td class="phase">2. 领域协议</td><td>Message、ContentBlock、LLM、Tool、Session 类型</td><td>编译期契约测试</td><td>类型检查、JSON round-trip</td></tr>
-      <tr><td class="phase">3. Session 事件账本</td><td>append-only log、seq、surface projection</td><td>重放一轮静态对话</td><td>逐事件 JSONL、投影快照</td></tr>
-      <tr><td class="phase">4. 流式 LLM</td><td>Adapter、StreamChunk、Assembler、Mock LLM</td><td>流式输出文本与 usage</td><td>wire chunk、组装消息、usage</td></tr>
-      <tr><td class="phase">5. Agent Loop</td><td>Inbox、Turn、Step、停止原因</td><td>用户消息→模型回答</td><td>turn/step 边界、状态机日志</td></tr>
-      <tr><td class="phase">6. 工具管线</td><td>Tool Registry、Schema、call/result、超时</td><td>模型调用内存计算器</td><td>pre/execute/post 事件与结果</td></tr>
-      <tr><td class="phase">7. 本地执行世界</td><td>FS、Subprocess、Shell、PTY</td><td>读文件并运行测试</td><td>argv、cwd、stdout/stderr、文件 diff</td></tr>
-      <tr><td class="phase">8. 权限与沙箱</td><td>Approval、Policy、workspace-write、平台沙箱</td><td>允许工作区写、拒绝越界写</td><td>策略判定链、审批记录</td></tr>
-      <tr><td class="phase">9. 持久化与恢复</td><td>JSONL/Zstd、flush、resume、fork</td><td>杀进程后继续会话</td><td>Session Header、连续 seq、interrupted closer</td></tr>
-      <tr><td class="phase">10. 上下文治理</td><td>Token Meter、Compaction、Tool Pruner、Spill</td><td>超长工具结果自动裁剪</td><td>token projection、替换前后 surface</td></tr>
-      <tr><td class="phase">11. 外部能力</td><td>Skills、MCP、Web Fetch/Search、LSP、Attachment</td><td>加载 Skill 并调用 MCP</td><td>能力目录、协议帧、资源生命周期</td></tr>
-      <tr><td class="phase">12. 并发编排</td><td>Jobs、Subagent、spawn/fork、Workflow</td><td>父 Agent 委派两个子任务</td><td>父子谱系、任务状态、合并结果</td></tr>
-      <tr><td class="phase">13. Headless 产品面</td><td>Profile、Bundle、Patch、CLI</td><td>单命令完成 Coding Task</td><td>dump-config、插件树、退出码</td></tr>
-      <tr><td class="phase">14. Agent Server</td><td>WebServer、Connection、Gateway、API Proxy、SSE</td><td>REST 发消息，SSE 收事件</td><td>RPC id、路由、Agent lookup、事件游标</td></tr>
-      <tr><td class="phase">15. Web 与生产闭环</td><td>React Client、Projection、Settings、Telemetry、打包</td><td>完整 Web Agent + 恢复 + 观测</td><td>Client/Host 双端日志、OTLP、E2E</td></tr>
-      <tr><td class="phase">16. 加固</td><td>跨平台、HMR、兼容、发布、故障注入</td><td>构建可分发 CLI 并跑兼容矩阵</td><td>CI gates、崩溃恢复、资源泄漏检查</td></tr>
+      <tr><td class="phase">1. 基线</td><td>Bun、TypeScript、bun:test</td><td>Hello + 单测</td><td>版本输出、测试报告、源码断点</td></tr>
+      <tr><td class="phase">2. 插件内核</td><td>Context、Service、Plugin、Effect、dispose</td><td>动态挂载/卸载插件</td><td>服务表、事件监听数、卸载日志</td></tr>
+      <tr><td class="phase">3. 领域协议</td><td>Message、ContentBlock、LLM、Tool、Session 类型</td><td>编译期契约测试</td><td>类型检查、JSON round-trip</td></tr>
+      <tr><td class="phase">4. Session 事件账本</td><td>append-only log、seq、surface projection</td><td>重放一轮静态对话</td><td>逐事件 JSONL、投影快照</td></tr>
+      <tr><td class="phase">5. 流式 LLM</td><td>Adapter、StreamChunk、Assembler、Mock LLM</td><td>流式输出文本与 usage</td><td>wire chunk、组装消息、usage</td></tr>
+      <tr><td class="phase">6. Agent Loop</td><td>Inbox、Turn、Step、停止原因</td><td>用户消息→模型回答</td><td>turn/step 边界、状态机日志</td></tr>
+      <tr><td class="phase">7. 工具管线</td><td>Tool Registry、Schema、call/result、超时</td><td>模型调用内存计算器</td><td>pre/execute/post 事件与结果</td></tr>
+      <tr><td class="phase">8. 本地执行世界</td><td>FS、Subprocess、Shell、PTY</td><td>读文件并运行测试</td><td>argv、cwd、stdout/stderr、文件 diff</td></tr>
+      <tr><td class="phase">9. 权限与沙箱</td><td>Approval、Policy、workspace-write、平台沙箱</td><td>允许工作区写、拒绝越界写</td><td>策略判定链、审批记录</td></tr>
+      <tr><td class="phase">10. 持久化与恢复</td><td>JSONL/Zstd、flush、resume、fork</td><td>杀进程后继续会话</td><td>Session Header、连续 seq、interrupted closer</td></tr>
+      <tr><td class="phase">11. 上下文治理</td><td>Token Meter、Compaction、Tool Pruner、Spill</td><td>超长工具结果自动裁剪</td><td>token projection、替换前后 surface</td></tr>
+      <tr><td class="phase">12. 外部能力</td><td>Skills、MCP、Web Fetch/Search、LSP、Attachment</td><td>加载 Skill 并调用 MCP</td><td>能力目录、协议帧、资源生命周期</td></tr>
+      <tr><td class="phase">13. 并发编排</td><td>Jobs、Subagent、spawn/fork、Workflow</td><td>父 Agent 委派两个子任务</td><td>父子谱系、任务状态、合并结果</td></tr>
+      <tr><td class="phase">14. Headless 产品面</td><td>Profile、Bundle、Patch、CLI</td><td>单命令完成 Coding Task</td><td>dump-config、插件树、退出码</td></tr>
+      <tr><td class="phase">15. Agent Server</td><td>WebServer、Connection、Gateway、API Proxy、SSE</td><td>REST 发消息，SSE 收事件</td><td>RPC id、路由、Agent lookup、事件游标</td></tr>
+      <tr><td class="phase">16. Web 与生产闭环</td><td>React Client、Projection、Settings、Telemetry、打包</td><td>完整 Web Agent + 恢复 + 观测</td><td>Client/Host 双端日志、OTLP、E2E</td></tr>
+      <tr><td class="phase">17. 加固</td><td>跨平台、HMR、兼容、发布、故障注入</td><td>构建可分发 CLI 并跑兼容矩阵</td><td>CI gates、崩溃恢复、资源泄漏检查</td></tr>
     </tbody>
   </table>
 
@@ -43,7 +43,7 @@
     <li><strong>运行层：</strong>在 VS Code Run and Debug 中选择阶段配置并按 <code>F5</code>。</li>
     <li><strong>事件层：</strong>每个 Turn 输出连续 seq 的事件日志，禁止仅靠 console 文本猜测。</li>
     <li><strong>故障层：</strong>至少覆盖取消、超时、进程中断和重复请求。</li>
-    <li><strong>回归层：</strong>每阶段保留 smoke test，最终形成 0→16 的累积测试梯。</li>
+    <li><strong>回归层：</strong>每阶段保留 smoke test，最终形成 1→17 的累积测试梯。</li>
   </ol>
 
   <p><a href="../lessons/0001-zero-baseline.html">第 1 课：建立可调试基线 →</a></p>

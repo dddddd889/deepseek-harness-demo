@@ -17,6 +17,6 @@ export declare class LocalAttachmentStore {
         readonly mediaType: ImageAttachmentRef['mediaType'];
         readonly name?: string;
     }): Promise<ImageAttachmentRef>;
-    /** 冷读取同时复验 id、字节、解码元数据，引用不能替代完整性检查。 */
+    /** 冷读取同时复验 标识、字节、解码元数据，引用不能替代完整性检查。 */
     readImage(ref: ImageAttachmentRef): Promise<Uint8Array>;
 }

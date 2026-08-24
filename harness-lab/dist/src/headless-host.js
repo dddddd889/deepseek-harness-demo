@@ -19,18 +19,18 @@ export class HeadlessConversation {
     }
     async run(task, signal) {
         if (this.#closed)
-            throw new Error('Conversation 已关闭');
+            throw new Error('对话已关闭');
         if (task.trim() === '')
-            throw new TypeError('task 不能为空');
+            throw new TypeError('任务不能为空');
         return this.runContent([{ type: 'text', text: task }], signal);
     }
     async runContent(content, signal) {
         if (this.#closed)
-            throw new Error('Conversation 已关闭');
+            throw new Error('对话已关闭');
         this.agent.sendContent(content);
         const result = await this.agent.run(signal);
         if (result === undefined)
-            throw new Error('Agent 未接受任务');
+            throw new Error('智能体未接受任务');
         await this.#host.flush(this.session);
         const text = result.message?.content.filter(block => block.type === 'text').map(block => block.text).join('') ?? '';
         return { sessionId: this.header.id, turn: result.turn, text, reason: result.reason };
@@ -42,7 +42,7 @@ export class HeadlessConversation {
         await this.#host.closeConversation(this.session);
     }
 }
-/** 无 HTTP 的 Host：Profile、Provider、Session Store 与 Agent 的统一装配入口。 */
+/** 无 HTTP 的宿主：配置、提供方、会话存储与智能体的统一装配入口。 */
 export class HeadlessHost {
     profile;
     bundle;

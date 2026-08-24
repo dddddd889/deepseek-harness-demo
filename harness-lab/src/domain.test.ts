@@ -16,7 +16,7 @@ test('消息生成稳定身份并与调用方对象隔离', () => {
   assert.ok(Object.isFrozen(message.content))
 })
 
-test('Session 分配连续 seq，事件可以无损 JSON 往返', () => {
+test('会话分配连续序号，事件可以无损 JSON 往返', () => {
   const session = new Session()
   session.append('turn/start', { turn: 1 }, 100)
   session.append('step/start', { turn: 1, step: 1 }, 101)
@@ -30,7 +30,7 @@ test('Session 分配连续 seq，事件可以无损 JSON 往返', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(session.events)), session.events)
 })
 
-test('恢复拒绝 seq 缺口，避免从残缺历史继续运行', () => {
+test('恢复拒绝序号缺口，避免从残缺历史继续运行', () => {
   const broken = [
     { type: 'turn/start', seq: 0, time: 100, data: { turn: 1 } },
     { type: 'turn/end', seq: 2, time: 101, data: { turn: 1, reason: { kind: 'completed' } } },
@@ -48,7 +48,7 @@ test('JSON 边界拒绝静默丢失或改变含义的数据', () => {
   assert.throws(() => assertJsonValue(cyclic), /循环引用/)
 })
 
-test('StreamChunk 消费者可以按标签处理全部当前变体', () => {
+test('流式数据块消费者可以按标签处理全部当前变体', () => {
   const describe = (chunk: StreamChunk): string => {
     switch (chunk.type) {
       case 'block-start': return `开始:${chunk.blockType}`

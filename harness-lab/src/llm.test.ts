@@ -8,7 +8,7 @@ import { Session } from './session.ts'
 
 const request = { provider: 'fake', model: 'debug-model', messages: [] } as const
 
-test('BlockAssembler 按首次 index 顺序组装可交错的文本与工具参数', () => {
+test('内容块组装器按首次索引顺序组装可交错的文本与工具参数', () => {
   const assembler = new BlockAssembler()
   assembler.push({ type: 'block-start', index: 0, blockType: 'text' })
   assembler.push({ type: 'text-delta', index: 0, text: '先' })
@@ -21,7 +21,7 @@ test('BlockAssembler 按首次 index 顺序组装可交错的文本与工具参�
   ])
 })
 
-test('LlmRuntime 把 Provider 裸异常转换成唯一 error finish', async () => {
+test('大模型运行时把提供方裸异常转换成唯一错误终止帧', async () => {
   const runtime = new LlmRuntime()
   const broken: LlmProvider = {
     async *stream() {
@@ -38,7 +38,7 @@ test('LlmRuntime 把 Provider 裸异常转换成唯一 error finish', async () =
   })
 })
 
-test('取消等待中的 Provider 会快速得到 aborted finish', async () => {
+test('取消等待中的提供方会快速得到取消终止帧', async () => {
   const runtime = new LlmRuntime()
   runtime.register('fake', new ScriptedLlmProvider([{ type: 'text-delta', index: 0, text: '不会到达' }], 1_000))
   const controller = new AbortController()
@@ -50,7 +50,7 @@ test('取消等待中的 Provider 会快速得到 aborted finish', async () => {
   if (chunks[0]?.type === 'finish') assert.equal(chunks[0].reason.kind, 'aborted')
 })
 
-test('模型步骤逐 chunk 落账，并把最终 usage 与消息写入 Session', async () => {
+test('模型步骤逐数据块落账，并把最终用量与消息写入会话', async () => {
   const runtime = new LlmRuntime()
   runtime.register('fake', new ScriptedLlmProvider([
     { type: 'block-start', index: 0, blockType: 'text' },
@@ -75,7 +75,7 @@ test('模型步骤逐 chunk 落账，并把最终 usage 与消息写入 Session'
   assert.equal(inspectLifecycle(session.events).status, 'idle')
 })
 
-test('失败流保留原始 chunks，但不伪造 assistant message', async () => {
+test('失败流保留原始数据块，但不伪造助手消息', async () => {
   const runtime = new LlmRuntime()
   runtime.register('fake', {
     async *stream() { throw new Error('上游 503') },

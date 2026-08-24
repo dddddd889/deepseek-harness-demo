@@ -38,7 +38,7 @@ test('事件监听器跟随插件生命周期自动撤销', async () => {
   assert.deepEqual(context.inspect().listeners, {})
 })
 
-test('Effect 按照后进先出顺序释放', async () => {
+test('清理操作按照后进先出顺序执行', async () => {
   const context = new HarnessContext()
   const order: string[] = []
   const plugin: Plugin = {
@@ -69,7 +69,7 @@ test('插件启动失败会回滚部分注册，容器保持干净', async () =>
   assert.deepEqual(context.inspect(), { services: [], plugins: [], listeners: {} })
 })
 
-test('服务 key 冲突会失败并保留原服务', async () => {
+test('服务键冲突时失败并保留原服务', async () => {
   const context = new HarnessContext()
   const first = await context.mount({
     name: 'first',
@@ -87,4 +87,3 @@ test('服务 key 冲突会失败并保留原服务', async () => {
   assert.deepEqual(context.inspect().plugins, ['first'])
   await first()
 })
-

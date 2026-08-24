@@ -10,19 +10,19 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-test('owned job 需要 controller，starter 失败不消耗 id', () => {
+test('有所有者的后台任务需要控制器，启动器失败不消耗标识', () => {
   const jobs = new LocalJobRegistry()
   assert.throws(() => jobs.start({
     kind: 'bash', label: 'x', ownerSession: 'alice',
     run: () => ({ cancel() {}, done: Promise.resolve({ status: 'completed' }) }),
   }), (error: unknown) => error instanceof JobError && error.code === 'JOB_NO_CONTROLLER')
   jobs.attachController()
-  assert.throws(() => jobs.start({ kind: 'bash', label: 'bad', run: () => { throw new Error('spawn failed') } }), /spawn failed/)
+  assert.throws(() => jobs.start({ kind: 'bash', label: '错误任务', run: () => { throw new Error('启动失败') } }), /启动失败/)
   const id = jobs.start({ kind: 'bash', label: 'ok', run: () => ({ cancel() {}, done: new Promise(() => {}) }) })
   assert.equal(id, 'bash-1')
 })
 
-test('owner 鉴权不泄露 foreign job，unowned job 对所有调用方可见', () => {
+test('所有者鉴权不泄露外部后台任务，无所有者任务对所有调用方可见', () => {
   const jobs = new LocalJobRegistry()
   jobs.attachController()
   const hooks = { cancel() {}, done: new Promise<JobOutcome>(() => {}) }
@@ -32,7 +32,7 @@ test('owner 鉴权不泄露 foreign job，unowned job 对所有调用方可见',
   assert.throws(() => jobs.get(owned, 'bob'), (error: unknown) => error instanceof JobError && error.code === 'JOB_NOT_FOUND')
 })
 
-test('stream output 只有一个消费游标，终态 final output 则幂等', async () => {
+test('流式输出只有一个消费游标，终态最终输出保持幂等', async () => {
   const jobs = new LocalJobRegistry()
   let buffer = 'first'
   const done = deferred<JobOutcome>()
@@ -53,7 +53,7 @@ test('stream output 只有一个消费游标，终态 final output 则幂等', a
   assert.equal(jobs.read(finalId).text, 'answer')
 })
 
-test('kill 先调用 producer，再提交 stopping，终态第一写胜出', async () => {
+test('终止操作先调用生产方，再提交停止中状态，终态第一写胜出', async () => {
   const jobs = new LocalJobRegistry()
   const done = deferred<JobOutcome>()
   let cancelled = 0
@@ -69,30 +69,30 @@ test('kill 先调用 producer，再提交 stopping，终态第一写胜出', asy
   assert.equal(jobs.kill(id), 'already-finished')
 })
 
-test('wait 超时不取消 job，Abort 只取消等待者', async () => {
+test('等待超时不取消后台任务，取消信号只取消等待者', async () => {
   const jobs = new LocalJobRegistry()
   const id = jobs.start({ kind: 'bash', label: 'long', run: () => ({ cancel() {}, done: new Promise(() => {}) }) })
   assert.equal((await jobs.wait(id, 5)).status, 'running')
   const controller = new AbortController()
   const waiting = jobs.wait(id, 1_000, undefined, controller.signal)
-  controller.abort(new Error('caller left'))
-  await assert.rejects(waiting, /caller left/)
+  controller.abort(new Error('调用方离开'))
+  await assert.rejects(waiting, /调用方离开/)
   assert.equal(jobs.get(id).status, 'running')
 })
 
-test('producer done rejection 归一为 failed，listener 异常被隔离', async () => {
+test('生产方完成承诺的拒绝被归一为失败，监听器异常被隔离', async () => {
   const jobs = new LocalJobRegistry()
   let healthyCalls = 0
-  jobs.onDone(() => { throw new Error('bad listener') })
+  jobs.onDone(() => { throw new Error('监听器异常') })
   jobs.onDone(() => { healthyCalls += 1 })
-  const id = jobs.start({ kind: 'bash', label: 'broken', run: () => ({ cancel() {}, done: Promise.reject(new Error('boom')) }) })
+  const id = jobs.start({ kind: 'bash', label: '损坏任务', run: () => ({ cancel() {}, done: Promise.reject(new Error('模拟爆炸')) }) })
   const result = await jobs.wait(id, 100)
   assert.equal(result.status, 'failed')
-  assert.equal(result.detail, 'boom')
+  assert.equal(result.detail, '模拟爆炸')
   assert.equal(healthyCalls, 1)
 })
 
-test('owner dispose 取消、等待并移除 owner-private jobs', async () => {
+test('所有者释放时取消、等待并移除其私有后台任务', async () => {
   const jobs = new LocalJobRegistry()
   jobs.attachController()
   const done = deferred<JobOutcome>()

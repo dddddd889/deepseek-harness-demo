@@ -5,14 +5,14 @@ const allowed = new Set([
     'name', 'provider', 'model', 'persistenceRoot', 'cwd', 'apiKeyEnv', 'baseURL', 'system',
     'maxSteps', 'sandboxMode', 'approvalPolicy', 'scriptedResponse',
 ]);
-/** file < environment < CLI；所有层最终走同一严格校验函数。 */
+/** 文件 < 环境变量 < 命令行；所有层最终走同一严格校验函数。 */
 export async function loadProfile(path, env = process.env, cli = {}) {
     let file = {};
     if (path !== undefined) {
         const parsed = JSON.parse(await readFile(path, 'utf8'));
         assertJsonValue(parsed);
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
-            throw new TypeError('Profile 根必须是对象');
+            throw new TypeError('配置文件根节点必须是对象');
         file = parsed;
     }
     for (const key of Object.keys(file))
@@ -40,19 +40,19 @@ export function validateProfile(value) {
     };
     const provider = text('provider');
     if (provider !== 'deepseek' && provider !== 'scripted')
-        throw new TypeError(`Profile provider 无效：${provider}`);
+        throw new TypeError(`配置中的模型提供方无效：${provider}`);
     const sandboxMode = text('sandboxMode');
     if (!['read-only', 'workspace-write', 'danger-full-access'].includes(sandboxMode))
-        throw new TypeError(`Profile sandboxMode 无效：${sandboxMode}`);
+        throw new TypeError(`配置中的沙箱模式无效：${sandboxMode}`);
     const approvalPolicy = text('approvalPolicy');
     if (approvalPolicy !== 'ask' && approvalPolicy !== 'never')
         throw new TypeError(`Profile approvalPolicy 无效：${approvalPolicy}`);
     const maxSteps = value.maxSteps;
     if (!Number.isSafeInteger(maxSteps) || maxSteps <= 0)
-        throw new TypeError('Profile maxSteps 必须为正整数');
+        throw new TypeError('配置中的最大步骤数必须为正整数');
     const apiKeyEnv = text('apiKeyEnv');
     if (!/^[A-Z_][A-Z0-9_]*$/.test(apiKeyEnv))
-        throw new TypeError('Profile apiKeyEnv 不是合法环境变量名');
+        throw new TypeError('配置中的密钥环境变量名称不合法');
     const optional = (key) => value[key] === undefined ? undefined : text(key);
     const profile = {
         name: text('name'), provider, model: text('model'),
@@ -65,7 +65,7 @@ export function validateProfile(value) {
         ...optional('scriptedResponse') === undefined ? {} : { scriptedResponse: optional('scriptedResponse') },
     };
     if (profile.provider === 'scripted' && profile.scriptedResponse === undefined)
-        throw new TypeError('scripted provider 需要 scriptedResponse');
+        throw new TypeError('脚本模型提供方需要配置脚本响应');
     return snapshotJson(profile);
 }
 //# sourceMappingURL=profile.js.map

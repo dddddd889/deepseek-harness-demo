@@ -1,4 +1,4 @@
-/** 为冷恢复时的 open turn 生成确定性 tool/step/turn closers。 */
+/** 为冷恢复时未闭合的轮次生成确定性的工具、步骤与轮次闭合事件。 */
 export function interruptedTurnClosers(events) {
     let openTurn = null;
     let openStep = null;

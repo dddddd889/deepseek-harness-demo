@@ -18,7 +18,7 @@ const request = (script: string) => ({
   subagentProvider: 'inproc', parentSession: 'root', parentDepth: 0,
 })
 
-test('worker 脚本动态并发 agent，并产生完整 lifecycle', async () => {
+test('工作线程脚本动态并发智能体，并产生完整生命周期', async () => {
   let active = 0
   let peak = 0
   const { workflows } = engine(async request => {
@@ -48,7 +48,7 @@ test('worker 脚本动态并发 agent，并产生完整 lifecycle', async () => 
   assert.equal(events.filter(type => type === 'agent-end').length, 2)
 })
 
-test('maxConcurrentAgents 限制并发但不改变脚本 Promise.all 语义', async () => {
+test('最大并发智能体数限制并发，但不改变脚本的并行等待语义', async () => {
   let active = 0
   let peak = 0
   const { workflows } = engine(async () => {
@@ -64,7 +64,7 @@ test('maxConcurrentAgents 限制并发但不改变脚本 Promise.all 语义', as
   assert.equal(peak, 1)
 })
 
-test('超过 maxTotalAgents fail closed 并取消已启动 children', async () => {
+test('超过智能体总数上限时以拒绝方式失败，并取消已启动的子智能体', async () => {
   const { workflows } = engine(async (_request, signal) => {
     await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
     return { output: [], stopReason: 'completed' }
@@ -78,7 +78,7 @@ test('超过 maxTotalAgents fail closed 并取消已启动 children', async () =
   assert.match(result.error ?? '', /maxTotalAgents=2/)
 })
 
-test('未声明 phase 导致取消，worker 忙循环则在 grace 后强制收敛', async () => {
+test('未声明阶段会导致取消，工作线程忙循环则在宽限期后强制收敛', async () => {
   const { workflows } = engine()
   const badPhase = await workflows.start(request(`phase('unknown'); return 1`)).result
   assert.equal(badPhase.stopReason, 'cancelled')
@@ -91,7 +91,7 @@ test('未声明 phase 导致取消，worker 忙循环则在 grace 后强制收�
   assert.equal(stopped.error, 'operator stop')
 })
 
-test('child 非 completed 映射为 null，脚本仍可显式决定结果', async () => {
+test('子智能体未完成时映射为空值，脚本仍可显式决定结果', async () => {
   const { workflows } = engine(async () => ({ output: [{ type: 'text', text: 'partial' }], stopReason: 'error' }))
   const result = await workflows.start(request(`
     const child = await agent({ prompt: 'fails' })

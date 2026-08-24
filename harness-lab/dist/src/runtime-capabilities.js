@@ -14,7 +14,7 @@ export function probeRuntime(input = {}) {
         shell,
     };
 }
-/** 对不可降级的能力 fail-fast，并包含可诊断的 capability key。 */
+/** 对不可降级的能力 快速失败，并包含可诊断的 能力键。 */
 export function requireCapability(capabilities, key) {
     const available = key === 'pty' ? capabilities.pty : capabilities.sandbox === 'seatbelt';
     if (!available)

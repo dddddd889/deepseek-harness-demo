@@ -8,7 +8,7 @@ export function encodeSegment(raw) {
         : `~${character.codePointAt(0)?.toString(16).toUpperCase().padStart(4, '0')}`).join('');
     return encoded === '' || encoded === '.' || encoded === '..' ? '~empty' : encoded;
 }
-/** 本地 spill：session 隔离、随机文件名、0600 独占写，并记录摘要校验。 */
+/** 本地溢出存储：会话隔离、随机文件名、0600 独占写，并记录摘要校验。 */
 export class LocalSpillStore {
     #root;
     constructor(root) {
@@ -38,12 +38,12 @@ export class LocalSpillStore {
         const content = await readFile(ref.locator, 'utf8');
         const sha256 = createHash('sha256').update(content).digest('hex');
         if (sha256 !== ref.sha256 || Buffer.byteLength(content, 'utf8') !== ref.bytes) {
-            throw new Error('spill 文件完整性校验失败');
+            throw new Error('溢出文件完整性校验失败');
         }
         return content;
     }
 }
-/** 超阈值时只向模型返回短引用，完整文本进入 spill store。 */
+/** 超阈值时只向模型返回短引用，完整文本进入 溢出存储。 */
 export async function spillIfNeeded(store, input, thresholdBytes) {
     if (Buffer.byteLength(input.content, 'utf8') <= thresholdBytes)
         return { modelText: input.content };

@@ -21,7 +21,7 @@ async function fixture(run: (root: string) => Promise<void>): Promise<void> {
   finally { await rm(root, { recursive: true, force: true }) }
 }
 
-test('flush 后冷恢复保持 header、事件和连续 seq', async () => fixture(async root => {
+test('刷盘后冷恢复保持会话头、事件和连续序号', async () => fixture(async root => {
   const store = await JsonlSessionStore.open(root)
   const created = await store.create('session-a', '/workspace')
   created.session.append('turn/start', { turn: 1 }, 10)
@@ -42,7 +42,7 @@ test('flush 后冷恢复保持 header、事件和连续 seq', async () => fixtur
   await store.dispose()
 }))
 
-test('newline-less crash tail 被截断且修复结果持久化', async () => fixture(async root => {
+test('缺少换行符的崩溃尾部会被截断，并持久化修复结果', async () => fixture(async root => {
   const store = await JsonlSessionStore.open(root)
   const created = await store.create('torn', '/workspace')
   created.session.append('turn/start', { turn: 1 }, 20)
@@ -61,7 +61,7 @@ test('newline-less crash tail 被截断且修复结果持久化', async () => fi
   assert.doesNotMatch(await readFile(store.pathFor('torn'), 'utf8'), /"half"/)
 }))
 
-test('完整但 checksum 错误的记录属于已提交损坏，绝不自动截断', async () => fixture(async root => {
+test('完整但校验和错误的记录属于已提交损坏，绝不自动截断', async () => fixture(async root => {
   const store = await JsonlSessionStore.open(root)
   const created = await store.create('corrupt', '/workspace')
   created.session.append('turn/start', { turn: 1 })
@@ -74,7 +74,7 @@ test('完整但 checksum 错误的记录属于已提交损坏，绝不自动截�
   assert.equal(await readFile(path, 'utf8'), before.replace('"turn":1', '"turn":9'))
 }))
 
-test('恢复悬空已开始工具时合成 unknown result、step/end、interrupted turn/end', async () => fixture(async root => {
+test('恢复悬空工具调用时合成未知结果、步骤结束和已中断轮次结束事件', async () => fixture(async root => {
   const store = await JsonlSessionStore.open(root)
   const created = await store.create('tool-crash', '/workspace')
   created.session.append('turn/start', { turn: 1 }, 100)
@@ -97,7 +97,7 @@ test('恢复悬空已开始工具时合成 unknown result、step/end、interrupt
   await store.dispose()
 }))
 
-test('恢复后 Agent 从下一个 turn 编号继续运行', async () => fixture(async root => {
+test('恢复后智能体从下一个轮次编号继续运行', async () => fixture(async root => {
   const firstStore = await JsonlSessionStore.open(root)
   const created = await firstStore.create('continue', '/workspace')
   created.session.append('turn/start', { turn: 1 })
@@ -122,7 +122,7 @@ test('恢复后 Agent 从下一个 turn 编号继续运行', async () => fixture
   assert.deepEqual((await finalStore.inspect('continue')).events.filter(event => event.type === 'turn/start').map(event => event.data.turn), [1, 2])
 }))
 
-test('fork 在指定 seq 截断、补平边界，并与源日志独立增长', async () => fixture(async root => {
+test('分叉在指定序号截断并补齐边界，随后与源日志独立增长', async () => fixture(async root => {
   const store = await JsonlSessionStore.open(root)
   const source = await store.create('source', '/workspace')
   source.session.append('turn/start', { turn: 1 }, 1)
@@ -152,7 +152,7 @@ test('fork 在指定 seq 截断、补平边界，并与源日志独立增长', a
   assert.equal((await cold.inspect('branch')).events.some(event => event.type === 'sandbox/mode'), true)
 }))
 
-test('危险 session id 被编码为 root 内单个文件名，重复 id 不覆盖', async () => fixture(async root => {
+test('危险会话标识被编码为根目录内的单个文件名，重复标识不会覆盖', async () => fixture(async root => {
   const store = await JsonlSessionStore.open(root)
   const dangerous = '../outside/session'
   const created = await store.create(dangerous, '/workspace')
@@ -163,7 +163,7 @@ test('危险 session id 被编码为 root 内单个文件名，重复 id 不覆�
   assert.equal((await store.inspect(dangerous)).header.cwd, '/workspace')
 }))
 
-test('flush 是进程骤停前的耐久屏障', async () => fixture(async root => {
+test('刷盘是进程骤停前的持久化屏障', async () => fixture(async root => {
   const moduleUrl = pathToFileURL(join(process.cwd(), 'src/session-store.ts')).href
   const script = `
     import { JsonlSessionStore } from ${JSON.stringify(moduleUrl)};

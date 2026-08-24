@@ -1,7 +1,7 @@
 import { Session } from "./session.js";
 import { createToolOutcomeMessage, failureOutcome, ToolRegistry } from "./tools.js";
 import { PermissionService } from "./permissions.js";
-/** 执行一批模型工具调用：安全调用组成并发池，exclusive 调用形成顺序屏障。 */
+/** 执行一批模型工具调用：安全调用组成并发池，独占调用形成顺序屏障。 */
 export async function executeToolCalls(registry, session, turn, step, calls, signal, permissions) {
     const planned = calls.map(call => ({ call, prepared: registry.prepare(call) }));
     let index = 0;
@@ -31,7 +31,7 @@ export async function executeToolCalls(registry, session, turn, step, calls, sig
         }
         for (const item of group)
             appendCall(session, turn, step, item.call);
-        // 审批按模型顺序串行完成；只有获准的工具 body 才进入并发区。
+        // 审批按模型顺序串行完成；只有获准的工具执行体 才进入并发区。
         const authorized = [];
         for (const item of group)
             authorized.push(await authorize(permissions, registry, session, item.prepared, signal));
@@ -48,14 +48,14 @@ export async function executeToolCalls(registry, session, turn, step, calls, sig
         }));
     }
 }
-/** 权限异常也必须成为 tool/result，不能破坏 call/result 配对。 */
+/** 权限异常也必须成为 工具结果，不能破坏 调用与结果 配对。 */
 async function executeAuthorized(registry, permissions, session, prepared, signal) {
     const decision = await authorize(permissions, registry, session, prepared, signal);
     if ('isError' in decision)
         return decision;
     return registry.execute(prepared, signal, decision.mode === undefined ? undefined : { sandboxMode: decision.mode });
 }
-/** 在 body 启动前得到本次调用的有效模式。 */
+/** 在 执行体 启动前得到本次调用的有效模式。 */
 async function authorize(permissions, registry, session, prepared, signal) {
     if (!permissions)
         return {};
@@ -68,15 +68,15 @@ async function authorize(permissions, registry, session, prepared, signal) {
         return failureOutcome(code, error instanceof Error ? error.message : String(error), error instanceof Error ? error.name : 'PermissionError');
     }
 }
-/** PreparedToolCall 的结构守卫。 */
+/** 已准备工具调用的结构守卫。 */
 function isPrepared(value) {
     return 'mode' in value;
 }
-/** 原始 tool arguments 必须在执行前落账。 */
+/** 原始工具参数 必须在执行前落账。 */
 function appendCall(session, turn, step, call) {
     session.append('tool/call', { turn, step, callId: call.id, name: call.name, arguments: call.arguments });
 }
-/** 结果以 tool-result message 落账，供下一次模型请求直接投影。 */
+/** 结果以 工具结果消息 落账，供下一次模型请求直接投影。 */
 function appendResult(session, turn, step, call, outcome) {
     session.append('tool/result', {
         turn, step, callId: call.id, message: createToolOutcomeMessage(call.id, outcome),

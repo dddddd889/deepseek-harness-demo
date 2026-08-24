@@ -24,10 +24,10 @@ try {
     await appendFile(first.pathFor('demo'), '{"torn":');
     const second = await JsonlSessionStore.open(root);
     const resumed = await second.resume('demo');
-    console.log('repair:', resumed.repair);
+    console.log('修复结果：', resumed.repair);
     console.table(resumed.session.events.map(event => ({ seq: event.seq, type: event.type })));
     const branch = await second.fork('demo', 'demo-branch', 2);
-    console.log('fork parent:', branch.header.parent);
+    console.log('分叉会话的父级：', branch.header.parent);
     await second.dispose();
 }
 finally {

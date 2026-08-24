@@ -10,7 +10,7 @@ interface Planned {
   readonly prepared: PreparedToolCall | ToolOutcome
 }
 
-/** 执行一批模型工具调用：安全调用组成并发池，exclusive 调用形成顺序屏障。 */
+/** 执行一批模型工具调用：安全调用组成并发池，独占调用形成顺序屏障。 */
 export async function executeToolCalls(
   registry: ToolRegistry,
   session: Session,
@@ -49,7 +49,7 @@ export async function executeToolCalls(
       index += 1
     }
     for (const item of group) appendCall(session, turn, step, item.call)
-    // 审批按模型顺序串行完成；只有获准的工具 body 才进入并发区。
+    // 审批按模型顺序串行完成；只有获准的工具执行体 才进入并发区。
     const authorized: ({ mode?: SandboxMode } | ToolOutcome)[] = []
     for (const item of group) authorized.push(await authorize(permissions, registry, session, item.prepared, signal))
     const outcomes = await Promise.all(group.map((item, position) => {
@@ -66,7 +66,7 @@ export async function executeToolCalls(
   }
 }
 
-/** 权限异常也必须成为 tool/result，不能破坏 call/result 配对。 */
+/** 权限异常也必须成为 工具结果，不能破坏 调用与结果 配对。 */
 async function executeAuthorized(
   registry: ToolRegistry,
   permissions: PermissionService | undefined,
@@ -79,7 +79,7 @@ async function executeAuthorized(
   return registry.execute(prepared, signal, decision.mode === undefined ? undefined : { sandboxMode: decision.mode })
 }
 
-/** 在 body 启动前得到本次调用的有效模式。 */
+/** 在 执行体 启动前得到本次调用的有效模式。 */
 async function authorize(
   permissions: PermissionService | undefined,
   registry: ToolRegistry,
@@ -97,17 +97,17 @@ async function authorize(
   }
 }
 
-/** PreparedToolCall 的结构守卫。 */
+/** 已准备工具调用的结构守卫。 */
 function isPrepared(value: PreparedToolCall | ToolOutcome): value is PreparedToolCall {
   return 'mode' in value
 }
 
-/** 原始 tool arguments 必须在执行前落账。 */
+/** 原始工具参数 必须在执行前落账。 */
 function appendCall(session: Session, turn: number, step: number, call: ToolCallBlock): void {
   session.append('tool/call', { turn, step, callId: call.id, name: call.name, arguments: call.arguments })
 }
 
-/** 结果以 tool-result message 落账，供下一次模型请求直接投影。 */
+/** 结果以 工具结果消息 落账，供下一次模型请求直接投影。 */
 function appendResult(session: Session, turn: number, step: number, call: ToolCallBlock, outcome: ToolOutcome): void {
   session.append('tool/result', {
     turn, step, callId: call.id, message: createToolOutcomeMessage(call.id, outcome),

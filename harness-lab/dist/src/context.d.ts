@@ -13,17 +13,17 @@ export declare class PluginContext {
     effect(body: EffectBody): Promise<void>;
     /** 发布服务；插件卸载时只撤销自己发布的那个实例。 */
     provide<T>(key: string, value: T): Promise<void>;
-    /** 订阅事件；底层订阅会自动转成当前插件的 Effect。 */
+    /** 订阅事件；底层订阅会自动转成当前插件的副作用。 */
     on(event: string, listener: EventListener): Promise<void>;
-    /** 获取已发布服务；调用方通过稳定 key，而不是具体实现类耦合。 */
+    /** 获取已发布服务；调用方通过稳定键，而不是具体实现类耦合。 */
     get<T>(key: string): T;
     /** 逆序释放资源，保证后注册的依赖先被清理。 */
     dispose(): Promise<void>;
 }
-/** 最小 Harness 容器：管理服务、事件和插件生命周期。 */
+/** 最小框架容器：管理服务、事件和插件生命周期。 */
 export declare class HarnessContext {
     #private;
-    /** 挂载插件；启动失败时回滚已经注册的全部 Effect。 */
+    /** 挂载插件；启动失败时回滚已经注册的全部副作用。 */
     mount(plugin: Plugin): Promise<Disposer>;
     /** 按注册顺序广播同步事件。 */
     emit(event: string, ...args: readonly unknown[]): void;

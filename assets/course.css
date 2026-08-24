@@ -19,9 +19,9 @@ pre { overflow: auto; background: #151b2b; color: #f2f5ff; border-radius: 12px; 
 pre code { background: transparent; padding: 0; }
 table { width: 100%; border-collapse: collapse; font-size: .94rem; }
 th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 12px 10px; }
+td:empty::before { content: "-"; color: var(--muted); }
 th { color: var(--muted); font-weight: 650; }
 .callout { border-left: 4px solid var(--accent); background: var(--soft); padding: 14px 18px; border-radius: 0 10px 10px 0; }
 .check { display: inline-block; color: #19734b; font-weight: 700; }
 .phase { color: var(--accent); font-weight: 700; white-space: nowrap; }
 @media print { main { max-width: none; padding: 20px; } a { color: inherit; } }
-

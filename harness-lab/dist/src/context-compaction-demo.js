@@ -25,15 +25,15 @@ session.append('assistant/message', {
     usage: { inputTokens: 800, outputTokens: 120, cacheReadTokens: 100 },
 });
 session.append('user/message', user('最近问题'));
-console.log('压缩前 surface:', deriveSurface(session.events).map(event => event.seq));
-console.log('压缩前估算:', measureTokens(session.events));
-console.log('压缩前压力:', projectContextPressure(session.events, 4_096));
+console.log('压缩前模型可见面：', deriveSurface(session.events).map(event => event.seq));
+console.log('压缩前估算：', measureTokens(session.events));
+console.log('压缩前压力：', projectContextPressure(session.events, 4_096));
 await compactRange(session, { start: 0, end: 1 }, {
     summarize: async (messages) => `已总结 ${messages.length} 条早期消息：讨论了一个历史问题。`,
 });
-console.log('压缩后 surface:', deriveSurface(session.events).map(event => event.seq));
-console.log('模型可见消息:', deriveMessages(session.events).map(message => message.content));
-console.log('压缩后压力:', projectContextPressure(session.events, 4_096));
+console.log('压缩后模型可见面：', deriveSurface(session.events).map(event => event.seq));
+console.log('模型可见消息：', deriveMessages(session.events).map(message => message.content));
+console.log('压缩后压力：', projectContextPressure(session.events, 4_096));
 console.table(session.events.map(event => ({ seq: event.seq, type: event.type, surfaceOp: JSON.stringify(event.surfaceOp ?? '-') })));
 const root = await mkdtemp(join(tmpdir(), 'harness-context-demo-'));
 try {
@@ -42,8 +42,8 @@ try {
         suggestedName: 'tool-result.txt',
         content: '一段很大的工具结果。'.repeat(200),
     }, 128);
-    console.log('模型收到:', spilled.modelText);
-    console.log('spill 引用:', spilled.ref);
+    console.log('模型收到：', spilled.modelText);
+    console.log('溢出存储引用：', spilled.ref);
 }
 finally {
     await rm(root, { recursive: true, force: true });

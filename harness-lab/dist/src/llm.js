@@ -1,5 +1,5 @@
 import { assertNever, createMessage } from "./domain.js";
-/** Provider 路由与错误边界；消费者永远看到一个终止 finish，而不是裸异常。 */
+/** 提供方路由与错误边界；消费者永远看到一个终止帧，而不是裸异常。 */
 export class LlmRuntime {
     #providers = new Map();
     register(id, provider) {
@@ -11,7 +11,7 @@ export class LlmRuntime {
     async *stream(options, signal) {
         const provider = this.#providers.get(options.provider);
         if (!provider) {
-            yield failureFinish('UNKNOWN_PROVIDER', `找不到 LLM Provider：${options.provider}`);
+            yield failureFinish('UNKNOWN_PROVIDER', `找不到大模型提供方：${options.provider}`);
             return;
         }
         try {
@@ -34,7 +34,7 @@ export class LlmRuntime {
         }
     }
 }
-/** 可脚本化 Provider：测试和调试无需网络，也能精确控制每个 chunk。 */
+/** 可脚本化提供方：测试和调试无需网络，也能精确控制每个数据块。 */
 export class ScriptedLlmProvider {
     #chunks;
     #delayMs;
@@ -51,7 +51,7 @@ export class ScriptedLlmProvider {
         }
     }
 }
-/** 将可交错的 delta 流确定性组装成最终 assistant message。 */
+/** 将可交错的增量流确定性组装成最终助手消息。 */
 export class BlockAssembler {
     #partials = new Map();
     #order = [];
@@ -93,7 +93,7 @@ export class BlockAssembler {
                 return assertNever(chunk);
         }
     }
-    /** 只允许首次出现的 index 决定顺序，避免交错 delta 改写块顺序。 */
+    /** 只允许首次出现的 索引决定顺序，避免交错增量 改写块顺序。 */
     ensure(index, blockType) {
         let partial = this.#partials.get(index);
         if (!partial) {
@@ -125,7 +125,7 @@ export class BlockAssembler {
         return createMessage({ role: 'assistant', content: this.blocks(), source: { kind: 'model', provider, model } });
     }
 }
-/** 将计时器与 AbortSignal 绑定，取消后不遗留后台定时任务。 */
+/** 将计时器与 取消信号 绑定，取消后不遗留后台定时任务。 */
 function abortableDelay(ms, signal) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(done, ms);
@@ -140,7 +140,7 @@ function abortableDelay(ms, signal) {
         signal.addEventListener('abort', cancelled, { once: true });
     });
 }
-/** 构造 Provider 异常对应的协议终止帧。 */
+/** 构造 提供方异常对应的协议终止帧。 */
 function failureFinish(code, message) {
     return { type: 'finish', reason: { kind: 'error', failure: { code, message } } };
 }

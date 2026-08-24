@@ -11,7 +11,7 @@ import { SkillRegistry } from './skills.ts'
 import { ToolRegistry } from './tools.ts'
 import { WebRuntime, WebRuntimeError } from './web-runtime.ts'
 
-test('统一能力目录按 kind/id 稳定列出并随 disposer 撤销', () => {
+test('统一能力目录按类型和标识稳定列出，并随释放操作撤销', () => {
   const catalog = new CapabilityCatalog()
   const dispose = catalog.register({ kind: 'lsp', id: 'ts', provider: 'stdio', description: 'TypeScript' })
   catalog.register({ kind: 'web-search', id: 'deepseek', provider: 'deepseek', description: 'Search' })
@@ -20,7 +20,7 @@ test('统一能力目录按 kind/id 稳定列出并随 disposer 撤销', () => {
   assert.equal(catalog.list('lsp').length, 0)
 })
 
-test('Web provider 选择不依赖注册顺序，多候选必须显式配置', async () => {
+test('网页提供方选择不依赖注册顺序，多候选必须显式配置', async () => {
   const provider = (id: string) => ({
     id,
     available: () => true,
@@ -57,7 +57,7 @@ test('LSP 原子注册扩展路由，冲突不泄露部分映射', async () => {
     (error: unknown) => error instanceof LspRuntimeError && error.code === 'LSP_UNAVAILABLE')
 })
 
-test('Skills 按 rank 选 winner，并区分 model/user invocation', async () => {
+test('技能按优先级选择胜出者，并区分模型调用与用户调用', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-skills-'))
   const project = join(root, 'project')
   const user = join(root, 'user')
@@ -77,7 +77,7 @@ test('Skills 按 rank 选 winner，并区分 model/user invocation', async () =>
   assert.match(skills.render(loaded as NonNullable<typeof loaded>), /Base directory:/)
 })
 
-test('MCP 完整分页后注册限定名，并始终用 raw name 调用 transport', async () => {
+test('MCP 完整分页后注册限定名，并始终用原始名称调用传输端', async () => {
   const calls: string[] = []
   const registry = new ToolRegistry()
   const bridge = new McpToolBridge('docs', {
@@ -93,7 +93,7 @@ test('MCP 完整分页后注册限定名，并始终用 raw name 调用 transpor
   assert.deepEqual(calls, ['read-file'])
 })
 
-test('MCP 发现失败保留旧 generation，cursor 循环不会替换工具', async () => {
+test('MCP 发现失败时保留旧代次，游标循环不会替换工具', async () => {
   let broken = false
   const registry = new ToolRegistry()
   const bridge = new McpToolBridge('stable', {
@@ -108,7 +108,7 @@ test('MCP 发现失败保留旧 generation，cursor 循环不会替换工具', a
   assert.deepEqual(registry.schemas().map(tool => tool.name), ['mcp__stable__old'])
 })
 
-test('Attachment 完整解码后内容寻址，引用不泄露本地路径', async () => {
+test('附件完整解码后按内容寻址，引用不泄露本地路径', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-attachments-'))
   const store = new LocalAttachmentStore(root, {
     maxImageBytes: 1_024,

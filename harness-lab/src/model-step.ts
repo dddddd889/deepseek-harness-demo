@@ -8,7 +8,7 @@ export interface ModelStepResult {
   readonly message?: Message
 }
 
-/** 执行一次模型流：先逐帧落账，再组装最终消息；失败流不会伪造 assistant message。 */
+/** 执行一次模型流：先逐帧落账，再组装最终消息；失败流不会伪造助手消息。 */
 export async function runModelStep(
   runtime: LlmRuntime,
   session: Session,

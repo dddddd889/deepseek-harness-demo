@@ -17,7 +17,7 @@ export interface SessionInspection {
     readonly repairedTornBytes: number;
     readonly syntheticClosers: number;
 }
-/** 逐事件 checksummed JSONL Store，提供 flush、冷恢复修复与 fork。 */
+/** 逐事件写入带校验和的 JSONL 存储，提供刷盘、冷恢复修复与分叉。 */
 export declare class JsonlSessionStore {
     #private;
     readonly root: string;
@@ -32,9 +32,9 @@ export declare class JsonlSessionStore {
         session: Session;
         repair: Omit<SessionInspection, 'header' | 'events'>;
     }>;
-    /** 读取已提交前缀；完整坏行拒绝，只有 newline-less 尾部可截断。 */
+    /** 读取已提交前缀；完整坏行拒绝，只有缺少换行符的尾部可截断。 */
     inspect(id: string, repair?: boolean): Promise<SessionInspection>;
-    /** 从源事件前缀创建独立文件；切在 turn 中间时先合成 interrupted closers。 */
+    /** 从源事件前缀创建独立文件；切在 轮次中间时先合成中断闭合事件。 */
     fork(sourceId: string, targetId: string, atSeq?: number): Promise<{
         header: SessionHeader;
         session: Session;

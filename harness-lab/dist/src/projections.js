@@ -1,4 +1,4 @@
-/** 重放 append/replace 得到当前模型可见事件；replace 边界必须仍在 surface 上。 */
+/** 重放 追加与替换 得到当前模型可见事件；替换 边界必须仍在 模型可见面 上。 */
 export function deriveSurface(events) {
     const surface = [];
     for (const event of events) {
@@ -21,7 +21,7 @@ export function deriveSurface(events) {
     }
     return surface;
 }
-/** 从事实日志派生发给模型的消息历史；流式增量和纯 usage 消息不进入上下文。 */
+/** 从事实日志派生发给模型的消息历史；流式增量和纯 用量 消息不进入上下文。 */
 export function deriveMessages(events) {
     const messages = [];
     for (const event of deriveSurface(events)) {
@@ -34,7 +34,7 @@ export function deriveMessages(events) {
     }
     return messages;
 }
-/** 按 turn/step 覆盖 usage 样本，避免 chunk 与最终 message 对同一次请求重复计费。 */
+/** 按 轮次与步骤 覆盖 用量 样本，避免 数据块 与最终 消息 对同一次请求重复计费。 */
 export function foldTokenUsage(events) {
     const samples = new Map();
     for (const event of events) {
@@ -67,7 +67,7 @@ export function foldTokenUsage(events) {
     }
     return { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens };
 }
-/** 重放事件并校验 turn/step/tool 生命周期；错误携带 seq，便于定位损坏日志。 */
+/** 重放事件并校验 轮次与步骤/工具 生命周期；错误携带 序号，便于定位损坏日志。 */
 export function inspectLifecycle(events) {
     let openTurn = null;
     let openStep = null;

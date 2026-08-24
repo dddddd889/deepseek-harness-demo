@@ -1,4 +1,4 @@
-/** 最小 DeepSeek SSE Adapter；只负责 HTTP/Wire 与 Harness StreamChunk 之间的翻译。 */
+/** 最小 DeepSeek SSE 适配器；只负责 HTTP 线协议与框架流式数据块之间的翻译。 */
 export class DeepSeekProvider {
     #apiKey;
     #baseURL;
@@ -21,11 +21,11 @@ export class DeepSeekProvider {
         if (!response.ok)
             throw new Error(`DeepSeek HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
         if (!response.body)
-            throw new Error('DeepSeek 响应缺少流 body');
+            throw new Error('DeepSeek 响应缺少流式正文');
         yield* translateDeepSeek(parseSse(response.body));
     }
 }
-/** DeepSeek prompt_tokens 包含缓存命中；转换成 Harness 互斥 token 桶。 */
+/** DeepSeek 输入词元数包含缓存命中；转换成框架的互斥词元桶。 */
 export function mapDeepSeekUsage(usage) {
     const cacheRead = usage.prompt_tokens_details?.cached_tokens ?? usage.prompt_cache_hit_tokens;
     const reasoning = usage.completion_tokens_details?.reasoning_tokens;
@@ -36,7 +36,7 @@ export function mapDeepSeekUsage(usage) {
         ...(reasoning === undefined ? {} : { reasoningTokens: reasoning }),
     };
 }
-/** 将 DeepSeek data payload 翻译为稳定的块协议，并保证 usage 位于 finish 之前。 */
+/** 将 DeepSeek 数据载荷翻译为稳定的块协议，并保证用量位于结束帧之前。 */
 export async function* translateDeepSeek(payloads) {
     let nextIndex = 0;
     let text;
@@ -116,7 +116,7 @@ export async function* translateDeepSeek(payloads) {
     }
     throw new Error('DeepSeek SSE 在 [DONE] 前结束');
 }
-/** 解析跨任意网络 chunk 边界的 SSE data 帧。 */
+/** 解析跨任意网络数据块边界的 SSE 数据帧。 */
 async function* parseSse(body) {
     const decoder = new TextDecoder();
     let buffer = '';
@@ -133,7 +133,7 @@ async function* parseSse(body) {
         }
     }
 }
-/** 将 Harness 请求映射为 DeepSeek Chat Completions 请求。 */
+/** 将框架请求映射为 DeepSeek 对话补全请求。 */
 function serializeRequest(options) {
     return {
         model: options.model,
@@ -148,7 +148,7 @@ function serializeRequest(options) {
         ...(options.maxTokens === undefined ? {} : { max_tokens: options.maxTokens }),
     };
 }
-/** 一个 Harness message 可能拆成多个 DeepSeek tool 消息。 */
+/** 一个框架消息可能拆成多个 DeepSeek 工具消息。 */
 function serializeMessage(message) {
     if (message.content.some(block => block.type === 'image')) {
         throw new Error('当前 DeepSeek Chat Adapter 不支持图片输入；请配置支持 image block 的模型适配器');
@@ -172,7 +172,7 @@ function serializeMessage(message) {
             }),
         }];
 }
-/** 映射 Provider 的终止原因。 */
+/** 映射 提供方的终止原因。 */
 function mapFinish(reason) {
     if (reason === 'stop')
         return { kind: 'stop' };
@@ -182,7 +182,7 @@ function mapFinish(reason) {
         return { kind: 'max-tokens' };
     return { kind: 'error', failure: { code: reason.toUpperCase(), message: `DeepSeek 停止：${reason}` } };
 }
-/** 关闭一个 Provider block，保留工具原始 JSON 参数。 */
+/** 关闭一个提供方内容块，保留工具原始 JSON 参数。 */
 function closeBlock(block) {
     if (block.kind === 'text')
         return { type: 'text', text: block.text };

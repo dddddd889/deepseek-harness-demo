@@ -23,7 +23,7 @@ export declare class HeadlessConversation {
     runContent(content: readonly ContentBlock[], signal?: AbortSignal): Promise<HeadlessTurn>;
     close(): Promise<void>;
 }
-/** 无 HTTP 的 Host：Profile、Provider、Session Store 与 Agent 的统一装配入口。 */
+/** 无 HTTP 的宿主：配置、提供方、会话存储与智能体的统一装配入口。 */
 export declare class HeadlessHost {
     #private;
     readonly profile: HarnessProfile;

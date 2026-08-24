@@ -38,9 +38,9 @@ try {
     catalog.register({ kind: 'web-search', id: 'fake-search', provider: 'fake-search', description: '离线可调试搜索' });
     catalog.register({ kind: 'lsp', id: 'fake-ts', provider: 'fake-ts', description: '离线可调试 LSP' });
     console.table(catalog.list());
-    console.log('按需加载 skill:', await skills.get('explain'));
-    console.log('Web:', await web.search('DeepSeek Harness', 3));
-    console.log('LSP:', await lsp.query({ operation: 'hover', filePath: 'src/a.ts', line: 3, character: 5, workspaceRoot: root }));
+    console.log('按需加载技能：', await skills.get('explain'));
+    console.log('网页搜索结果：', await web.search('DeepSeek Harness', 3));
+    console.log('语言服务结果：', await lsp.query({ operation: 'hover', filePath: 'src/a.ts', line: 3, character: 5, workspaceRoot: root }));
 }
 finally {
     await rm(root, { recursive: true, force: true });

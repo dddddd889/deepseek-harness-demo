@@ -6,7 +6,7 @@
 
 1. 用 VS Code 打开仓库根目录，而不是只打开 `harness-lab/`。
 2. 安装工作区推荐的官方扩展 `oven.bun-vscode`。
-3. 在 VS Code 任务面板运行 `Harness · Bun install`。
+3. 在 VS Code 任务面板运行 `Harness · 安装依赖`。
 4. 在源码行号左侧设置断点。
 5. 打开 Run and Debug，选择对应阶段配置，按 `F5`。
 
@@ -22,25 +22,25 @@ bun test --max-concurrency=1 <阶段测试文件>
 
 | 阶段 | VS Code 配置 |
 |---|---|
-| 插件内核 | `01 · Plugin Kernel` |
-| Domain 协议 | `02 · Domain Protocol` |
-| Session 投影 | `03 · Session Projections` |
-| LLM / DeepSeek | `04 · Streaming LLM` / `04b · DeepSeek Provider` |
-| Agent / Tools | `05 · Agent Loop` / `06 · Tool Pipeline` |
-| 本地能力 | `07a · Workspace FS` / `07b · Process Shell PTY` |
-| 权限与恢复 | `08 · Permissions Sandbox` / `09 · Persistence Recovery` |
-| 上下文与外部能力 | `10 · Context Compaction` / `11 · External Capabilities` |
-| 编排 | `12a · Jobs` / `12b · Subagents` / `12c · Workflow` |
-| Host / Server / Web | `13 · Headless CLI` / `14 · Agent Server` / `15 · Web Client` |
-| 观测与加固 | `16a · Telemetry` / `16b · Cost Projection` / `16c · Hardening HMR` |
+| 插件内核 | `01 · 插件内核` |
+| Domain 协议 | `02 · 领域协议` |
+| Session 投影 | `03 · 会话投影` |
+| LLM / DeepSeek | `04 · 流式模型` / `04b · DeepSeek 提供方` |
+| Agent / Tools | `05 · 智能体循环` / `06 · 工具管线` |
+| 本地能力 | `07a · 工作区文件系统` / `07b · 进程、终端与伪终端` |
+| 权限与恢复 | `08 · 权限与沙箱` / `09 · 持久化与恢复` |
+| 上下文与外部能力 | `10 · 上下文压缩` / `11 · 外部能力` |
+| 编排 | `12a · 后台任务` / `12b · 子智能体` / `12c · 工作流` |
+| Host / Server / Web | `13 · 无界面命令行` / `14 · 智能体服务` / `15 · 网页客户端` |
+| 观测与加固 | `16a · 遥测` / `16b · 成本投影` / `16c · 加固与热重载` |
 
-`00 · 当前 TypeScript 文件` 可调试当前打开的 demo 或普通 `.ts` 入口。`Web Server · 本地调试` 启动带本地开发 token 的服务；真实 DeepSeek 请求仍从环境继承 `DEEPSEEK_API_KEY`。
+`00 · 当前 TypeScript 文件` 可调试当前打开的 demo 或普通 `.ts` 入口。`网页服务 · 本地调试` 启动带本地开发 token 的服务；真实 DeepSeek 请求仍从环境继承 `DEEPSEEK_API_KEY`。
 
 ## Tasks
 
-- `Harness · Typecheck`
-- `Harness · All tests`
-- `Harness · Verify release`（默认测试任务，快捷键通常为 `Cmd/Ctrl+Shift+B` 后选择）
+- `Harness · 类型检查`
+- `Harness · 全部测试`
+- `Harness · 发布验收`（默认测试任务，快捷键通常为 `Cmd/Ctrl+Shift+B` 后选择）
 
 ## 常见问题
 
