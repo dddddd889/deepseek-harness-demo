@@ -6,6 +6,14 @@
   <h1>第 14 课：Profile、Bundle、CLI 与 Headless Host</h1>
   <p class="lead">同一套 Runtime 不应为 CLI、测试和未来 Web Server 各装配一次。本课建立稳定 composition root：Profile 决定部署数据，Bundle 决定插件图，Host 提供用例 API，CLI 只翻译进程协议。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>分层配置、插件包装配、无界面宿主、命令行协议、会话创建与恢复。</td></tr>
+    <tr><th>涉及模块</th><td><code>HarnessProfile</code>、<code>HarnessBundle</code>、<code>HeadlessHost</code>、CLI 解析器和进程入口。</td></tr>
+    <tr><th>白话解释</th><td>把所有零件集中在一个装配入口接好，命令行只负责把参数和输入翻译成宿主调用。</td></tr>
+    <tr><th>解决的问题</th><td>避免 CLI、测试和服务端各自复制一套初始化逻辑，确保不同产品入口共享相同运行和恢复语义。</td></tr>
+  </tbody></table>
+
   <h2>四层边界</h2>
   <pre><code>CLI argv/stdin/stdout/SIGINT
           │ 翻译

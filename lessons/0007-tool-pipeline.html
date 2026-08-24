@@ -6,6 +6,14 @@
   <h1>第 7 课：工具管线与多 Step Agent</h1>
   <p class="lead">模型只产生原始 tool-call；Registry 才拥有 schema 和函数。工具结果落账后，Agent 使用同一 Session 投影发起下一 step。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>工具注册、参数校验、调用准备、并发调度、结果规范化和多步骤循环。</td></tr>
+    <tr><th>涉及模块</th><td><code>ToolRegistry</code>、JSON Schema 校验器、工具调度器、<code>HarnessAgent</code>。</td></tr>
+    <tr><th>白话解释</th><td>模型只填写“想调用什么和传什么参数”，真正能不能执行、怎么执行由工具管线把关。</td></tr>
+    <tr><th>解决的问题</th><td>阻止坏参数和未知工具进入业务函数，统一异常结果，并安全地支持并行工具与连续模型步骤。</td></tr>
+  </tbody></table>
+
   <h2>完整工具回路</h2>
   <pre><code>step 1 / assistant message
           │ tool-call(name, raw JSON, callId)

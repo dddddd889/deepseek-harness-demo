@@ -10,6 +10,14 @@
   <h1>第 2 课：最小可逆插件内核</h1>
   <p class="lead">这一阶段只解决一个问题：能力怎样动态加入 Harness，又怎样在热重载、失败或退出时完整撤销。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>服务注册、插件装载、事件订阅、清理栈、失败回滚和卸载。</td></tr>
+    <tr><th>涉及模块</th><td><code>Context</code>、<code>Service</code>、<code>Plugin</code>、<code>Effect</code>、事件总线。</td></tr>
+    <tr><th>白话解释</th><td>插件像可插拔电器：插上就获得能力，拔掉时电线、监听器和资源都必须一起收走。</td></tr>
+    <tr><th>解决的问题</th><td>防止热重载和启动失败后遗留服务、监听器或进程，为后续能力提供统一生命周期。</td></tr>
+  </tbody></table>
+
   <h2>四个最小抽象</h2>
   <table>
     <thead><tr><th>抽象</th><th>职责</th><th>本课实现</th></tr></thead>
@@ -82,4 +90,3 @@ fail  0</code></pre>
   <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
 </main></body>
 </html>
-

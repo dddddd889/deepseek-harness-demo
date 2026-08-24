@@ -6,6 +6,14 @@
   <h1>第 8 课：文件系统、子进程、Shell 与 PTY</h1>
   <p class="lead">本地能力不是一个万能 bash 函数，而是四层独立 seam：路径、进程、命令解释和交互终端。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>工作区文件读写、子进程、终端命令、伪终端、输出溢出和进程清理。</td></tr>
+    <tr><th>涉及模块</th><td><code>WorkspaceFs</code>、<code>LocalProcessRuntime</code>、<code>LocalShell</code>、<code>PTY</code>、溢出存储。</td></tr>
+    <tr><th>白话解释</th><td>把“碰文件”和“跑程序”拆成受控能力，而不是把整台机器直接交给模型。</td></tr>
+    <tr><th>解决的问题</th><td>防止路径逃逸、凭证泄漏和孤儿进程，同时支持真实编码任务需要的文件、命令与交互终端。</td></tr>
+  </tbody></table>
+
   <h2>分层</h2>
   <pre><code>Agent Tool
   ├── fs_read/write/list/search ──&gt; WorkspaceFs
