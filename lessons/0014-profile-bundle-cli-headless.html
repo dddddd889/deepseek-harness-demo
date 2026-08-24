@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 14 课：Profile、Bundle、CLI 与 Headless Host</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 14 课：Profile、Bundle、CLI 与 Headless Host</h1>
+  <p class="lead">同一套 Runtime 不应为 CLI、测试和未来 Web Server 各装配一次。本课建立稳定 composition root：Profile 决定部署数据，Bundle 决定插件图，Host 提供用例 API，CLI 只翻译进程协议。</p>
+
+  <h2>四层边界</h2>
+  <pre><code>CLI argv/stdin/stdout/SIGINT
+          │ 翻译
+          ▼
+HeadlessHost.create | resume | conversation.run | dispose
+          │
+          ▼
+Bundle: profile → session-store → llm-provider → runtime plugins
+          │
+          ▼
+Profile: JSON file < environment < CLI overrides</code></pre>
+
+  <table><thead><tr><th>层</th><th>负责</th><th>不负责</th></tr></thead><tbody>
+    <tr><td>Profile</td><td>模型、路径、权限默认值、部署选择</td><td>live service 或 API key 值</td></tr>
+    <tr><td>Bundle</td><td>有序 mount、失败回滚、逆序 dispose</td><td>用户任务</td></tr>
+    <tr><td>Headless Host</td><td>Session/Agent 生命周期与持久化屏障</td><td>argv 与终端格式</td></tr>
+    <tr><td>CLI</td><td>参数、JSONL/文本输出、stdin、退出码、SIGINT</td><td>直接构造 Agent 内部组件</td></tr>
+  </tbody></table>
+
+  <h2>配置规则</h2>
+  <pre><code>profile.json
+  provider/model/persistenceRoot/cwd/apiKeyEnv/...
+        ↓ strict unknown-field validation
+DSH_LAB_MODEL / DSH_LAB_SANDBOX / ...
+        ↓ same schema
+--model / --provider / --sandbox
+        ↓ same schema
+immutable resolved profile</code></pre>
+  <div class="callout"><strong>Profile 只保存环境变量名，不保存 secret 值。</strong>DeepSeek Provider 每次请求读取 <code>process.env[apiKeyEnv]</code>，支持轮换，也避免密钥进入 Session Event、Profile 快照或调试输出。</div>
+
+  <h2>Headless 恢复路径</h2>
+  <pre><code>process A: --session stable task-1
+  create → Agent turn 1 → flush/fsync → close/dispose
+
+process B: --resume stable task-2
+  checksum/repair → Session replay → Agent nextTurn=2
+  → flush/fsync → close/dispose</code></pre>
+  <p>独立进程测试验证了这条路径；它不是同一进程里复用内存对象的“伪恢复”。</p>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:headless
+bun run debug:headless
+bun run cli -- --profile ./profile.json --session demo "分析代码"
+bun run cli -- --profile ./profile.json --resume demo --json "继续"
+bun run cli -- --profile ./profile.json --interactive
+
+# 推荐断点
+# loadProfile / validateProfile：覆盖与诊断
+# HarnessBundle.mount：row mount 与回滚
+# HeadlessHost.create/resume：composition root
+# HeadlessConversation.run：turn + flush durability
+# runCli：进程协议与 finally shutdown</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/profile.ts">Profile Resolver</a></li>
+    <li><a href="../harness-lab/src/bundle.ts">Bundle Composer</a></li>
+    <li><a href="../harness-lab/src/headless-host.ts">Headless Host</a></li>
+    <li><a href="../harness-lab/src/cli.ts">CLI Adapter</a></li>
+    <li><a href="../harness-lab/src/headless.test.ts">冷恢复与 CLI 子进程测试</a></li>
+  </ul>
+  <p>下一课实现 Agent Server：RPC envelope、连接/订阅、幂等命令、背压、鉴权与多 Session 路由。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

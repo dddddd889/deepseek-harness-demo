@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DeepSeek Harness 从零搭建路线</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body><main>
+  <h1>DeepSeek Harness：16 个可调试阶段</h1>
+  <p class="lead">目标不是一次复制整个 monorepo，而是按依赖顺序构建 16 个始终可运行的垂直切片。第 0 阶段是环境基线，不计入能力阶段。</p>
+
+  <div class="callout"><strong>每阶段统一完成定义：</strong>有一个可执行入口、一个最小自动测试、一组断点位置、一份可检查状态产物；上一阶段保持通过后才能进入下一阶段。</div>
+
+  <h2>路线总表</h2>
+  <table>
+    <thead><tr><th>阶段</th><th>新增能力</th><th>最小演示</th><th>主要调试证据</th></tr></thead>
+    <tbody>
+      <tr><td class="phase">0. 基线</td><td>Bun、TypeScript、bun:test</td><td>Hello + 单测</td><td>版本输出、测试报告、源码断点</td></tr>
+      <tr><td class="phase">1. 插件内核</td><td>Context、Service、Plugin、Effect、dispose</td><td>动态挂载/卸载插件</td><td>服务表、事件监听数、卸载日志</td></tr>
+      <tr><td class="phase">2. 领域协议</td><td>Message、ContentBlock、LLM、Tool、Session 类型</td><td>编译期契约测试</td><td>类型检查、JSON round-trip</td></tr>
+      <tr><td class="phase">3. Session 事件账本</td><td>append-only log、seq、surface projection</td><td>重放一轮静态对话</td><td>逐事件 JSONL、投影快照</td></tr>
+      <tr><td class="phase">4. 流式 LLM</td><td>Adapter、StreamChunk、Assembler、Mock LLM</td><td>流式输出文本与 usage</td><td>wire chunk、组装消息、usage</td></tr>
+      <tr><td class="phase">5. Agent Loop</td><td>Inbox、Turn、Step、停止原因</td><td>用户消息→模型回答</td><td>turn/step 边界、状态机日志</td></tr>
+      <tr><td class="phase">6. 工具管线</td><td>Tool Registry、Schema、call/result、超时</td><td>模型调用内存计算器</td><td>pre/execute/post 事件与结果</td></tr>
+      <tr><td class="phase">7. 本地执行世界</td><td>FS、Subprocess、Shell、PTY</td><td>读文件并运行测试</td><td>argv、cwd、stdout/stderr、文件 diff</td></tr>
+      <tr><td class="phase">8. 权限与沙箱</td><td>Approval、Policy、workspace-write、平台沙箱</td><td>允许工作区写、拒绝越界写</td><td>策略判定链、审批记录</td></tr>
+      <tr><td class="phase">9. 持久化与恢复</td><td>JSONL/Zstd、flush、resume、fork</td><td>杀进程后继续会话</td><td>Session Header、连续 seq、interrupted closer</td></tr>
+      <tr><td class="phase">10. 上下文治理</td><td>Token Meter、Compaction、Tool Pruner、Spill</td><td>超长工具结果自动裁剪</td><td>token projection、替换前后 surface</td></tr>
+      <tr><td class="phase">11. 外部能力</td><td>Skills、MCP、Web Fetch/Search、LSP、Attachment</td><td>加载 Skill 并调用 MCP</td><td>能力目录、协议帧、资源生命周期</td></tr>
+      <tr><td class="phase">12. 并发编排</td><td>Jobs、Subagent、spawn/fork、Workflow</td><td>父 Agent 委派两个子任务</td><td>父子谱系、任务状态、合并结果</td></tr>
+      <tr><td class="phase">13. Headless 产品面</td><td>Profile、Bundle、Patch、CLI</td><td>单命令完成 Coding Task</td><td>dump-config、插件树、退出码</td></tr>
+      <tr><td class="phase">14. Agent Server</td><td>WebServer、Connection、Gateway、API Proxy、SSE</td><td>REST 发消息，SSE 收事件</td><td>RPC id、路由、Agent lookup、事件游标</td></tr>
+      <tr><td class="phase">15. Web 与生产闭环</td><td>React Client、Projection、Settings、Telemetry、打包</td><td>完整 Web Agent + 恢复 + 观测</td><td>Client/Host 双端日志、OTLP、E2E</td></tr>
+      <tr><td class="phase">16. 加固</td><td>跨平台、HMR、兼容、发布、故障注入</td><td>构建可分发 CLI 并跑兼容矩阵</td><td>CI gates、崩溃恢复、资源泄漏检查</td></tr>
+    </tbody>
+  </table>
+
+  <h2>固定调试协议</h2>
+  <ol>
+    <li><strong>单元层：</strong>每个状态机或 fold 使用 <code>bun:test</code> 固定输入和精确输出。</li>
+    <li><strong>协议层：</strong>所有跨边界对象可 JSON 序列化，并保存 fixture。</li>
+    <li><strong>运行层：</strong>用 <code>bun --inspect-brk</code> 启动当前阶段入口。</li>
+    <li><strong>事件层：</strong>每个 Turn 输出连续 seq 的事件日志，禁止仅靠 console 文本猜测。</li>
+    <li><strong>故障层：</strong>至少覆盖取消、超时、进程中断和重复请求。</li>
+    <li><strong>回归层：</strong>每阶段保留 smoke test，最终形成 0→16 的累积测试梯。</li>
+  </ol>
+
+  <p><a href="../lessons/0001-zero-baseline.html">第 1 课：建立可调试基线 →</a></p>
+  <p><a href="../lessons/0002-plugin-kernel.html">第 2 课：最小可逆插件内核 →</a></p>
+  <p><a href="../lessons/0003-domain-protocol.html">第 3 课：固定 Agent 领域协议 →</a></p>
+  <p><a href="../lessons/0004-session-projections.html">第 4 课：Session 事件账本与投影 →</a></p>
+  <p><a href="../lessons/0005-streaming-llm.html">第 5 课：可控流式 LLM 与 DeepSeek Adapter →</a></p>
+  <p><a href="../lessons/0006-agent-loop.html">第 6 课：Inbox 驱动的 Agent Loop →</a></p>
+  <p><a href="../lessons/0007-tool-pipeline.html">第 7 课：工具管线与多 Step Agent →</a></p>
+  <p><a href="../lessons/0008-local-capabilities.html">第 8 课：文件系统、子进程、Shell 与 PTY →</a></p>
+  <p><a href="../lessons/0009-permissions-sandbox.html">第 9 课：Permission、Approval 与 Sandbox →</a></p>
+  <p><a href="../lessons/0010-persistence-recovery.html">第 10 课：JSONL 持久化、恢复与 Fork →</a></p>
+  <p><a href="../lessons/0011-context-compaction-spill.html">第 11 课：Token、Surface、Compaction 与 Spill →</a></p>
+  <p><a href="../lessons/0012-external-capabilities.html">第 12 课：Skills、MCP、Web、LSP 与 Attachment →</a></p>
+  <p><a href="../lessons/0013-jobs-subagents-workflows.html">第 13 课：Jobs、子 Agent 与 Workflow →</a></p>
+  <p><a href="../lessons/0014-profile-bundle-cli-headless.html">第 14 课：Profile、Bundle、CLI 与 Headless Host →</a></p>
+  <p><a href="../lessons/0015-agent-server.html">第 15 课：Agent Server →</a></p>
+  <p><a href="../lessons/0016-web-production-loop.html">第 16 课：Web Client 与生产闭环 →</a></p>
+  <p><a href="../lessons/0017-hardening-release.html">第 17 课：可观测、成本与发布加固 →</a></p>
+</main></body>
+</html>

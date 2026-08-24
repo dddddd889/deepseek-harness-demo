@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 13 课：Jobs、子 Agent 与 Workflow</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 13 课：Jobs、子 Agent 与 Workflow</h1>
+  <p class="lead">并发不是 <code>Promise.all</code> 本身，而是身份、所有权、取消、资源收敛和可观察生命周期共同组成的控制面。</p>
+
+  <h2>三层职责</h2>
+  <pre><code>Workflow Engine（动态脚本、phase、fan-out/fan-in、预算）
+      │ agent()
+      ▼
+Subagent Runtime（provider 选择、能力/深度校验、start/end 配对）
+      │ 可选后台化
+      ▼
+Job Registry（id、owner 鉴权、output cursor、wait/kill、清理）</code></pre>
+
+  <table><thead><tr><th>层</th><th>拥有</th><th>不拥有</th></tr></thead><tbody>
+    <tr><td>Job Registry</td><td>身份、状态、访问、通知</td><td>进程/Agent 等执行资源</td></tr>
+    <tr><td>Subagent Runtime</td><td>provider 选择、发布边界、run 生命周期</td><td>具体模型/进程实现</td></tr>
+    <tr><td>Workflow Engine</td><td>worker、脚本预算、child 汇合</td><td>child Agent 的内部 loop</td></tr>
+  </tbody></table>
+
+  <h2>Job 状态机</h2>
+  <pre><code>start preflight ── run() throws ──► 无记录、id 不消耗
+       │
+       ▼
+    running ── kill() 成功 ──► stopping
+       │                         │
+       └──────── done ───────────┘
+                    ▼
+          completed | killed | failed
+
+wait timeout / wait Abort：只离开等待，不取消 Job
+owner dispose：cancel → await done → 删除 private record</code></pre>
+  <p>Job ID 是可预测的 <code>&lt;kind&gt;-N</code>，所以安全边界必须是 owner session 鉴权。unknown 与 foreign 返回相同错误，避免枚举侧信道。</p>
+
+  <h2>子 Agent 发布边界</h2>
+  <ol>
+    <li>检查 provider 是否存在、可用。</li>
+    <li>检查 output schema、深度、工具过滤、persona 是否被 provider 支持。</li>
+    <li><code>provider.start()</code> 完成握手并发布 child。</li>
+    <li>只有此时才发出 <code>subagent/start</code>。</li>
+    <li>任何终态归一为不会 reject 的 result，并发出唯一配对 <code>subagent/end</code>。</li>
+    <li><code>dispose()</code> 取消剩余工作并等待资源静止。</li>
+  </ol>
+
+  <h2>Workflow worker</h2>
+  <pre><code>worker: phase()/log()/agent() ── message ──► Host
+                                           │ semaphore
+                                           │ maxTotalAgents
+                                           ▼
+                                      Subagent Runtime
+                                           │ result/null
+worker Promise 恢复 ◄──────── agent-result ┘</code></pre>
+  <p>脚本运行在独立 Worker Thread，因此死循环不会卡住 Host event loop。Worker 不是安全沙箱；脚本必须来自可信来源。取消先传播给所有 child，并等待 dispose；只有超过 <code>cancelGraceMs</code> 才强制终止。</p>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:orchestration
+bun run debug:jobs
+bun run debug:subagents
+bun run debug:workflow
+
+# 推荐断点
+# LocalJobRegistry.start/#settle/#authorized
+# SubagentRuntime.start：preflight 与 publication
+# WorkflowEngine.start：worker message router
+# executeAgent：semaphore、child start/end、dispose
+# cancel：协作取消与 grace 强制边界</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/jobs.ts">Job Registry</a></li>
+    <li><a href="../harness-lab/src/subagents.ts">Subagent Runtime</a></li>
+    <li><a href="../harness-lab/src/workflow.ts">Worker Workflow Engine</a></li>
+    <li><a href="../harness-lab/src/orchestration-demo.ts">端到端编排演示</a></li>
+    <li><a href="../harness-lab/src/jobs.test.ts">Job 测试</a></li>
+    <li><a href="../harness-lab/src/subagents.test.ts">Subagent 测试</a></li>
+    <li><a href="../harness-lab/src/workflow.test.ts">Workflow 测试</a></li>
+  </ul>
+  <p>下一课实现 Profile、Bundle、CLI 与 Headless Host，把零散插件装配成可部署产品入口。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

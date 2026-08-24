@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 8 课：文件系统、子进程、Shell 与 PTY</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 8 课：文件系统、子进程、Shell 与 PTY</h1>
+  <p class="lead">本地能力不是一个万能 bash 函数，而是四层独立 seam：路径、进程、命令解释和交互终端。</p>
+
+  <h2>分层</h2>
+  <pre><code>Agent Tool
+  ├── fs_read/write/list/search ──&gt; WorkspaceFs
+  └── shell_exec ────────────────&gt; LocalShell
+                                         │
+                                         ▼
+                              LocalProcessRuntime
+                                ├── pipe subprocess
+                                └── Bun Terminal (PTY)</code></pre>
+
+  <table><thead><tr><th>层</th><th>拥有的语义</th><th>不应该拥有</th></tr></thead><tbody>
+    <tr><td>WorkspaceFs</td><td>canonical root、symlink、原子写、搜索上限</td><td>用户审批</td></tr>
+    <tr><td>ProcessRuntime</td><td>环境清洗、进程组、TERM→KILL、spill</td><td>Shell 字符串解释</td></tr>
+    <tr><td>LocalShell</td><td>bash/pwsh 选择、cwd、默认 timeout</td><td>进程回收</td></tr>
+    <tr><td>PTY</td><td>终端分配、write、resize、终端输出</td><td>后台 Job id</td></tr>
+  </tbody></table>
+
+  <h2>文件安全</h2>
+  <pre><code>用户路径
+  → 拒绝绝对路径
+  → resolve(root, relative)
+  → 拒绝词法 .. 逃逸
+  → realpath(existing / nearest ancestor)
+  → 再次拒绝 symlink 逃逸
+  → 执行读写</code></pre>
+  <div class="callout"><strong>只检查字符串前缀不够。</strong><code>workspace/escape -&gt; /outside</code> 看起来位于 root 下，真正访问时却已越界，所以现有路径和可写父目录都必须检查 realpath。</div>
+
+  <h2>进程生命周期</h2>
+  <pre><code>spawn detached process group
+  ├── stdout/stderr → 有限内存前缀 + 完整 spill
+  ├── abort/timeout → SIGTERM
+  ├── grace 到期    → SIGKILL
+  └── runtime dispose → 终止并等待所有后台进程和 PTY</code></pre>
+  <p>父进程环境会默认删除名字匹配 <code>KEY|PASSWORD|SECRET|TOKEN</code> 以及 <code>DSH_*</code> 的变量。只有调用方显式传入的环境项才可以恢复它们。</p>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:local
+bun run debug:fs
+bun run debug:process
+
+# 重点断点
+# WorkspaceFs.resolveExisting / ensureWritableParent
+# LocalProcessRuntime.spawn 的 terminate
+# OutputCollector.push / finish
+# spawnTerminal 的 onData / onExit</code></pre>
+
+  <h2>三方依赖</h2>
+  <p>普通子进程使用 Bun 兼容的进程 API；真实 PTY 使用 Bun 原生 <code>Bun.spawn(..., { terminal })</code>，无需 <code>node-pty</code> 或其他运行时三方包。</p>
+
+  <h2>本阶段验收</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 53
+pass:  53
+fail:  0
+
+覆盖：相对/绝对/符号链接逃逸、原子写、读写/搜索上限、
+环境密钥清洗、非零退出、spill、timeout、abort、SIGKILL 升级、
+dispose 回收、固定 cwd、shell tool、真实 PTY write/resize/exit。</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/workspace-fs.ts">WorkspaceFs 与文件工具</a></li>
+    <li><a href="../harness-lab/src/local-process.ts">受管子进程和 PTY</a></li>
+    <li><a href="../harness-lab/src/local-shell.ts">Shell seam 与工具</a></li>
+    <li><a href="../harness-lab/src/workspace-fs.test.ts">路径安全测试</a></li>
+    <li><a href="../harness-lab/src/local-process.test.ts">进程与 PTY 测试</a></li>
+  </ul>
+  <p>下一课在这些能力之前加入 Permission + Sandbox：read-only、workspace-write、danger-full-access，以及审批后重试。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

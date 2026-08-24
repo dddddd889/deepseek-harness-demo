@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 7 课：工具管线与多 Step Agent</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 7 课：工具管线与多 Step Agent</h1>
+  <p class="lead">模型只产生原始 tool-call；Registry 才拥有 schema 和函数。工具结果落账后，Agent 使用同一 Session 投影发起下一 step。</p>
+
+  <h2>完整工具回路</h2>
+  <pre><code>step 1 / assistant message
+          │ tool-call(name, raw JSON, callId)
+          ▼
+ToolRegistry.prepare
+  ├── 查找工具
+  ├── JSON.parse（失败保留原文）
+  ├── JSON Schema 校验
+  └── 决定 parallel / exclusive
+          │
+          ▼
+append tool/call ──&gt; execute ──&gt; normalize ──&gt; append tool/result
+                                                        │
+                                                        ▼
+                                              step 2 / model request</code></pre>
+
+  <table><thead><tr><th>失败点</th><th>稳定 code</th><th>是否进入下一 step</th></tr></thead><tbody>
+    <tr><td>名字未注册</td><td>UNKNOWN_TOOL</td><td>是，让模型看到错误并修正</td></tr>
+    <tr><td>坏 JSON/schema 不匹配</td><td>INVALID_ARGUMENTS</td><td>是</td></tr>
+    <tr><td>execute 抛异常</td><td>TOOL_EXECUTION_FAILED</td><td>是</td></tr>
+    <tr><td>协作式取消</td><td>TOOL_ABORTED</td><td>否，闭合当前 turn</td></tr>
+    <tr><td>无限工具循环</td><td>MAX_STEPS</td><td>否</td></tr>
+  </tbody></table>
+
+  <h2>并发调度</h2>
+  <pre><code>parallel A ─┐
+parallel B ─┴─ 同时执行 ── 按 A、B 顺序提交结果
+exclusive C ─ 单独执行，形成屏障
+parallel D ─ 下一并发组</code></pre>
+  <div class="callout"><strong>执行顺序不等于提交顺序。</strong>安全工具的 body 可以重叠，但 Session seq、tool/result 和下一模型上下文必须保持模型原始 call 顺序。</div>
+
+  <h2>运行与断点</h2>
+  <pre><code>cd harness-lab
+bun run demo:tools
+bun run debug:tools
+
+# 建议断点
+# ToolRegistry.prepare()：观察 raw → parsed → validated
+# executeToolCalls()：观察 parallel group 与 exclusive barrier
+# ToolRegistry.execute() catch：观察错误归一化
+# HarnessAgent.run() continue：观察 step 1 → step 2</code></pre>
+
+  <h2>本阶段验收</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 38
+pass:  38
+fail:  0
+
+覆盖：坏 JSON、缺字段、额外字段、未知工具、工具异常、
+并发重叠、exclusive 屏障、顺序提交、多 step、取消、MAX_STEPS。</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/tools.ts">Registry、Schema 校验、错误规范化</a></li>
+    <li><a href="../harness-lab/src/tool-execution.ts">并发与屏障调度</a></li>
+    <li><a href="../harness-lab/src/tools.test.ts">工具故障注入测试</a></li>
+    <li><a href="../harness-lab/src/tools-demo.ts">两步工具演示</a></li>
+    <li><a href="../deepseek-harness/packages/core/agent-loop/src/tool-calls.ts">Harness 权威调度实现</a></li>
+  </ul>
+  <p>下一课实现本地能力层：受控文件系统、子进程、Shell 和 PTY。它们会作为普通 ToolDefinition 接入，不侵入 Agent Loop。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

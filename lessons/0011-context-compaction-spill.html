@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 11 课：Token、Surface、Compaction 与 Spill</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 11 课：Token、Surface、Compaction 与 Spill</h1>
+  <p class="lead">长会话治理的核心不是删日志，而是保留事实、缩小模型可见 surface，并把大字节移到受控文件中。</p>
+
+  <h2>先拆开四个量</h2>
+  <table><thead><tr><th>量</th><th>来源</th><th>用途</th><th>是否可计费</th></tr></thead><tbody>
+    <tr><td>累计 TokenUsage</td><td>Session 中 provider usage 事件</td><td>历史统计、成本派生</td><td>可以，但需要带版本的价格表</td></tr>
+    <tr><td>pressureTokens</td><td>最近一次 provider prompt usage</td><td>实测上下文锚点</td><td>不是新增账单</td></tr>
+    <tr><td>projectedTokens</td><td>锚点 + surface 估算变化</td><td>预测下一请求是否超窗</td><td>不可以</td></tr>
+    <tr><td>contextWindow</td><td>路由模型能力</td><td>容量分母</td><td>不可以</td></tr>
+  </tbody></table>
+  <div class="callout"><strong>Cost 存哪里？</strong>本实验与 DeepSeek Harness 都把原始 usage 放在 Session Event，投影可重建累计桶。货币 cost 应由 <code>provider/model + usage + 生效时间/价格表版本</code> 派生；OTel 可复制指标做观测，但不是恢复或账单事实源。</div>
+
+  <h2>事实日志与模型 Surface</h2>
+  <pre><code>append user(seq=0) ─┐
+append assistant(1) ├─ 原始 Session Event 永久保留
+append user(seq=2) ─┘
+
+compaction/start(3)
+compaction/summary(4, shadowedTokens)
+user summary(seq=5, surfaceOp=replace 0..1)
+compaction/end(6)
+
+当前 surface: [5, 2]
+原始 log:      [0, 1, 2, 3, 4, 5, 6]</code></pre>
+  <p>恢复时重放 <code>surfaceOp</code> 即可得到相同模型输入；二次压缩还能替换 seq=5 与后续节点。摘要失败只闭合 start/end 审计 bracket，不产生 replacement。</p>
+
+  <h2>压缩事务的不变量</h2>
+  <ol>
+    <li>在异步摘要前冻结选区及 token 价格。</li>
+    <li>不能切开 assistant tool-call 与对应 tool-result。</li>
+    <li>摘要期间选区发生变化则拒绝提交。</li>
+    <li>摘要估算 token 必须小于被遮蔽内容。</li>
+    <li>先记录 shadow price，再同步提交 replacement。</li>
+    <li>任何失败都不改变当前 surface。</li>
+  </ol>
+
+  <h2>Spill 与 Attachment 不同</h2>
+  <table><thead><tr><th>机制</th><th>对象</th><th>模型看到</th></tr></thead><tbody>
+    <tr><td>Spill</td><td>过大的工具文本输出</td><td>路径/locator、字节数、分段读取提示</td></tr>
+    <tr><td>Attachment</td><td>用户上传的图片等不可变二进制</td><td>内容寻址 attachmentId 与媒体元数据</td></tr>
+  </tbody></table>
+  <p>本地 spill 使用 session 哈希目录、随机文件名、<code>0700</code> 目录、<code>0600</code> 独占写；实验版额外记录 SHA-256，并在读取时复验。</p>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:context
+bun run debug:context
+
+# 推荐断点
+# projectContextPressure：provider 锚点与 surface delta
+# deriveSurface：append/replace 重放
+# selectCompactableRange：保留尾部与工具原子边界
+# compactRange：summary → stability check → replacement
+# LocalSpillStore.saveText/readText：权限与完整性边界</code></pre>
+
+  <h2>本阶段验收</h2>
+  <p>独立测试覆盖：pressure 分桶、工具原子边界、replacement 冷重放与链式替换、压缩后压力下降、摘要失败/不缩小拒绝、spill 路径隔离和篡改检测。</p>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/token-meter.ts">Token Meter</a></li>
+    <li><a href="../harness-lab/src/compaction.ts">Surface Compaction</a></li>
+    <li><a href="../harness-lab/src/spill-store.ts">Local Spill Store</a></li>
+    <li><a href="../harness-lab/src/context-compaction.test.ts">可调试验收测试</a></li>
+    <li><a href="../deepseek-harness/packages/compaction/compaction-basic/src/region.ts">Harness 权威压缩事务</a></li>
+    <li><a href="../deepseek-harness/packages/llm/token-meter/src/surface-projection.ts">Harness 权威 O(1) shadow-price 投影</a></li>
+  </ul>
+  <p>下一课接入 Skills、MCP、Web、LSP 与 Attachment，把外部能力统一成可发现、可授权、可观测的 capability。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

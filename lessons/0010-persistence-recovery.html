@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 10 课：JSONL 持久化、恢复与 Fork</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 10 课：JSONL 持久化、恢复与 Fork</h1>
+  <p class="lead">恢复源是持久化 Session Log，不是 OTel、UI Store 或正在运行的 Agent 对象。本课把“提交了什么”和“什么允许修复”做成字节级协议。</p>
+
+  <h2>文件格式</h2>
+  <pre><code>{ kind: "header", header: { id, format, version, cwd, parent? }, checksum }
+{ kind: "event",  event:  { seq: 0, type, time, data },       checksum }
+{ kind: "event",  event:  { seq: 1, type, time, data },       checksum }
+...</code></pre>
+
+  <table><thead><tr><th>情况</th><th>处理</th><th>原因</th></tr></thead><tbody>
+    <tr><td>最后一段没有换行</td><td>截断到最后完整换行</td><td>writer 永远以换行提交记录，它是 torn tail</td></tr>
+    <tr><td>完整 JSON 行 checksum 错</td><td>拒绝恢复</td><td>这是已提交数据损坏，不能猜测</td></tr>
+    <tr><td>seq 有缺口</td><td>拒绝恢复</td><td>无法证明中间事件语义</td></tr>
+    <tr><td>open turn/step</td><td>追加 deterministic closer</td><td>提供可继续的协议闭包</td></tr>
+    <tr><td>tool/call 无结果</td><td>TOOL_OUTCOME_UNKNOWN</td><td>外部副作用可能已经发生</td></tr>
+  </tbody></table>
+
+  <h2>恢复顺序</h2>
+  <pre><code>read bytes
+  → 找 committed newline prefix
+  → 校验 header identity/version/checksum
+  → 校验每条 event checksum + seq
+  → fsync 截断 torn tail
+  → 合成 tool/result / step/end / interrupted turn/end
+  → fsync closers
+  → 构造 Session
+  → 重放 messages / usage / permissions / lifecycle 投影
+  → Agent 从 max(turn)+1 继续</code></pre>
+
+  <div class="callout"><strong>未知副作用不能自动重试。</strong>如果 <code>tool/call</code> 已持久化而 result 没有，恢复只能声明 <code>TOOL_OUTCOME_UNKNOWN</code>。读操作或幂等操作可评估后重试；写操作必须先检查外部状态。</div>
+
+  <h2>Flush 与骤停</h2>
+  <p><code>Session.append()</code> 进入串行 write-behind 队列；<code>flush()</code> 等待队列并调用文件 <code>fsync</code>。测试用独立 Node 子进程 flush 后直接退出，再由父进程冷恢复，证明耐久边界不是同进程缓存假象。</p>
+
+  <h2>Fork</h2>
+  <pre><code>source events[0..atSeq]
+  → 如果切在 turn 中间，补 interrupted closers
+  → 新 header.parent = { sessionId, seq }
+  → 写入独立 JSONL
+  → 后续 append 互不影响</code></pre>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:persistence
+bun run debug:persistence
+
+# 重点断点
+# Session.onAppend：事件进入 write-behind
+# JsonlSessionStore.flush：耐久屏障
+# inspect：committedEnd 与 checksum
+# interruptedTurnClosers：悬空工具修复
+# fork：prefix 与 lineage</code></pre>
+
+  <h2>本阶段验收</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 70
+pass:  70
+fail:  0
+
+覆盖：flush/reload、半行截断、完整行腐败拒绝、悬空工具、
+interrupted closers、恢复后继续编号、fork 隔离、id 路径编码、
+重复 id 防覆盖、独立进程骤停恢复。</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/session-store.ts">Checksummed JSONL Store</a></li>
+    <li><a href="../harness-lab/src/session-repair.ts">崩溃边界修复</a></li>
+    <li><a href="../harness-lab/src/session-store.test.ts">骤停、损坏、恢复与 fork 测试</a></li>
+    <li><a href="../harness-lab/src/persistence-demo.ts">可观察恢复演示</a></li>
+    <li><a href="../deepseek-harness/packages/session/session-persistence-jsonl/src/index.ts">Harness 权威 JSONL/Zstd 后端</a></li>
+    <li><a href="../deepseek-harness/packages/core/session/src/repair.ts">Harness 权威 interrupted repair</a></li>
+  </ul>
+  <p>下一课实现 context/token budget、compaction 和 attachment spill，控制长会话的模型窗口与内存。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>
