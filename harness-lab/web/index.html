@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DeepSeek Harness Lab</title><link rel="stylesheet" href="/style.css">
+</head><body>
+  <header><h1>DeepSeek Harness Lab</h1><span id="connection" data-state="offline">未连接</span></header>
+  <main>
+    <aside>
+      <section><h2>连接</h2>
+        <label>Bearer Token<input id="token" type="password" autocomplete="off"></label>
+        <label>Session ID<input id="session" value="web-demo"></label>
+        <div class="row"><button id="create">创建</button><button id="resume">恢复</button></div>
+      </section>
+      <section><h2>投影</h2><dl>
+        <dt>最后 seq</dt><dd id="seq">-1</dd><dt>运行</dt><dd id="running">否</dd>
+        <dt>输入 tokens</dt><dd id="inputTokens">0</dd><dt>输出 tokens</dt><dd id="outputTokens">0</dd>
+      </dl></section>
+      <section><h2>事件</h2><ol id="events"></ol></section>
+      <section><h2>待审批</h2><div id="approvals"></div></section>
+    </aside>
+    <section class="conversation">
+      <div id="notice" role="status"></div><div id="messages" aria-live="polite"></div>
+      <form id="composer"><textarea id="prompt" rows="4" placeholder="输入任务，Cmd/Ctrl+Enter 发送"></textarea>
+        <label>图片附件<input id="attachments" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple></label><div id="attachmentList"></div>
+        <div class="row"><button id="send" type="submit">发送</button><button id="cancel" type="button">取消运行</button><button id="retry" type="button" hidden>重试同一命令</button></div>
+      </form>
+    </section>
+  </main><script type="module" src="/app.js"></script>
+</body></html>

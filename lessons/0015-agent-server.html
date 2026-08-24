@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 15 课：Agent Server</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 15 课：Agent Server</h1>
+  <p class="lead">Agent Server 位于 Client 与 Agent Runtime 之间：它不是 Agent Loop 的别名，而是网络信任边界、多 Session 路由器、命令控制面和事件数据面。</p>
+
+  <h2>完整分层</h2>
+  <pre><code>CLI / Web / SDK Client
+        │ Bearer + JSON-RPC / SSE
+        ▼
+┌──────────────── Agent Server ────────────────┐
+│ auth │ envelope │ idempotency │ backpressure│
+│ session router │ active ownership │ shutdown│
+└───────────────────┬──────────────────────────┘
+                    │ HeadlessHost API
+                    ▼
+       Agent Registry / Agent Loop / Inbox
+                    │
+       Session Event Log + Projections
+                    │
+       JSONL/SQLite + Attachment/Spill stores</code></pre>
+
+  <h2>控制面与数据面分开</h2>
+  <table><thead><tr><th>接口</th><th>用途</th><th>关键语义</th></tr></thead><tbody>
+    <tr><td><code>POST /rpc</code></td><td>create/resume/send/cancel/snapshot/close</td><td>JSON-RPC 2.0、request id 幂等、结构化错误</td></tr>
+    <tr><td><code>GET /events</code></td><td>Session Event replay + tail</td><td>SSE id=Session seq、Last-Event-ID、队列预算</td></tr>
+  </tbody></table>
+
+  <h2>一次远程 Turn</h2>
+  <pre><code>Client ─ session.send(id=42) ─► Server
+Server ─ auth/fingerprint/route ─► active Conversation
+Conversation ─ Inbox → Agent.run ─► Session.append(seq=N...)
+Session ─ committed event ─► SSE clients
+Agent ─ turn/end ─► flush/fsync
+Server ─ RPC result ─► Client
+
+重复 id=42 + 相同 params：复用同一 pending/final response
+重复 id=42 + 不同 params：IDEMPOTENCY_CONFLICT</code></pre>
+
+  <h2>恢复在哪里发生</h2>
+  <p><code>session.resume</code> 通过 HeadlessHost 调用 Session Store：checksum、torn-tail repair、interrupted closer、投影重放，再发布 active Conversation。Agent Server 的幂等缓存、SSE 连接和 live Agent 都是易失控制状态，不是恢复源。</p>
+
+  <h2>背压与停机</h2>
+  <ul>
+    <li>SSE 每个连接有独立字节队列；单帧或积压超预算立即断开慢消费者。</li>
+    <li><code>res.write()</code> 返回 false 时等待 drain/close，不无限写入内存。</li>
+    <li>Server close 先停止接收和关闭 SSE，再取消 running Agent，flush/close conversations，最后 dispose Host。</li>
+  </ul>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:server
+bun run debug:server
+
+# 推荐断点
+# AgentServer.#authorize：网络信任边界
+# #rpc：body 限制与幂等表
+# #dispatch：多 Session 路由
+# #events / SseClient.#enqueue：replay+tail 与背压
+# close：取消、flush、Host dispose 顺序</code></pre>
+
+  <h2>验收证据</h2>
+  <p>真实随机端口测试覆盖：错误 token、幂等 replay/conflict、多 Session 隔离、并发 busy/cancel、SSE replay+tail、body 413、SSE 背压断开，以及 Server 关闭后另一个 Host 冷恢复。</p>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/agent-server.ts">Agent Server</a></li>
+    <li><a href="../harness-lab/src/agent-server.test.ts">网络集成测试</a></li>
+    <li><a href="../harness-lab/src/agent-server-demo.ts">可观察 Server Demo</a></li>
+  </ul>
+  <p>下一课实现 Web Client 与生产闭环：客户端投影、断线重连、乐观命令状态、审批 UI、附件上传和端到端恢复。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

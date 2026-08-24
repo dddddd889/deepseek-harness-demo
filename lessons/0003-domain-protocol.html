@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 3 课：固定 Agent 领域协议</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body><main>
+  <h1>第 3 课：固定 Agent 领域协议</h1>
+  <p class="lead">Agent Loop、持久化、Web Server 和 UI 必须讲同一种语言。本课先固定跨边界数据，再开始写行为。</p>
+
+  <h2>协议分层</h2>
+  <pre><code>ContentBlock
+  ├── text / reasoning
+  ├── tool-call
+  └── tool-result
+        ↓
+Message + stable id + source
+        ↓
+StreamChunk / TokenUsage / FinishReason
+        ↓
+SessionEvent&lt;type, data&gt;
+        ↓
+append-only Session</code></pre>
+
+  <table>
+    <thead><tr><th>边界</th><th>必须保留</th><th>不能进入</th></tr></thead>
+    <tbody>
+      <tr><td>模型</td><td>Message、ToolSchema、StreamChunk</td><td>工具执行函数、Service 实例</td></tr>
+      <tr><td>持久化</td><td>SessionEvent、稳定 id、原始 tool arguments</td><td>AbortSignal、Error 实例、闭包</td></tr>
+      <tr><td>UI/Server</td><td>事件标签、seq、time、JSON data</td><td>运行时对象引用</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><strong>为什么工具参数先保留字符串？</strong>模型产生的是原始 JSON 字符串。只有 Tool Registry 知道目标 schema，解析、校验和规范化必须留到工具执行阶段；事件账本保留原文才能忠实复盘模型行为。</div>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run typecheck
+bun test
+bun run demo:protocol
+
+# 在 assertJsonValue、Session.append 或测试 switch 中设断点
+bun run debug:protocol</code></pre>
+
+  <p>协议演示会打印连续的：</p>
+  <pre><code>turn/start         seq 0
+user/message       seq 1
+step/start         seq 2
+request/header     seq 3
+assistant/chunk    seq 4  text-delta
+assistant/chunk    seq 5  usage</code></pre>
+
+  <h2>本阶段的调试闸门</h2>
+  <ol>
+    <li><strong>编译期：</strong><code>SessionEventMap</code> 绑定 event type 与 data；新增变体会迫使消费者处理。</li>
+    <li><strong>运行期：</strong><code>assertJsonValue()</code> 拒绝 undefined、NaN、BigInt、Date、Symbol 和循环引用。</li>
+    <li><strong>身份：</strong>Message 在创建时生成 UUID，克隆并深度冻结。</li>
+    <li><strong>顺序：</strong>Session 独占 seq 分配；恢复日志有缺口立即拒绝。</li>
+    <li><strong>往返：</strong>事件必须满足 <code>JSON.parse(JSON.stringify(x)) === x</code>。</li>
+  </ol>
+
+  <h2>练习</h2>
+  <ol>
+    <li>给 <code>StreamChunk</code> 新增 <code>image-delta</code>，先运行 typecheck，观察穷尽 switch 报错。</li>
+    <li>在一个 Session Event 中放入 <code>new Date()</code>，在 <code>assertJsonValue()</code> 查看失败路径。</li>
+    <li>手工把恢复数组的第二条事件 seq 改为 9，确认 Session 拒绝恢复。</li>
+  </ol>
+
+  <h2>验收结果</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 10
+pass:  10
+fail:  0</code></pre>
+
+  <h2>源码与一手参考</h2>
+  <ul>
+    <li><a href="../harness-lab/src/domain.ts">领域协议</a></li>
+    <li><a href="../harness-lab/src/json.ts">Lossless JSON 边界</a></li>
+    <li><a href="../harness-lab/src/session.ts">最小 Session</a></li>
+    <li><a href="../harness-lab/src/domain.test.ts">协议测试</a></li>
+    <li><a href="../deepseek-harness/packages/core/session/src/types.ts">Harness Session 权威类型</a></li>
+    <li><a href="../deepseek-harness/packages/llm/llm/src/types.ts">Harness LLM 权威类型</a></li>
+  </ul>
+
+  <p>下一课会实现真正的 append-only Session 账本及 surface/history 投影，证明“日志是唯一真源”。遇到任何协议或断点问题，直接继续问我。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body>
+</html>
+

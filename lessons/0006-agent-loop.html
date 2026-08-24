@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 6 课：Inbox 驱动的 Agent Loop</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 6 课：Inbox 驱动的 Agent Loop</h1>
+  <p class="lead">把用户输入、Session、LLM 串成一个不可重入的 turn/step 状态机，并让取消和错误也闭合日志。</p>
+
+  <h2>状态与事件顺序</h2>
+  <pre><code>send() ──&gt; Inbox
+             │ run() 原子认领
+             ▼
+idle ──&gt; running
+          turn/start
+          user/message × N
+          step/start
+          request/header
+          assistant/chunk × N
+          assistant/message（仅成功）
+          step/end
+          turn/end
+             │
+             ▼
+            idle</code></pre>
+
+  <table><thead><tr><th>Finish</th><th>TurnEndReason</th><th>本阶段含义</th></tr></thead><tbody>
+    <tr><td>stop</td><td>completed</td><td>正常完成</td></tr>
+    <tr><td>max-tokens</td><td>max-tokens</td><td>输出达到上限</td></tr>
+    <tr><td>error</td><td>error</td><td>保留结构化 failure</td></tr>
+    <tr><td>aborted</td><td>aborted/user</td><td>取消仍闭合 step/turn</td></tr>
+    <tr><td>tool-calls</td><td>blocked</td><td>等待下一课接入工具执行</td></tr>
+  </tbody></table>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:agent
+bun run debug:agent
+
+# 推荐断点
+# HarnessAgent.run() 的 Inbox splice
+# runModelStep() 的 for-await
+# turn/end reason 映射</code></pre>
+
+  <h2>必须验证的竞态</h2>
+  <ol>
+    <li>同一 Agent 并发 <code>run()</code> 必须拒绝，不能产生交错 seq。</li>
+    <li>运行期间新到的输入不能混进已认领 turn，必须留给下一 turn。</li>
+    <li>取消慢流后仍产生 <code>step/end</code> 与 <code>turn/end</code>。</li>
+    <li>恢复已有 Session 后，下一个 turn 编号不能从 1 重来。</li>
+  </ol>
+
+  <h2>本阶段验收</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 31
+pass:  31
+fail:  0</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/agent.ts">Agent 状态机</a></li>
+    <li><a href="../harness-lab/src/agent.test.ts">竞态、取消和终止测试</a></li>
+    <li><a href="../harness-lab/src/agent-demo.ts">可观察演示</a></li>
+    <li><a href="../deepseek-harness/packages/core/agent-loop/src/agent.ts">Harness 权威 Agent Loop</a></li>
+  </ul>
+  <p>下一课实现工具注册、JSON 参数校验、并发执行、结果落账，并把 tool-calls 从 blocked 变成下一 step。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

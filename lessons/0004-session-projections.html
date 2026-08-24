@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 4 课：Session 事件账本与投影</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body><main>
+  <h1>第 4 课：Session 事件账本与投影</h1>
+  <p class="lead">Session Event Log 是事实源；消息历史、Token 汇总和运行状态都是可以删除并从日志重建的投影。</p>
+
+  <h2>读写边界</h2>
+  <pre><code>LLM stream ── usage chunk ─┐
+final assistant/message ──┼──&gt; append-only Session Event Log
+tool call/result ─────────┘                 │
+                           ┌────────────────┼───────────────┐
+                           ▼                ▼               ▼
+                    model history     token usage      lifecycle
+                      projection       projection       projection</code></pre>
+
+  <table>
+    <thead><tr><th>数据</th><th>事实存放处</th><th>投影规则</th></tr></thead>
+    <tbody>
+      <tr><td>模型上下文</td><td>user/assistant/tool-result 事件中的 Message</td><td>忽略 chunk 和空 assistant message</td></tr>
+      <tr><td>Token usage</td><td>assistant/chunk 或 assistant/message 的 usage</td><td>同一 turn/step 后来的样本覆盖前者，防止重复计数</td></tr>
+      <tr><td>运行位置</td><td>turn、step、tool 事件序列</td><td>重放得到 open turn/step 和 pending tool calls</td></tr>
+      <tr><td>货币 cost</td><td>本阶段没有独立权威字段</td><td>由 TokenUsage × 模型价格派生时必须记录价格版本</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><strong>投影不是备份。</strong>投影缓存丢失不会丢会话；事件日志丢失才会。恢复时先加载日志、验证 seq 连续，再重放投影。</div>
+
+  <h2>运行与断点</h2>
+  <pre><code>cd harness-lab
+bun run typecheck
+bun test
+
+# Chrome 打开 chrome://inspect，在 foldTokenUsage 或 inspectLifecycle 设断点
+bun run debug:projection</code></pre>
+
+  <h2>建议观察的三个断点</h2>
+  <ol>
+    <li><code>deriveMessages()</code>：确认 text-delta 不会污染模型历史。</li>
+    <li><code>samples.set(`${turn}:${step}`, usage)</code>：观察最终 usage 覆盖流式 usage。</li>
+    <li><code>inspectLifecycle()</code> 的 <code>fail()</code>：把 tool/result 的 callId 改错，确认错误包含 seq。</li>
+  </ol>
+
+  <h2>本阶段验收</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 16
+pass:  16
+fail:  0
+
+覆盖：消息身份、usage 去重、生命周期校验、JSON 恢复后投影一致</code></pre>
+
+  <h2>源码与一手参考</h2>
+  <ul>
+    <li><a href="../harness-lab/src/projections.ts">课程投影实现</a></li>
+    <li><a href="../harness-lab/src/projections.test.ts">投影与恢复测试</a></li>
+    <li><a href="../deepseek-harness/packages/core/session/src/surface.ts">Harness 消息 surface 规则</a></li>
+    <li><a href="../deepseek-harness/packages/session/session-projection/src/index.ts">Harness 通用投影注册表</a></li>
+    <li><a href="../deepseek-harness/packages/llm/token-meter/src/usage-projection.ts">Harness TokenUsage 投影</a></li>
+  </ul>
+
+  <p>下一课接入可控的流式 LLM seam：先做 fake provider，再接真实 DeepSeek API，让每个 chunk 都能暂停和复现。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body>
+</html>

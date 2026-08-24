@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 2 课：最小可逆插件内核</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body><main>
+  <h1>第 2 课：最小可逆插件内核</h1>
+  <p class="lead">这一阶段只解决一个问题：能力怎样动态加入 Harness，又怎样在热重载、失败或退出时完整撤销。</p>
+
+  <h2>四个最小抽象</h2>
+  <table>
+    <thead><tr><th>抽象</th><th>职责</th><th>本课实现</th></tr></thead>
+    <tbody>
+      <tr><td>Context</td><td>服务仓库和事件总线</td><td><code>HarnessContext</code></td></tr>
+      <tr><td>Plugin</td><td>一组一起创建、一起销毁的行为</td><td><code>Plugin.apply()</code></td></tr>
+      <tr><td>Service</td><td>通过稳定 key 暴露的直接能力</td><td><code>provide/get</code></td></tr>
+      <tr><td>Effect</td><td>带清理函数的可逆注册</td><td><code>effect/dispose</code></td></tr>
+    </tbody>
+  </table>
+
+  <pre><code>插件挂载
+  ├── provide("clock")  ── disposer A
+  ├── on("message")     ── disposer B
+  └── effect(resource)  ── disposer C
+
+插件卸载
+  └── C → B → A（后进先出）</code></pre>
+
+  <div class="callout"><strong>关键不变量：</strong>插件启动到一半失败，也必须执行已经登记的 disposer。否则一次 HMR 或配置错误就会留下幽灵 Service、重复 listener 或未关闭资源。</div>
+
+  <h2>运行与断点</h2>
+  <pre><code>cd harness-lab
+bun test
+bun run demo
+
+# 在 Chrome DevTools 或 VS Code 附加 9229
+bun run debug:test
+bun run debug:demo</code></pre>
+
+  <p>建议按顺序在以下位置设置断点：</p>
+  <ol>
+    <li><code>HarnessContext.mount()</code>：观察独立 <code>PluginContext</code> 如何创建。</li>
+    <li><code>PluginContext.effect()</code>：观察 disposer 何时进入栈。</li>
+    <li><code>HarnessContext.provide()</code>：观察 Service 的 owner 和实例身份。</li>
+    <li><code>PluginContext.dispose()</code>：观察资源逆序回收。</li>
+    <li><code>mount()</code> 的 catch 分支：观察启动失败如何回滚。</li>
+  </ol>
+
+  <h2>自动验收</h2>
+  <p>测试文件覆盖五个生命周期事实：</p>
+  <ul>
+    <li>Service 在插件卸载后不可访问。</li>
+    <li>Event listener 在插件卸载后不再收到事件。</li>
+    <li>Effect 按后进先出顺序释放。</li>
+    <li>插件启动失败后容器恢复干净状态。</li>
+    <li>两个插件争用同一个 Service key 时失败且不破坏原实例。</li>
+  </ul>
+  <pre><code>tests 5
+pass  5
+fail  0</code></pre>
+
+  <h2>练习：制造一个泄漏</h2>
+  <p>临时删掉 <code>PluginContext.on()</code> 中的 <code>effect()</code> 包装，让监听器直接注册。预测哪个测试失败，再运行测试确认。恢复代码后，回答：</p>
+  <ol>
+    <li>为什么 Service 方法适合直接调用，而策略拦截更适合 Event？</li>
+    <li>为什么 disposer 要做实例身份检查，而不能只按 key 删除？</li>
+    <li>为什么卸载顺序必须和注册顺序相反？</li>
+  </ol>
+
+  <h2>源码与一手参考</h2>
+  <ul>
+    <li><a href="../harness-lab/src/context.ts">本课最小实现</a></li>
+    <li><a href="../harness-lab/src/context.test.ts">生命周期测试</a></li>
+    <li><a href="../deepseek-harness/docs/cordis-primer.zh.md">Cordis Primer</a></li>
+    <li><a href="../deepseek-harness/vendor/cordis/src/fiber.ts">Cordis Fiber/Effect 源码</a></li>
+  </ul>
+
+  <p>遇到断点或练习问题直接继续问我。下一课会在这个内核上加入强类型 Message、LLM、Tool 和 Session 协议。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body>
+</html>
+

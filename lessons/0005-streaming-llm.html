@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 5 课：可控流式 LLM 与 DeepSeek Adapter</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body><main>
+  <h1>第 5 课：可控流式 LLM 与 DeepSeek Adapter</h1>
+  <p class="lead">核心只依赖 StreamChunk 协议。Fake Provider 与真实 DeepSeek Provider 共享同一 Runtime、Assembler 和 Session 落账路径。</p>
+
+  <h2>调用链</h2>
+  <pre><code>GenerateOptions
+      │
+      ▼
+LlmRuntime ── provider route ──&gt; Fake Provider / DeepSeek HTTP SSE
+      │                                  │
+      │          StreamChunk             │
+      ◀──────────────────────────────────┘
+      │
+      ├── 每帧 append assistant/chunk
+      ├── BlockAssembler 组装 content
+      └── 成功后 append assistant/message + usage</code></pre>
+
+  <table>
+    <thead><tr><th>边界</th><th>保证</th><th>调试点</th></tr></thead>
+    <tbody>
+      <tr><td>LlmRuntime</td><td>裸异常、取消都归一为唯一终止 finish</td><td><code>LlmRuntime.stream()</code></td></tr>
+      <tr><td>BlockAssembler</td><td>交错 index 仍按首次出现顺序组装</td><td><code>BlockAssembler.push()</code></td></tr>
+      <tr><td>Model Step</td><td>先写 raw chunk，再写最终 message</td><td><code>runModelStep()</code></td></tr>
+      <tr><td>DeepSeek Adapter</td><td>密钥逐请求解析；SSE、usage 和 finish 翻译</td><td><code>translateDeepSeek()</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><strong>密钥不是领域数据。</strong><code>DEEPSEEK_API_KEY</code> 只在发起 HTTP 请求时解析，不能出现在 RequestHeader、Session Event、日志或 OTel 属性里。</div>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:llm
+bun run typecheck
+bun test
+
+# Fake Provider：调流顺序、异常、取消、Session 落账
+bun run debug:llm
+
+# DeepSeek Adapter：调 SSE 切帧、usage 映射、请求序列化
+bun run debug:deepseek</code></pre>
+
+  <p>Bun 直接执行 TypeScript；本课仍同时要求 <code>tsc</code> typecheck 和真实 <code>bun test</code> 两道闸门，避免只验证类型而没有验证运行时行为。</p>
+
+  <h2>故障注入练习</h2>
+  <ol>
+    <li>让 Provider 输出一个 text delta 后抛异常，确认日志保留半截 chunk，但没有伪造 assistant/message。</li>
+    <li>把 Scripted Provider 延迟设为 1 秒，10ms 后 abort，观察 aborted finish。</li>
+    <li>删掉 SSE 的 <code>[DONE]</code>，确认 Adapter 报协议截断，而不是把半截响应当成功。</li>
+    <li>令 prompt_tokens=100、cache hit=40，确认 inputTokens=60，而非重复计为 100。</li>
+  </ol>
+
+  <h2>本阶段验收</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 25
+pass:  25
+fail:  0
+
+未使用真实 API Key；网络边界通过注入 fetch 完整测试。</code></pre>
+
+  <h2>源码</h2>
+  <ul>
+    <li><a href="../harness-lab/src/llm.ts">Runtime、Fake Provider、Assembler</a></li>
+    <li><a href="../harness-lab/src/model-step.ts">流式落账</a></li>
+    <li><a href="../harness-lab/src/deepseek-provider.ts">真实 DeepSeek Adapter</a></li>
+    <li><a href="../harness-lab/src/llm.test.ts">Runtime 故障注入测试</a></li>
+    <li><a href="../harness-lab/src/deepseek-provider.test.ts">DeepSeek Wire 测试</a></li>
+  </ul>
+
+  <p>下一课实现 Agent Loop：Inbox → turn → step → LLM → tool-call → 下一 step，并明确每一种终止原因。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html><html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 17 课：可观测、成本与发布加固</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 17 课：可观测、成本与发布加固</h1>
+  <p class="lead">最后一层不是再加业务能力，而是证明系统在失败、重载、跨平台和冷启动时仍有清晰边界。</p>
+
+  <h2>三类数据不要混成一份</h2>
+  <pre><code>Session JSONL（权威事实） ──► 恢复 / fork / replay
+        │
+        ├── usage projection × versioned PriceBook ──► Cost（可复算派生值）
+        │
+        └── capture + redact ──► OTel Logs ──► Collector / 检索 / 告警
+                                  best effort，不参与恢复</code></pre>
+  <table><thead><tr><th>数据</th><th>存储位置</th><th>丢失后果</th></tr></thead><tbody>
+    <tr><td>Session Events / usage</td><td>本地 checksummed JSONL</td><td>影响恢复与准确计费输入</td></tr>
+    <tr><td>PriceBook</td><td>部署配置/版本化价格目录</td><td>usage 仍在，但暂时无法定价</td></tr>
+    <tr><td>Cost</td><td>查询时投影或外部账单缓存</td><td>可从 usage + 同版本价目表重算</td></tr>
+    <tr><td>OTel Logs</td><td>SDK 队列与外部 Collector/backend</td><td>只影响观测，不影响 Session 恢复</td></tr>
+  </tbody></table>
+
+  <h2>OTel Logs 在 DeepSeek Harness 中的准确角色</h2>
+  <p>原生实现把 canonical Session Event 的投影映射为两个 logger scope：ledger 与 ops。首个 streaming chunk 表示流开始，完整内容最终由 assistant/message 承载；导出前可挂脱敏 waterfall。同步捕获和 exporter 异常都被隔离，不能反向打断 agent loop。批处理、重试、队列和丢失策略归 OTel SDK；handoff cursor 只代表“交给 SDK”，不代表远端已确认。</p>
+  <p>因此这里采用的是 <strong>OTel Logs</strong>，而不是用 Trace/Metric 重建 Session。若部署需要 traces/metrics，可为 HTTP、LLM、tool latency 和队列深度另加运维信号，但它们仍不是恢复事实源。</p>
+
+  <h2>Cost 为什么是投影</h2>
+  <ul>
+    <li>同一 turn/step 的最终 usage 覆盖流式中间样本，避免重复计费。</li>
+    <li>缓存读写 token 与普通 input 分桶，不能重复相加。</li>
+    <li>按 request/header 的请求时刻选择当时生效价格，而不是按查看账单的今天。</li>
+    <li>金额使用整数皮美元计算；未知模型进入 unpriced，不静默记为 0。</li>
+  </ul>
+
+  <h2>加固边界</h2>
+  <pre><code>Capability Probe ─► seatbelt / process-only / PTY availability
+HotBundle.reload ─► 影子挂载候选 ─成功→原子切换→释放旧代
+                                └失败→回滚候选，旧代继续
+FaultInjector ─► 第 N 次 throw/delay，稳定复现传输与 provider 故障
+Build ─► TypeScript → dist JS + declarations + source maps + Web assets
+Smoke ─► 编译产物 CLI + 插件内核 + JSONL 冷恢复</code></pre>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:observability
+bun run debug:observability
+bun run demo:hardening
+bun run debug:hardening
+
+# 完整发布验收
+bun run verify
+
+# 推荐断点
+# SessionTelemetry.#capture：投影、脱敏、失败隔离
+# projectCost：usage 去重与时间版本价格
+# HotBundle.reload：影子挂载和原子切换
+# FaultInjector.hit：确定性故障点
+# JsonlSessionStore.resume：编译产物冷恢复</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/session-telemetry.ts">Telemetry capture</a></li>
+    <li><a href="../harness-lab/src/cost-projection.ts">Cost projection</a></li>
+    <li><a href="../harness-lab/src/runtime-capabilities.ts">Capability probe</a></li>
+    <li><a href="../harness-lab/src/hot-bundle.ts">Transactional HMR</a></li>
+    <li><a href="../harness-lab/src/fault-injector.ts">Fault injector</a></li>
+    <li><a href="../VERIFICATION.md">完整验收矩阵</a></li>
+  </ul>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

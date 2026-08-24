@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 9 课：Permission、Approval 与 Sandbox</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 9 课：Permission、Approval 与 Sandbox</h1>
+  <p class="lead">策略决定默认权限，审批允许单次严格升级，内核沙箱负责真正执行限制，Session 事件负责审计与恢复。</p>
+
+  <h2>四层职责</h2>
+  <pre><code>Session policy events
+  sandbox/mode + approval/policy
+              │
+              ▼
+PermissionService.authorize
+  ├── 当前模式是否足够 ──────────────&gt; execute
+  ├── 未请求升级且不足 ──────────────&gt; SANDBOX_DENIED
+  └── 请求严格升级
+         │
+         ├── approval/asked
+         ├── answerer / never / unavailable / cancel
+         └── approval/decided
+                  │ allowed-once
+                  ▼
+       ToolExecutionContext.sandboxMode
+                  │
+                  ▼
+         Workspace fence / OS sandbox</code></pre>
+
+  <table><thead><tr><th>概念</th><th>生命周期</th><th>事实位置</th></tr></thead><tbody>
+    <tr><td>Session sandbox mode</td><td>直到下一次切换</td><td>最后一条 sandbox/mode</td></tr>
+    <tr><td>Approval policy</td><td>直到下一次切换</td><td>最后一条 approval/policy</td></tr>
+    <tr><td>allowed-once</td><td>仅当前 call</td><td>asked/decided 审计对</td></tr>
+    <tr><td>实际约束</td><td>每次进程/文件操作</td><td>WorkspaceFs fence / Seatbelt runner</td></tr>
+  </tbody></table>
+
+  <h2>严格升级规则</h2>
+  <pre><code>read-only → workspace-write → danger-full-access
+
+sandbox_permissions 与 justification 必须同时出现；
+目标必须严格宽于当前模式；
+目标还必须满足工具声明的 minimumMode；
+approval/policy=never 时不调用任何 answerer；
+没有 answerer 时 fail closed。</code></pre>
+
+  <div class="callout"><strong>策略检查不是沙箱。</strong>如果只在 TypeScript 里判断后直接启动 bash，恶意或误判命令仍可能越界。本课在 macOS 下实际用 <code>sandbox-exec</code>/Seatbelt 包装 argv；没有可用受限 runner 的平台必须返回 <code>SANDBOX_UNAVAILABLE</code>，不能静默裸跑。</div>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:permissions
+bun run debug:permissions
+
+# 重点断点
+# PermissionService.authorize：模式排序与严格升级
+# requestApproval：asked → answer → decided
+# executeToolCalls.authorize：body 前权限边界
+# LocalSandbox.confine：原 argv → Seatbelt argv</code></pre>
+
+  <h2>恢复规则</h2>
+  <p>恢复不读取 OTel Logs，也不保存内存里的“已批准”布尔值。长期策略由 Session Event 最后写入获胜；一次性批准只证明历史上的那个 call 为什么执行，不能在恢复后复用。</p>
+
+  <h2>本阶段验收</h2>
+  <pre><code>TypeScript strict check: passed
+tests: 62
+pass:  62
+fail:  0
+
+覆盖：默认拒绝、allowed-once、never、无 answerer、非严格升级、
+参数配对、取消/迟到回答、策略恢复、审计损坏、真实 Seatbelt 限制。</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/permissions.ts">权限、审批与审计投影</a></li>
+    <li><a href="../harness-lab/src/local-sandbox.ts">本地内核沙箱 Provider</a></li>
+    <li><a href="../harness-lab/src/tool-execution.ts">工具 body 前授权边界</a></li>
+    <li><a href="../harness-lab/src/permissions.test.ts">权限与真实沙箱测试</a></li>
+    <li><a href="../harness-lab/src/permissions-demo.ts">一次拒绝、一次批准演示</a></li>
+  </ul>
+  <p>下一课实现 JSONL 持久化、崩溃尾修复、resume 与 fork，回答“中断后究竟从哪里恢复”。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

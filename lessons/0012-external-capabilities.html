@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 12 课：Skills、MCP、Web、LSP 与 Attachment</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 12 课：Skills、MCP、Web、LSP 与 Attachment</h1>
+  <p class="lead">外部能力不是一锅“工具”：统一目录负责发现，各能力 seam 保留自己的选择、生命周期和信任边界，最后只有模型可调用操作桥接进 Tool Registry。</p>
+
+  <h2>整体结构</h2>
+  <pre><code>Capability Catalog（摘要/所有权）
+ ├─ Skills Registry ─ project/user/bundled roots ─ list → get body
+ ├─ MCP Bridge ─ JSON-RPC transport ─ tools/list → Tool Registry → tools/call
+ ├─ Web Runtime ─ search/fetch provider selection → web tools
+ ├─ LSP Runtime ─ extension route → semantic query provider → lsp tool
+ └─ Attachment Store ─ decode/limits/content address → ImageAttachmentRef</code></pre>
+
+  <h2>为什么不能只有一个万能接口</h2>
+  <table><thead><tr><th>能力</th><th>身份</th><th>关键不变量</th></tr></thead><tbody>
+    <tr><td>Skill</td><td>kebab-case name</td><td>摘要发现与正文加载分离；低 rank winner；model/user invocation 分离</td></tr>
+    <tr><td>MCP Tool</td><td>(server, rawName)</td><td>公开名限定 namespace；wire 永远用 rawName；完整分页后原子换代</td></tr>
+    <tr><td>Web</td><td>provider id</td><td>执行时选择；多候选时拒绝猜测；结果上限由 seam 再执行</td></tr>
+    <tr><td>LSP</td><td>provider id + extension</td><td>全部扩展原子占用；只暴露语义操作，不暴露任意 JSON-RPC</td></tr>
+    <tr><td>Attachment</td><td>sha256 digest</td><td>完整解码、类型/字节/像素限制；引用不含路径；冷读复验</td></tr>
+  </tbody></table>
+
+  <h2>MCP 换代时序</h2>
+  <pre><code>tools/list(cursor=∅)
+  → tools/list(cursor=next) ...
+  → 校验重复 raw/public name 与 cursor loop
+  → 构造完整 next generation（此时旧工具仍在线）
+  → unregister old
+  → register all next
+  → 若注册冲突：撤销 partial next，并恢复 old</code></pre>
+
+  <h2>Attachment 与恢复</h2>
+  <p>Session Event 只持久化 <code>ImageAttachmentRef</code>：<code>attachmentId</code>、真实 media type、字节数和尺寸。恢复后 store 用 digest 定位不可变对象并复验；路径或临时 bearer URL 不进入协议。Fork 继承历史引用，不复制对象。</p>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:capabilities
+bun run debug:capabilities
+
+# 推荐断点
+# SkillRegistry.refresh/get：winner 与渐进加载
+# McpToolBridge.sync：fetch/swap 两阶段
+# WebRuntime.#resolve：配置、歧义、不可用
+# LspRuntime.register/query：原子扩展路由
+# LocalAttachmentStore.saveImage/readImage：解码与摘要复验</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/capability-catalog.ts">Capability Catalog</a></li>
+    <li><a href="../harness-lab/src/skills.ts">Skills Registry</a></li>
+    <li><a href="../harness-lab/src/mcp-bridge.ts">MCP Tool Bridge</a></li>
+    <li><a href="../harness-lab/src/web-runtime.ts">Web Runtime</a></li>
+    <li><a href="../harness-lab/src/lsp-runtime.ts">LSP Runtime</a></li>
+    <li><a href="../harness-lab/src/attachment-store.ts">Attachment Store</a></li>
+    <li><a href="../harness-lab/src/capabilities.test.ts">离线可调试测试</a></li>
+  </ul>
+  <p>下一课实现 Jobs、子 Agent 与 Workflow，把一次前台 turn 扩展成可取消、可恢复、可汇合的并行工作。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

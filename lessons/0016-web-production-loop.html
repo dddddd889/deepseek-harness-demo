@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 16 课：Web Client 与生产闭环</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+  <h1>第 16 课：Web Client 与生产闭环</h1>
+  <p class="lead">浏览器不是恢复源。可靠 Web Client 先取权威 snapshot，再用 Session seq 追尾事件；断线只丢连接，不丢会话语义。</p>
+
+  <h2>客户端数据流</h2>
+  <pre><code>session.snapshot ─► ClientProjection.reset(events[0..N])
+                              │
+GET /events?after=N ──────────┤
+                              ▼
+                      apply seq=N+1, N+2...
+                              │
+             messages / partial / running / usage
+
+断线：after=lastSeq 重连
+发现 gap：重新 snapshot，不在 UI 猜事件</code></pre>
+
+  <h2>命令与事件为何双通道</h2>
+  <table><thead><tr><th>状态</th><th>来源</th></tr></thead><tbody>
+    <tr><td>按钮 pending / 网络错误 / retry</td><td>RPC request 生命周期，易失 UI 状态</td></tr>
+    <tr><td>用户消息、模型流、工具、审批、turn/end</td><td>Session Event，恢复后仍存在</td></tr>
+    <tr><td>重复发送是否执行两次</td><td>Server request-id 幂等表</td></tr>
+  </tbody></table>
+  <p>网络失败后的“重试”必须复用原 request id；换一个 id 就是新命令，而不是 transport retry。</p>
+
+  <h2>审批闭环</h2>
+  <pre><code>PermissionService → approval/asked Session Event
+                      │ SSE
+Web 显示允许一次/拒绝 ─┤
+                      ▼
+interaction.answer RPC → InteractionBroker first-wins
+                      ▼
+PermissionService → approval/decided → 工具执行或拒绝</code></pre>
+
+  <h2>附件闭环</h2>
+  <pre><code>Browser File bytes ─ POST /attachments ─► decode + limits + SHA-256 store
+Browser ◄──────────── ImageAttachmentRef（无路径/URL）
+session.send(text, refs) ─► Server 冷读复验每个 ref
+                         ─► user/message image block
+恢复 ─► 同一个 durable ref ─► store 复验读取</code></pre>
+  <p>模型适配器必须显式声明 image 支持。当前 DeepSeek Chat adapter 会 fail loud，不会静默丢弃图片；离线 scripted/未来 vision adapter 可消费 image block。</p>
+
+  <h2>Web 安全边界</h2>
+  <ul>
+    <li>Token 只放 Authorization header 和 sessionStorage，不进入 URL。</li>
+    <li>SSE 使用 fetch stream，因此能携带 Bearer header；不使用受限的原生 EventSource。</li>
+    <li>静态路径 realpath containment，拒绝 dot segment/symlink 逃逸。</li>
+    <li>CSP、nosniff、no-referrer、frame-ancestors 防御默认开启。</li>
+    <li>附件读取同样要求鉴权，durable ref 不是公开 bearer URL。</li>
+  </ul>
+
+  <h2>运行与调试</h2>
+  <pre><code>cd harness-lab
+bun run demo:web
+bun run debug:web
+
+# 真实服务（profile 可省略以使用默认 DeepSeek profile）
+DSH_LAB_AUTH_TOKEN='至少16字符的随机token' \
+DEEPSEEK_API_KEY='...' \
+bun run serve:web -- ./profile.json
+
+# 推荐断点
+# ClientProjection.apply：seq/gap
+# AgentClient.follow：snapshot/reconnect
+# AgentServer.#static：同源资源安全
+# InteractionBroker.answer：审批 first-wins
+# #uploadAttachment / session.send：字节到 durable ref</code></pre>
+
+  <h2>源码</h2><ul>
+    <li><a href="../harness-lab/src/client-runtime.ts">Client Runtime</a></li>
+    <li><a href="../harness-lab/web/index.html">Web UI</a></li>
+    <li><a href="../harness-lab/web/app.js">Browser Client</a></li>
+    <li><a href="../harness-lab/src/interactions.ts">Interaction Broker</a></li>
+    <li><a href="../harness-lab/src/web-server-entry.ts">生产启动入口</a></li>
+    <li><a href="../harness-lab/src/client-runtime.test.ts">客户端/审批/附件集成测试</a></li>
+  </ul>
+  <p>下一课是最终加固：遥测、成本投影、故障注入、跨平台降级、HMR、发布构建与完整验收矩阵。</p>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+</main></body></html>

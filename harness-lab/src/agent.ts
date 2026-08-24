@@ -1,0 +1,162 @@
+import { createMessage } from './domain.ts'
+import type { ContentBlock, Message, TurnEndReason } from './domain.ts'
+import { LlmRuntime } from './llm.ts'
+import { runModelStep } from './model-step.ts'
+import { deriveMessages } from './projections.ts'
+import { Session } from './session.ts'
+import { executeToolCalls } from './tool-execution.ts'
+import { ToolRegistry } from './tools.ts'
+import { PermissionService } from './permissions.ts'
+
+export type AgentStatus = 'idle' | 'running'
+
+export interface AgentConfig {
+  readonly provider: string
+  readonly model: string
+  readonly system?: string
+  readonly maxSteps?: number
+}
+
+export interface TurnResult {
+  readonly turn: number
+  readonly reason: TurnEndReason
+  readonly message?: Message
+}
+
+/** 最小 Inbox 驱动 Agent；一次 run 原子认领当时排队的全部用户消息。 */
+export class HarnessAgent {
+  readonly session: Session
+  readonly runtime: LlmRuntime
+  readonly config: AgentConfig
+  readonly tools: ToolRegistry
+  readonly permissions: PermissionService | undefined
+  readonly #inbox: Message[] = []
+  readonly #statusListeners = new Set<(status: AgentStatus) => void>()
+  #status: AgentStatus = 'idle'
+  #abort: AbortController | undefined
+
+  constructor(
+    session: Session,
+    runtime: LlmRuntime,
+    config: AgentConfig,
+    tools = new ToolRegistry(),
+    permissions?: PermissionService,
+  ) {
+    this.session = session
+    this.runtime = runtime
+    this.config = config
+    this.tools = tools
+    this.permissions = permissions
+  }
+
+  get status(): AgentStatus { return this.#status }
+  get pendingMessages(): number { return this.#inbox.length }
+
+  /** 用户输入只进入 Inbox；真正写入 Session 必须等某个 turn 成功认领。 */
+  send(text: string): Message {
+    return this.sendContent([{ type: 'text', text }])
+  }
+
+  /** 接受已通过 Host 边界验证的富内容；Inbox 仍只保存不可变 Message。 */
+  sendContent(content: readonly ContentBlock[]): Message {
+    if (content.length === 0) throw new TypeError('用户消息 content 不能为空')
+    const message = createMessage({ role: 'user', content, source: { kind: 'user' } })
+    this.#inbox.push(message)
+    return message
+  }
+
+  onStatus(listener: (status: AgentStatus) => void): () => void {
+    this.#statusListeners.add(listener)
+    return () => this.#statusListeners.delete(listener)
+  }
+
+  /** 取消当前模型读取；归一化后的 aborted finish 仍会进入 Session。 */
+  cancel(reason = new Error('用户取消')): void {
+    this.#abort?.abort(reason)
+  }
+
+  async run(externalSignal?: AbortSignal): Promise<TurnResult | undefined> {
+    if (this.#status === 'running') throw new Error('Agent 已在运行，禁止并发 run')
+    if (this.#inbox.length === 0) return undefined
+
+    const claimed = this.#inbox.splice(0)
+    const turn = this.nextTurn()
+    this.#abort = new AbortController()
+    const signal = externalSignal
+      ? AbortSignal.any([this.#abort.signal, externalSignal])
+      : this.#abort.signal
+    this.setStatus('running')
+
+    this.session.append('turn/start', { turn })
+    for (const message of claimed) this.session.append('user/message', message)
+    try {
+      const maxSteps = this.config.maxSteps ?? 100
+      for (let step = 1; step <= maxSteps; step += 1) {
+        this.session.append('step/start', { turn, step })
+        const schemas = this.tools.schemas()
+        const model = await runModelStep(this.runtime, this.session, turn, step, {
+          provider: this.config.provider,
+          model: this.config.model,
+          messages: deriveMessages(this.session.events),
+          ...(this.config.system === undefined ? {} : { system: this.config.system }),
+          ...(schemas.length === 0 ? {} : { tools: schemas }),
+        }, signal)
+
+        if (model.finish.kind === 'error' || model.finish.kind === 'aborted') {
+          this.session.append('step/end', { turn, step })
+          const reason: TurnEndReason = model.finish.kind === 'error'
+            ? { kind: 'error', error: model.finish.failure }
+            : { kind: 'aborted', reason: 'user' }
+          this.session.append('turn/end', { turn, reason })
+          return { turn, reason }
+        }
+        if (model.finish.kind === 'max-tokens') {
+          this.session.append('step/end', { turn, step })
+          const reason: TurnEndReason = { kind: 'max-tokens' }
+          this.session.append('turn/end', { turn, reason })
+          return { turn, reason, ...(model.message === undefined ? {} : { message: model.message }) }
+        }
+
+        const calls = model.message?.content.filter(block => block.type === 'tool-call') ?? []
+        if (calls.length > 0) {
+          await executeToolCalls(this.tools, this.session, turn, step, calls, signal, this.permissions)
+          this.session.append('step/end', { turn, step })
+          if (signal.aborted) {
+            const reason: TurnEndReason = { kind: 'aborted', reason: 'user' }
+            this.session.append('turn/end', { turn, reason })
+            return { turn, reason }
+          }
+          continue
+        }
+
+        this.session.append('step/end', { turn, step })
+        const reason: TurnEndReason = model.finish.kind === 'tool-calls' ? { kind: 'blocked' } : { kind: 'completed' }
+        this.session.append('turn/end', { turn, reason })
+        return { turn, reason, ...(model.message === undefined ? {} : { message: model.message }) }
+      }
+
+      const reason: TurnEndReason = {
+        kind: 'error', error: { code: 'MAX_STEPS', message: `Agent 超过最大步数 ${this.config.maxSteps ?? 100}` },
+      }
+      this.session.append('turn/end', { turn, reason })
+      return { turn, reason }
+    } finally {
+      this.#abort = undefined
+      this.setStatus('idle')
+    }
+  }
+
+  /** 从已存在日志计算下一个 turn，使恢复后的 Agent 不会重用编号。 */
+  private nextTurn(): number {
+    let maximum = 0
+    for (const event of this.session.events) {
+      if ('turn' in event.data) maximum = Math.max(maximum, event.data.turn)
+    }
+    return maximum + 1
+  }
+
+  private setStatus(status: AgentStatus): void {
+    this.#status = status
+    for (const listener of this.#statusListeners) listener(status)
+  }
+}
