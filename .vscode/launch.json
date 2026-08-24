@@ -1,0 +1,176 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "00 · 当前 TypeScript 文件",
+      "type": "bun",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/harness-lab",
+      "runtime": "bun",
+      "stopOnEntry": false,
+      "watchMode": false
+    },
+    {
+      "name": "01 · Plugin Kernel",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/context.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "02 · Domain Protocol",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/domain.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "03 · Session Projections",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/projections.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "04 · Streaming LLM",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/llm.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "04b · DeepSeek Provider",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/deepseek-provider.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "05 · Agent Loop",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/agent.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "06 · Tool Pipeline",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/tools.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "07a · Workspace FS",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/workspace-fs.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "07b · Process Shell PTY",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/local-process.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "08 · Permissions Sandbox",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/permissions.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "09 · Persistence Recovery",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/session-store.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "10 · Context Compaction",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/context-compaction.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "11 · External Capabilities",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/capabilities.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "12a · Jobs",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/jobs.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "12b · Subagents",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/subagents.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "12c · Workflow",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/workflow.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "13 · Headless CLI",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/headless.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "14 · Agent Server",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/agent-server.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "15 · Web Client",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/client-runtime.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "16a · Telemetry",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/session-telemetry.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "16b · Cost Projection",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/cost-projection.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "16c · Hardening HMR",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/hardening.test.ts",
+      "runtimeArgs": ["test", "--max-concurrency=1"],
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "Web Server · 本地调试",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/web-server-entry.ts",
+      "cwd": "${workspaceFolder}/harness-lab",
+      "env": { "DSH_LAB_AUTH_TOKEN": "vscode-debug-token-change-me" }
+    }
+  ]
+}
