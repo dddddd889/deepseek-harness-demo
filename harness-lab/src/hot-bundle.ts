@@ -1,7 +1,7 @@
 import { HarnessBundle } from './bundle.ts'
 import type { Plugin } from './context.ts'
 
-/** 以整套 Bundle 为事务边界热替换；候选挂载失败时旧代仍继续服务。 */
+/** 以整套 插件包 为事务边界热替换；候选挂载失败时旧代仍继续服务。 */
 export class HotBundle {
   #current: HarnessBundle | undefined
   #generation = 0
@@ -9,7 +9,7 @@ export class HotBundle {
   get generation(): number { return this.#generation }
 
   use<T>(key: string): T {
-    if (!this.#current) throw new Error('Bundle 尚未加载')
+    if (!this.#current) throw new Error('插件包尚未加载')
     return this.#current.context.get<T>(key)
   }
 

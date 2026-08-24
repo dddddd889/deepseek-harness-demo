@@ -22,8 +22,8 @@ try {
   })
   const address = await server.listen()
   const page = await fetch(address.url)
-  console.log('Web URL:', address.url)
-  console.log('CSP:', page.headers.get('content-security-policy'))
-  console.log('HTML bytes:', (await page.arrayBuffer()).byteLength)
+  console.log('网页地址：', address.url)
+  console.log('内容安全策略：', page.headers.get('content-security-policy'))
+  console.log('HTML 字节数：', (await page.arrayBuffer()).byteLength)
   await server.close()
 } finally { await rm(root, { recursive: true, force: true }) }

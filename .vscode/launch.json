@@ -12,161 +12,161 @@
       "watchMode": false
     },
     {
-      "name": "01 · Plugin Kernel",
+      "name": "01 · 插件内核",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/context.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "02 · Domain Protocol",
+      "name": "02 · 领域协议",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/domain.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "03 · Session Projections",
+      "name": "03 · 会话投影",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/projections.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "04 · Streaming LLM",
+      "name": "04 · 流式模型",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/llm.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "04b · DeepSeek Provider",
+      "name": "04b · DeepSeek 提供方",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/deepseek-provider.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "05 · Agent Loop",
+      "name": "05 · 智能体循环",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/agent.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "06 · Tool Pipeline",
+      "name": "06 · 工具管线",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/tools.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "07a · Workspace FS",
+      "name": "07a · 工作区文件系统",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/workspace-fs.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "07b · Process Shell PTY",
+      "name": "07b · 进程、终端与伪终端",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/local-process.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "08 · Permissions Sandbox",
+      "name": "08 · 权限与沙箱",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/permissions.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "09 · Persistence Recovery",
+      "name": "09 · 持久化与恢复",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/session-store.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "10 · Context Compaction",
+      "name": "10 · 上下文压缩",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/context-compaction.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "11 · External Capabilities",
+      "name": "11 · 外部能力",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/capabilities.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "12a · Jobs",
+      "name": "12a · 后台任务",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/jobs.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "12b · Subagents",
+      "name": "12b · 子智能体",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/subagents.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "12c · Workflow",
+      "name": "12c · 工作流",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/workflow.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "13 · Headless CLI",
+      "name": "13 · 无界面命令行",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/headless.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "14 · Agent Server",
+      "name": "14 · 智能体服务",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/agent-server.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "15 · Web Client",
+      "name": "15 · 网页客户端",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/client-runtime.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "16a · Telemetry",
+      "name": "16a · 遥测",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/session-telemetry.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "16b · Cost Projection",
+      "name": "16b · 成本投影",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/cost-projection.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "16c · Hardening HMR",
+      "name": "16c · 加固与热重载",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/hardening.test.ts",
       "runtimeArgs": ["test", "--max-concurrency=1"],
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
-      "name": "Web Server · 本地调试",
+      "name": "网页服务 · 本地调试",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/web-server-entry.ts",
       "cwd": "${workspaceFolder}/harness-lab",

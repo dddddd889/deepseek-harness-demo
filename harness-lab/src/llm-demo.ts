@@ -23,5 +23,5 @@ session.append('step/end', { turn: 1, step: 1 })
 session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
 for (const event of session.events) console.log(event.seq, event.type)
-console.log('finish:', result.finish.kind)
-console.log('usage:', foldTokenUsage(session.events))
+console.log('结束原因：', result.finish.kind)
+console.log('词元用量：', foldTokenUsage(session.events))

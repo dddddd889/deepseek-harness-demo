@@ -14,7 +14,7 @@ import { Session } from './session.ts'
 
 const TOKEN = 'web-client-token-0123456789'
 
-test('ClientProjection 严格检查 seq，重复 replay 幂等且 gap fail loud', () => {
+test('客户端投影严格检查序号，重复重放保持幂等，序号缺口时明确失败', () => {
   const session = new Session()
   session.append('turn/start', { turn: 1 })
   session.append('user/message', createMessage({ role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'hi' }] }))
@@ -28,7 +28,7 @@ test('ClientProjection 严格检查 seq，重复 replay 幂等且 gap fail loud'
   assert.throws(() => projection.apply({ ...session.events[3], seq: 5 } as NonNullable<typeof session.events[3]>), /CLIENT_EVENT_GAP/)
 })
 
-test('ClientProjection 重放 surface replacement 与 usage 覆盖规则', () => {
+test('客户端投影重放模型可见面替换与用量覆盖规则', () => {
   const session = new Session()
   const old = createMessage({ role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'old' }] })
   session.append('user/message', old)
@@ -64,7 +64,7 @@ async function serverFixture() {
   return { server, url: address.url }
 }
 
-test('AgentClient snapshot 后 SSE 追尾，Abort 可终止 follow', async () => {
+test('智能体客户端读取快照后通过 SSE 追尾，取消可终止追随', async () => {
   const fixture = await serverFixture()
   try {
     const client = new AgentClient(fixture.url, TOKEN)
@@ -87,7 +87,7 @@ test('AgentClient snapshot 后 SSE 追尾，Abort 可终止 follow', async () =>
   } finally { await fixture.server.close() }
 })
 
-test('同源 Web 静态资源带 CSP，静态路径不能逃逸；RPC 仍需鉴权', async () => {
+test('同源网页静态资源携带 CSP，静态路径不能逃逸，RPC 仍需鉴权', async () => {
   const fixture = await serverFixture()
   try {
     const page = await fetch(`${fixture.url}/`)
@@ -103,7 +103,7 @@ test('同源 Web 静态资源带 CSP，静态路径不能逃逸；RPC 仍需鉴�
   } finally { await fixture.server.close() }
 })
 
-test('审批通过共享 Broker 由 RPC 第一写决定', async () => {
+test('审批通过共享中介器处理，由首个 RPC 写入决定结果', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-web-approval-'))
   const profile = validateProfile({
     name: 'approval', provider: 'scripted', model: 'fixture', scriptedResponse: 'ok',
@@ -129,7 +129,7 @@ test('审批通过共享 Broker 由 RPC 第一写决定', async () => {
   } finally { await server.close() }
 })
 
-test('图片上传、durable ref 消息与鉴权读取形成附件闭环', async () => {
+test('图片上传、持久引用消息与鉴权读取形成附件闭环', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-web-attachment-'))
   const profile = validateProfile({
     name: 'attachment', provider: 'scripted', model: 'fixture', scriptedResponse: 'saw image',

@@ -15,7 +15,7 @@ try {
   })
   const server = new AgentServer(await HeadlessHost.open(profile), { authToken: token })
   const address = await server.listen()
-  console.log('listening:', address)
+  console.log('监听地址：', address)
 
   const rpc = async (id: string, method: string, params: Record<string, unknown>) => {
     const response = await fetch(`${address.url}/rpc`, {
@@ -25,10 +25,10 @@ try {
     })
     return response.json()
   }
-  console.log('create:', await rpc('1', 'session.create', { sessionId: 'demo' }))
-  console.log('send:', await rpc('2', 'session.send', { sessionId: 'demo', text: '解释架构' }))
+  console.log('创建结果：', await rpc('1', 'session.create', { sessionId: 'demo' }))
+  console.log('发送结果：', await rpc('2', 'session.send', { sessionId: 'demo', text: '解释架构' }))
   const snapshot = await rpc('3', 'session.snapshot', { sessionId: 'demo' }) as { result?: { events?: unknown[] } }
-  console.log('snapshot event count:', snapshot.result?.events?.length)
+  console.log('快照事件数量：', snapshot.result?.events?.length)
   await server.close()
 } finally {
   await rm(root, { recursive: true, force: true })

@@ -15,15 +15,15 @@ export interface TokenMeasurement {
 }
 
 export interface ContextPressure {
-  /** 最近一次 provider 实测的 prompt，不含输出。 */
+  /** 最近一次提供方 实测的 输入，不含输出。 */
   readonly pressureTokens?: number
-  /** provider 锚点加 surface 变化量，表示下一次请求。 */
+  /** 提供方锚点加 模型可见面变化量，表示下一次请求。 */
   readonly projectedTokens?: number
   readonly contextWindow?: number
   readonly ratio?: number
 }
 
-/** 固定密度估算器只用于相对决策；账单必须使用 provider usage。 */
+/** 固定密度估算器只用于相对决策；账单必须使用 提供方用量。 */
 export function estimateText(text: string): number {
   return text.length === 0 ? 0 : Math.ceil(Buffer.byteLength(text, 'utf8') / 4)
 }
@@ -44,7 +44,7 @@ export function estimateBlock(block: ContentBlock): number {
   }
 }
 
-/** 估算模型消息价格；角色和消息 envelope 也占 token。 */
+/** 估算模型消息价格；角色和消息封装 也占 词元。 */
 export function estimateMessage(message: Message): number {
   return 6 + message.content.reduce((total, block) => total + estimateBlock(block), 0)
 }
@@ -56,7 +56,7 @@ function eventMessage(event: SessionEvent): Message | undefined {
   return undefined
 }
 
-/** 对当前 surface 定价，同时把 system/tool schemas 分桶展示。 */
+/** 对当前 模型可见面 定价，同时把 系统提示与工具模式 分桶展示。 */
 export function measureTokens(events: readonly SessionEvent[]): TokenMeasurement {
   const nodes = deriveSurface(events).flatMap(event => {
     const message = eventMessage(event)
@@ -82,7 +82,7 @@ function promptUsage(usage: TokenUsage): number {
   return usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
 }
 
-/** provider usage 为锚点；锚点之后只用 surface 的估算增减修正下一请求压力。 */
+/** 提供方用量 为锚点；锚点之后只用 模型可见面的估算增减修正下一请求压力。 */
 export function projectContextPressure(
   events: readonly SessionEvent[],
   contextWindow?: number,

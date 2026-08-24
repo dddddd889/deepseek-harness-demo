@@ -29,7 +29,7 @@ export declare class WebRuntimeError extends Error {
     readonly code: string;
     constructor(message: string, code: string);
 }
-/** Web seam 在执行时选择 provider，绝不依赖注册顺序。 */
+/** 网页接口边界在执行时选择提供方，绝不依赖注册顺序。 */
 export declare class WebRuntime {
     #private;
     constructor(config?: {

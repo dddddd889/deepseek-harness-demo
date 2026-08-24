@@ -5,7 +5,7 @@ export class WebRuntimeError extends Error {
         this.code = code;
     }
 }
-/** Web seam 在执行时选择 provider，绝不依赖注册顺序。 */
+/** 网页接口边界在执行时选择提供方，绝不依赖注册顺序。 */
 export class WebRuntime {
     #search = new Map();
     #fetch = new Map();
@@ -32,7 +32,7 @@ export class WebRuntime {
     }
     #register(store, provider) {
         if (store.has(provider.id))
-            throw new WebRuntimeError(`Web provider 重复：${provider.id}`, 'WEB_DUPLICATE_PROVIDER');
+            throw new WebRuntimeError(`网页提供方重复：${provider.id}`, 'WEB_DUPLICATE_PROVIDER');
         store.set(provider.id, provider);
         return () => store.delete(provider.id);
     }
@@ -40,16 +40,16 @@ export class WebRuntime {
         if (configured !== undefined) {
             const provider = store.get(configured);
             if (provider === undefined)
-                throw new WebRuntimeError(`配置的 provider 未注册：${configured}`, 'WEB_PROVIDER_CONFIGURED_MISSING');
+                throw new WebRuntimeError(`配置的提供方未注册：${configured}`, 'WEB_PROVIDER_CONFIGURED_MISSING');
             if (!provider.available())
-                throw new WebRuntimeError(`配置的 provider 不可用：${configured}`, 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE');
+                throw new WebRuntimeError(`配置的提供方不可用：${configured}`, 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE');
             return provider;
         }
         const available = [...store.values()].filter(provider => provider.available());
         if (available.length === 0)
-            throw new WebRuntimeError('没有可用 Web provider', 'WEB_PROVIDER_UNAVAILABLE');
+            throw new WebRuntimeError('没有可用的网页提供方', 'WEB_PROVIDER_UNAVAILABLE');
         if (available.length > 1)
-            throw new WebRuntimeError('存在多个 Web provider，必须显式选择', 'WEB_PROVIDER_AMBIGUOUS');
+            throw new WebRuntimeError('存在多个网页提供方，必须显式选择', 'WEB_PROVIDER_AMBIGUOUS');
         return available[0];
     }
 }

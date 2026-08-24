@@ -1,14 +1,14 @@
 import { HarnessContext } from './context.ts'
 import type { Disposer, Plugin } from './context.ts'
 
-/** Bundle 是有序插件补丁；任何 row 失败都会逆序回滚此前已挂载 rows。 */
+/** 插件包是一组有序插件；任一条目失败时都会逆序回滚此前已挂载的条目。 */
 export class HarnessBundle {
   readonly context = new HarnessContext()
   readonly #disposers: Disposer[] = []
   #mounted = false
 
   async mount(plugins: readonly Plugin[]): Promise<void> {
-    if (this.#mounted) throw new Error('Bundle 已挂载')
+    if (this.#mounted) throw new Error('插件包已挂载')
     this.#mounted = true
     try {
       for (const plugin of plugins) this.#disposers.push(await this.context.mount(plugin))
@@ -24,6 +24,6 @@ export class HarnessBundle {
       try { await dispose() } catch (error) { errors.push(error) }
     }
     this.#disposers.length = 0
-    if (errors.length > 0) throw new AggregateError(errors, 'Bundle 清理失败')
+    if (errors.length > 0) throw new AggregateError(errors, '插件包清理失败')
   }
 }

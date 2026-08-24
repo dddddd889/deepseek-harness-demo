@@ -24,7 +24,7 @@ const server = new AgentServer(host, {
     webRoot: join(dirname(fileURLToPath(import.meta.url)), '../web'),
 });
 const address = await server.listen();
-process.stdout.write(`DeepSeek Harness Lab Web: ${address.url}\n`);
+process.stdout.write(`DeepSeek Harness 实验室网页服务：${address.url}\n`);
 await new Promise(resolve => {
     let stopping = false;
     const stop = () => {

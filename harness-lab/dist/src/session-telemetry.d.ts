@@ -9,14 +9,14 @@ export interface TelemetryRecord {
     readonly body: unknown;
 }
 export interface TelemetrySink {
-    /** 必须是非阻塞入队；传输失败不能回穿 agent loop。 */
+    /** 必须是非阻塞入队；传输失败不能回穿 智能体循环。 */
     emit(record: TelemetryRecord): void;
     shutdown(): Promise<void>;
 }
 export type TelemetryRedactor = (record: TelemetryRecord) => TelemetryRecord;
 /**
- * 将权威 Session Log 投影成 OTel Logs 风格记录。
- * 它只维护“已交给 sink”的游标，不承诺远端已经收到，因此不能承担恢复职责。
+ * 将权威 会话日志 投影成 开放遥测日志风格记录。
+ * 它只维护“已交给 日志接收端”的游标，不承诺远端已经收到，因此不能承担恢复职责。
  */
 export declare class SessionTelemetry {
     #private;

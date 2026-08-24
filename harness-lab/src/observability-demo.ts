@@ -16,5 +16,5 @@ const prices: PriceBook = {
   }],
 }
 const cost = projectCost(session.events, prices)
-console.log(JSON.stringify({ exportedLogs: sink.records.length, cost: formatPicoUsd(cost.picoUsd), priceBook: cost.priceBookVersion }))
+console.log(JSON.stringify({ 导出日志数: sink.records.length, 成本: formatPicoUsd(cost.picoUsd), 价目表版本: cost.priceBookVersion }))
 await telemetry.close()

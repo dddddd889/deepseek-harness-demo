@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { assertJsonValue } from "./json.js";
-/** 公共名稳定限定 server namespace；截断时用原始二元组摘要防碰撞。 */
+/** 公共名稳定限定 服务命名空间；截断时用原始二元组摘要防碰撞。 */
 export function publicMcpToolName(serverName, rawName) {
     const normalized = `mcp__${serverName}__${rawName}`.replace(/[^A-Za-z0-9_-]/g, '_');
     if (normalized.length <= 64)
@@ -8,7 +8,7 @@ export function publicMcpToolName(serverName, rawName) {
     const hash = createHash('sha256').update(`${serverName}\0${rawName}`).digest('hex').slice(0, 10);
     return `${normalized.slice(0, 53)}_${hash}`;
 }
-/** MCP bridge 先完整抓取分页，再原子换代；发现失败保留旧 generation。 */
+/** MCP 桥接器先完整抓取分页，再原子换代；发现失败时保留旧代次。 */
 export class McpToolBridge {
     #serverName;
     #transport;

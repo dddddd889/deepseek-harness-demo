@@ -70,18 +70,18 @@ export declare class SubagentError extends Error {
     readonly code: string;
     constructor(message: string, code: string);
 }
-/** 子 Agent 控制面：选择 provider、前置能力校验、配对生命周期与资源收敛。 */
+/** 子智能体控制面：选择提供方、前置能力校验、配对生命周期与资源收敛。 */
 export declare class SubagentRuntime {
     #private;
     register(provider: SubagentProvider): () => void;
     onLifecycle(listener: (event: SubagentLifecycleEvent) => void): () => void;
     active(): readonly SubagentRun[];
     start(providerName: string | undefined, request: SubagentStartRequest): Promise<SubagentRun>;
-    /** 把一次 delegation 包成 owner-private 后台 Job。 */
+    /** 把一次 委派包装成所有者私有的后台任务。 */
     startJob(jobs: LocalJobRegistry, providerName: string | undefined, request: Omit<SubagentStartRequest, 'signal'>): string;
     dispose(): Promise<void>;
 }
-/** 可注入 execute 的本地 provider，便于断点调试完整生命周期。 */
+/** 可注入 执行函数的本地提供方，便于断点调试完整生命周期。 */
 export declare class InProcessSubagentProvider implements SubagentProvider {
     #private;
     readonly name: string;

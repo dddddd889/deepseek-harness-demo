@@ -37,18 +37,18 @@ async function rpc(url: string, id: string, method: string, params: Record<strin
   return { status: response.status, body: await response.json() as Record<string, unknown> }
 }
 
-test('Bearer 鉴权发生在 RPC 分派前', async () => {
+test('持有者令牌鉴权发生在 RPC 分派前', async () => {
   const value = await fixture()
   try {
     const denied = await rpc(value.url, '1', 'session.create', { sessionId: 'secret' }, 'wrong-token-wrong')
     assert.equal(denied.status, 401)
-    assert.deepEqual(denied.body, { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } })
+    assert.deepEqual(denied.body, { error: { code: 'UNAUTHORIZED', message: '未授权' } })
     const snapshot = await rpc(value.url, '2', 'session.snapshot', { sessionId: 'secret' })
     assert.equal((snapshot.body.error as { code: string }).code, 'SESSION_NOT_ACTIVE')
   } finally { await value.server.close() }
 })
 
-test('RPC request id 同命令幂等，不同命令冲突', async () => {
+test('RPC 请求标识对同一命令幂等，对不同命令报告冲突', async () => {
   const value = await fixture()
   try {
     const first = await rpc(value.url, 'same-id', 'session.create', { sessionId: 'stable' })
@@ -60,7 +60,7 @@ test('RPC request id 同命令幂等，不同命令冲突', async () => {
   } finally { await value.server.close() }
 })
 
-test('多 Session 独立路由，send 后 snapshot 暴露持久事件而非 Agent 对象', async () => {
+test('多会话独立路由，发送后快照暴露持久事件而非智能体对象', async () => {
   const value = await fixture()
   try {
     await rpc(value.url, 'c1', 'session.create', { sessionId: 'a' })
@@ -74,7 +74,7 @@ test('多 Session 独立路由，send 后 snapshot 暴露持久事件而非 Agen
   } finally { await value.server.close() }
 })
 
-test('并发 send 被 AGENT_BUSY 拒绝，cancel 传播到运行 turn', async () => {
+test('并发发送被忙碌错误拒绝，取消操作传播到运行轮次', async () => {
   const value = await fixture(30)
   try {
     await rpc(value.url, 'create', 'session.create', { sessionId: 'busy' })
@@ -90,7 +90,7 @@ test('并发 send 被 AGENT_BUSY 拒绝，cancel 传播到运行 turn', async ()
   } finally { await value.server.close() }
 })
 
-test('SSE 从 after 重放后追尾，事件 id 与 Session seq 一致', async () => {
+test('SSE 从起始序号重放后追尾，事件标识与会话序号一致', async () => {
   const value = await fixture()
   try {
     await rpc(value.url, 'create', 'session.create', { sessionId: 'events' })
@@ -116,7 +116,7 @@ test('SSE 从 after 重放后追尾，事件 id 与 Session seq 一致', async (
   } finally { await value.server.close() }
 })
 
-test('Server close flush 后可由新 Host 冷恢复', async () => {
+test('服务关闭并刷盘后可由新宿主冷恢复', async () => {
   const value = await fixture()
   await rpc(value.url, 'create', 'session.create', { sessionId: 'durable' })
   await rpc(value.url, 'send', 'session.send', { sessionId: 'durable', text: 'one' })
@@ -128,7 +128,7 @@ test('Server close flush 后可由新 Host 冷恢复', async () => {
   await resumed.close(); await nextHost.dispose()
 })
 
-test('RPC body 超限返回 413，SSE 单帧超预算会断开慢消费者', async () => {
+test('RPC 请求体超限返回 413，SSE 单帧超预算会断开慢消费者', async () => {
   const bodyLimited = await fixture(0, { maxRequestBytes: 64 })
   try {
     const response = await fetch(`${bodyLimited.url}/rpc`, {
@@ -149,7 +149,7 @@ test('RPC body 超限返回 413，SSE 单帧超预算会断开慢消费者', asy
       await reading
       while (true) {
         const next = await reader?.read()
-        if (next?.done === true) throw new Error('SSE closed by backpressure')
+        if (next?.done === true) throw new Error('SSE 因背压关闭')
       }
     }, /terminated|backpressure|closed/i)
   } finally { await queueLimited.server.close() }

@@ -11,7 +11,7 @@ export interface SkillDefinition extends SkillSummary {
     readonly content: string;
     readonly path: string;
 }
-/** 文件系统 Skills：低 rank 胜出，list 不加载正文，get 才读取最新内容。 */
+/** 文件系统技能：低优先级者胜出，列表操作不加载正文，读取操作才读取最新内容。 */
 export declare class SkillRegistry {
     #private;
     constructor(roots: readonly {

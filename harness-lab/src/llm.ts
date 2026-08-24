@@ -20,11 +20,11 @@ export interface GenerateOptions {
 }
 
 export interface LlmProvider {
-  /** Provider 只负责翻译线上的流；异常与取消由 LlmRuntime 统一归一化。 */
+  /** 提供方只负责翻译线上的流；异常与取消由 大模型运行时 统一归一化。 */
   stream(options: GenerateOptions, signal: AbortSignal): AsyncIterable<StreamChunk>
 }
 
-/** Provider 路由与错误边界；消费者永远看到一个终止 finish，而不是裸异常。 */
+/** 提供方路由与错误边界；消费者永远看到一个终止帧，而不是裸异常。 */
 export class LlmRuntime {
   readonly #providers = new Map<string, LlmProvider>()
 
@@ -37,7 +37,7 @@ export class LlmRuntime {
   async *stream(options: GenerateOptions, signal: AbortSignal): AsyncGenerator<StreamChunk> {
     const provider = this.#providers.get(options.provider)
     if (!provider) {
-      yield failureFinish('UNKNOWN_PROVIDER', `找不到 LLM Provider：${options.provider}`)
+      yield failureFinish('UNKNOWN_PROVIDER', `找不到大模型提供方：${options.provider}`)
       return
     }
 
@@ -58,7 +58,7 @@ export class LlmRuntime {
   }
 }
 
-/** 可脚本化 Provider：测试和调试无需网络，也能精确控制每个 chunk。 */
+/** 可脚本化提供方：测试和调试无需网络，也能精确控制每个数据块。 */
 export class ScriptedLlmProvider implements LlmProvider {
   readonly #chunks: readonly StreamChunk[]
   readonly #delayMs: number
@@ -86,7 +86,7 @@ interface PartialBlock {
   block?: ContentBlock
 }
 
-/** 将可交错的 delta 流确定性组装成最终 assistant message。 */
+/** 将可交错的增量流确定性组装成最终助手消息。 */
 export class BlockAssembler {
   readonly #partials = new Map<number, PartialBlock>()
   readonly #order: number[] = []
@@ -126,7 +126,7 @@ export class BlockAssembler {
     }
   }
 
-  /** 只允许首次出现的 index 决定顺序，避免交错 delta 改写块顺序。 */
+  /** 只允许首次出现的 索引决定顺序，避免交错增量 改写块顺序。 */
   private ensure(index: number, blockType: ContentBlockType): PartialBlock {
     let partial = this.#partials.get(index)
     if (!partial) {
@@ -157,7 +157,7 @@ export class BlockAssembler {
   }
 }
 
-/** 将计时器与 AbortSignal 绑定，取消后不遗留后台定时任务。 */
+/** 将计时器与 取消信号 绑定，取消后不遗留后台定时任务。 */
 function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(done, ms)
@@ -173,7 +173,7 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-/** 构造 Provider 异常对应的协议终止帧。 */
+/** 构造 提供方异常对应的协议终止帧。 */
 function failureFinish(code: string, message: string): StreamChunk {
   return { type: 'finish', reason: { kind: 'error', failure: { code, message } } }
 }

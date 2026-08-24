@@ -14,5 +14,5 @@ export declare function probeRuntime(input?: {
     readonly commandExists?: (path: string) => boolean;
     readonly ptyAvailable?: boolean;
 }): RuntimeCapabilities;
-/** 对不可降级的能力 fail-fast，并包含可诊断的 capability key。 */
+/** 对不可降级的能力 快速失败，并包含可诊断的 能力键。 */
 export declare function requireCapability(capabilities: RuntimeCapabilities, key: 'pty' | 'strong-sandbox'): void;

@@ -1,6 +1,6 @@
 /**
- * cost 是 Session usage × 版本化价目表的派生投影，不写回事实日志。
- * 同一 turn/step 的最终 assistant/message 会覆盖流式 usage 样本，避免重复计费。
+ * 成本是会话用量 × 版本化价目表的派生投影，不写回事实日志。
+ * 同一轮次与步骤的最终助手消息会覆盖流式用量样本，避免重复计费。
  */
 export function projectCost(events, book) {
     let active;
@@ -41,14 +41,14 @@ function resolvePrice(book, header, time) {
         .filter((price) => price.provider === header.provider && price.model === header.model && price.effectiveFrom <= time)
         .sort((left, right) => right.effectiveFrom - left.effectiveFrom)[0];
 }
-/** 分桶计价；缓存 token 不会再落入普通 input 桶。 */
+/** 分桶计价；缓存词元不会再落入普通输入桶。 */
 function bucketCost(usage, price) {
     const cost = usage.inputTokens * price.inputMicroUsdPerMillion
         + usage.outputTokens * price.outputMicroUsdPerMillion
         + (usage.cacheReadTokens ?? 0) * (price.cacheReadMicroUsdPerMillion ?? price.inputMicroUsdPerMillion)
         + (usage.cacheWriteTokens ?? 0) * (price.cacheWriteMicroUsdPerMillion ?? price.inputMicroUsdPerMillion);
     if (!Number.isSafeInteger(cost))
-        throw new Error('cost 超出安全整数范围');
+        throw new Error('成本超出安全整数范围');
     return BigInt(cost);
 }
 /** 将皮美元格式化为美元字符串，仅用于展示。 */

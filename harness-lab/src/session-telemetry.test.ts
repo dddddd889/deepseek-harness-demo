@@ -3,7 +3,7 @@ import { test } from 'bun:test'
 import { Session } from './session.ts'
 import { MemoryTelemetrySink, SessionTelemetry } from './session-telemetry.ts'
 
-test('full 模式只导出每个 step 的首个 chunk，并允许脱敏', async () => {
+test('完整模式只导出每个步骤的首个数据块，并允许脱敏', async () => {
   const session = new Session()
   const sink = new MemoryTelemetrySink()
   const telemetry = new SessionTelemetry('s-1', session, sink, 'full', (record) => ({ ...record, body: '[redacted]' }))
@@ -17,7 +17,7 @@ test('full 模式只导出每个 step 的首个 chunk，并允许脱敏', async 
   await telemetry.close()
 })
 
-test('导出失败被隔离，Session 仍可继续 append', async () => {
+test('导出失败被隔离，会话仍可继续追加事件', async () => {
   const warnings: string[] = []
   const session = new Session()
   const telemetry = new SessionTelemetry('s-2', session, new MemoryTelemetrySink(0), 'full', undefined, (message) => warnings.push(message))
@@ -28,7 +28,7 @@ test('导出失败被隔离，Session 仍可继续 append', async () => {
   await telemetry.close()
 })
 
-test('feedback-only 只在提交反馈后导出该记录', async () => {
+test('仅反馈模式只在提交反馈后导出该记录', async () => {
   const session = new Session()
   const sink = new MemoryTelemetrySink()
   const telemetry = new SessionTelemetry('s-3', session, sink, 'feedback-only')

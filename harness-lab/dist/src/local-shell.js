@@ -1,6 +1,6 @@
 import { LocalProcessRuntime } from "./local-process.js";
 import { LocalSandbox } from "./local-sandbox.js";
-/** Shell 只决定解释器与默认值；进程树、输出和终止仍由 LocalProcessRuntime 拥有。 */
+/** 终端解释器只决定解释器与默认值；进程树、输出和终止仍由 本地进程运行时 拥有。 */
 export class LocalShell {
     #runtime;
     #cwd;
@@ -32,10 +32,10 @@ export class LocalShell {
         };
     }
 }
-/** 将前台 Shell 暴露为工具；后台任务归 Jobs 阶段统一分配 id 和轮询语义。 */
+/** 将前台终端解释器 暴露为工具；后台任务由后台任务阶段统一分配标识 和轮询语义。 */
 export function createShellTool(shell) {
     return {
-        name: 'shell_exec', description: '在 workspace 中运行一条 shell 命令',
+        name: 'shell_exec', description: '在工作区中运行一条终端命令',
         parameters: {
             type: 'object', required: ['command'], additionalProperties: false,
             properties: {
@@ -68,19 +68,19 @@ export function createShellTool(shell) {
         },
     };
 }
-/** 选择平台 shell；命令参数不在 Node 层做二次拼接。 */
+/** 选择平台终端解释器；命令参数不在 运行时层做二次拼接。 */
 function shellArgv(command) {
     if (process.platform === 'win32')
         return ['pwsh.exe', '-NoLogo', '-NoProfile', '-Command', command];
     return ['/bin/bash', '--noprofile', '--norc', '-c', command];
 }
-/** 交互终端不能携带 -c，否则 shell 会在空命令后立即退出。 */
+/** 交互终端不能携带 -c，否则终端解释器 会在空命令后立即退出。 */
 function interactiveShellArgv() {
     if (process.platform === 'win32')
         return ['pwsh.exe', '-NoLogo', '-NoProfile'];
     return ['/bin/bash', '--noprofile', '--norc'];
 }
-/** 将输出对象收窄为 lossless JSON。 */
+/** 将输出对象收窄为无损 JSON。 */
 function outputJson(output) {
     return {
         text: output.text, bytes: output.bytes, truncated: output.truncated,

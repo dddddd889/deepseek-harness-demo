@@ -24,6 +24,6 @@ export interface ProfileOverrides {
     readonly sandboxMode?: SandboxMode;
     readonly approvalPolicy?: ApprovalPolicy;
 }
-/** file < environment < CLI；所有层最终走同一严格校验函数。 */
+/** 文件 < 环境变量 < 命令行；所有层最终走同一严格校验函数。 */
 export declare function loadProfile(path: string | undefined, env?: NodeJS.ProcessEnv, cli?: ProfileOverrides): Promise<HarnessProfile>;
 export declare function validateProfile(value: Record<string, unknown>): HarnessProfile;

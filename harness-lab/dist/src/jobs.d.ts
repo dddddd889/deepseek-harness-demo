@@ -36,7 +36,7 @@ export declare class JobError extends Error {
     readonly code: string;
     constructor(message: string, code: string);
 }
-/** 进程内 Job 控制面；执行资源仍归 producer，Registry 只拥有身份与生命周期。 */
+/** 进程内后台任务控制面；执行资源仍归生产方，注册表只拥有身份与生命周期。 */
 export declare class LocalJobRegistry {
     #private;
     attachController(): () => void;
@@ -48,7 +48,7 @@ export declare class LocalJobRegistry {
     wait(id: string, timeoutMs: number, callerSession?: string, signal?: AbortSignal): Promise<JobSnapshot>;
     onDone(listener: (snapshot: JobSnapshot) => void | PromiseLike<void>): () => void;
     onChanged(listener: (ownerSession?: string) => void): () => void;
-    /** owner 释放会停止并等待其所有 live jobs，然后删除这些 owner-private 记录。 */
+    /** 所有者释放会停止并等待其所有活动任务，然后删除这些 所有者私有记录。 */
     disposeOwner(ownerSession: string): Promise<void>;
     dispose(): Promise<void>;
 }

@@ -20,20 +20,20 @@ export class LspRuntimeError extends Error {
   constructor(message: string, code: string) { super(message); this.code = code }
 }
 
-/** 取最终扩展名；foo.d.ts 路由为 .ts，dotfile 不被误判。 */
+/** 取最终扩展名；例如 foo.d.ts 路由为 .ts，以点开头的文件不会被误判。 */
 export function finalExtension(path: string): string {
   const base = path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
   const dot = base.lastIndexOf('.')
   return dot <= 0 ? '' : base.slice(dot).toLowerCase()
 }
 
-/** LSP seam 原子保留 provider id 与全部扩展名。 */
+/** LSP 接口边界会原子保留提供方标识及其全部扩展名。 */
 export class LspRuntime {
   readonly #ids = new Set<string>()
   readonly #routes = new Map<string, { readonly provider: LspProvider; readonly languageId: string }>()
 
   register(provider: LspProvider): () => void {
-    if (provider.id.trim() === '' || this.#ids.has(provider.id)) throw new LspRuntimeError('LSP provider id 无效或冲突', 'LSP_CONFLICT')
+    if (provider.id.trim() === '' || this.#ids.has(provider.id)) throw new LspRuntimeError('LSP 提供方标识无效或冲突', 'LSP_CONFLICT')
     const pending = new Map<string, string>()
     for (const [raw, languageId] of Object.entries(provider.extensionToLanguage)) {
       const extension = (raw.startsWith('.') ? raw : `.${raw}`).toLowerCase()
@@ -43,7 +43,7 @@ export class LspRuntime {
       if (this.#routes.has(extension)) throw new LspRuntimeError(`LSP 扩展冲突：${extension}`, 'LSP_CONFLICT')
       pending.set(extension, languageId)
     }
-    if (pending.size === 0) throw new LspRuntimeError('LSP provider 没有扩展映射', 'LSP_INVALID_PROVIDER')
+    if (pending.size === 0) throw new LspRuntimeError('LSP 提供方没有扩展映射', 'LSP_INVALID_PROVIDER')
     this.#ids.add(provider.id)
     for (const [extension, languageId] of pending) this.#routes.set(extension, { provider, languageId })
     return () => {

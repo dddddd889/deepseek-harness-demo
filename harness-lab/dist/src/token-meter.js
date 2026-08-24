@@ -1,5 +1,5 @@
 import { deriveSurface } from "./projections.js";
-/** 固定密度估算器只用于相对决策；账单必须使用 provider usage。 */
+/** 固定密度估算器只用于相对决策；账单必须使用 提供方用量。 */
 export function estimateText(text) {
     return text.length === 0 ? 0 : Math.ceil(Buffer.byteLength(text, 'utf8') / 4);
 }
@@ -18,7 +18,7 @@ export function estimateBlock(block) {
             return 32 + Math.ceil((block.attachment.width * block.attachment.height) / 10_000);
     }
 }
-/** 估算模型消息价格；角色和消息 envelope 也占 token。 */
+/** 估算模型消息价格；角色和消息封装 也占 词元。 */
 export function estimateMessage(message) {
     return 6 + message.content.reduce((total, block) => total + estimateBlock(block), 0);
 }
@@ -31,7 +31,7 @@ function eventMessage(event) {
         return event.data.message;
     return undefined;
 }
-/** 对当前 surface 定价，同时把 system/tool schemas 分桶展示。 */
+/** 对当前 模型可见面 定价，同时把 系统提示与工具模式 分桶展示。 */
 export function measureTokens(events) {
     const nodes = deriveSurface(events).flatMap(event => {
         const message = eventMessage(event);
@@ -55,7 +55,7 @@ export function measureTokens(events) {
 function promptUsage(usage) {
     return usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
 }
-/** provider usage 为锚点；锚点之后只用 surface 的估算增减修正下一请求压力。 */
+/** 提供方用量 为锚点；锚点之后只用 模型可见面的估算增减修正下一请求压力。 */
 export function projectContextPressure(events, contextWindow) {
     let sampledPressure;
     let sampledSurfaceTokens;

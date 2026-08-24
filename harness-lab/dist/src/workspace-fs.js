@@ -8,7 +8,7 @@ export class WorkspaceFsError extends Error {
         this.code = code;
     }
 }
-/** 只允许访问一个 canonical workspace；所有返回路径均为相对路径。 */
+/** 只允许访问一个 规范化工作区；所有返回路径均为相对路径。 */
 export class WorkspaceFs {
     root;
     #maxReadBytes;
@@ -26,7 +26,7 @@ export class WorkspaceFs {
         const canonical = await realpath(root);
         const info = await stat(canonical);
         if (!info.isDirectory())
-            throw new WorkspaceFsError('workspace 必须是目录', 'WORKSPACE_NOT_DIRECTORY');
+            throw new WorkspaceFsError('工作区必须是目录', 'WORKSPACE_NOT_DIRECTORY');
         return new WorkspaceFs(canonical, options);
     }
     async readText(path) {
@@ -46,7 +46,7 @@ export class WorkspaceFs {
             throw new WorkspaceFsError(`${path} 超过写入上限`, 'WRITE_LIMIT_EXCEEDED');
         const target = this.resolveLexical(path);
         await this.ensureWritableParent(dirname(target));
-        // 同目录临时文件 + rename，避免进程中断留下半写文件。
+        // 同目录临时文件 + 重命名，避免进程中断留下半写文件。
         const temporary = resolve(dirname(target), `.${basename(target)}.${crypto.randomUUID()}.tmp`);
         try {
             await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' });
@@ -112,7 +112,7 @@ export class WorkspaceFs {
         }
         return { matches, truncated };
     }
-    /** 词法检查拒绝绝对路径和 ..；真实路径检查另行阻断 symlink 逃逸。 */
+    /** 词法检查拒绝绝对路径和 ..；真实路径检查另行阻断符号链接逃逸。 */
     resolveLexical(path) {
         if (isAbsolute(path))
             throw new WorkspaceFsError(`拒绝绝对路径：${path}`, 'PATH_OUTSIDE_WORKSPACE');
@@ -134,7 +134,7 @@ export class WorkspaceFs {
         this.assertInside(canonical);
         return canonical;
     }
-    /** 创建缺失目录前先验证最近存在祖先的 realpath，防止父级 symlink 逃逸。 */
+    /** 创建缺失目录前先验证最近存在祖先的真实路径，防止父级符号链接逃逸。 */
     async ensureWritableParent(parent) {
         let ancestor = parent;
         while (true) {
@@ -148,7 +148,7 @@ export class WorkspaceFs {
                     throw error;
                 const next = dirname(ancestor);
                 if (next === ancestor)
-                    throw new WorkspaceFsError('找不到 workspace 内祖先目录', 'PATH_OUTSIDE_WORKSPACE');
+                    throw new WorkspaceFsError('找不到工作区内的祖先目录', 'PATH_OUTSIDE_WORKSPACE');
                 ancestor = next;
             }
         }
@@ -158,7 +158,7 @@ export class WorkspaceFs {
     assertInside(target) {
         const rel = relative(this.root, target);
         if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
-            throw new WorkspaceFsError(`路径逃逸 workspace：${target}`, 'PATH_OUTSIDE_WORKSPACE');
+            throw new WorkspaceFsError(`路径逃逸工作区：${target}`, 'PATH_OUTSIDE_WORKSPACE');
         }
     }
     display(target) {
@@ -166,43 +166,43 @@ export class WorkspaceFs {
         return value === '' ? '.' : value.split(sep).join('/');
     }
 }
-/** 将 WorkspaceFs 能力包装成四个普通工具，不让 Agent Loop 依赖本地文件 API。 */
+/** 将工作区文件系统能力包装成四个普通工具，不让智能体循环依赖本地文件接口。 */
 export function createWorkspaceFsTools(fs) {
     return [
         {
-            name: 'fs_read', description: '读取 workspace 内文本文件',
+            name: 'fs_read', description: '读取工作区内的文本文件',
             parameters: objectSchema({ path: { type: 'string' } }, ['path']),
             isConcurrencySafe: () => true,
-            effect: () => ({ minimumMode: 'read-only', reason: '读取 workspace 文件' }),
+            effect: () => ({ minimumMode: 'read-only', reason: '读取工作区文件' }),
             execute: async (args) => fs.readText(stringArg(args, 'path')),
         },
         {
-            name: 'fs_write', description: '原子写入 workspace 内文本文件',
+            name: 'fs_write', description: '以原子方式写入工作区内的文本文件',
             parameters: objectSchema({
                 path: { type: 'string' }, content: { type: 'string' },
                 sandbox_permissions: { enum: ['workspace-write', 'danger-full-access'] },
                 justification: { type: 'string', minLength: 1 },
             }, ['path', 'content']),
-            effect: () => ({ minimumMode: 'workspace-write', reason: '写入 workspace 文件' }),
+            effect: () => ({ minimumMode: 'workspace-write', reason: '写入工作区文件' }),
             execute: async (args) => fs.writeText(stringArg(args, 'path'), stringArg(args, 'content')),
         },
         {
-            name: 'fs_list', description: '列出 workspace 内目录',
+            name: 'fs_list', description: '列出工作区内的目录',
             parameters: objectSchema({ path: { type: 'string' } }),
             isConcurrencySafe: () => true,
-            effect: () => ({ minimumMode: 'read-only', reason: '列出 workspace 目录' }),
+            effect: () => ({ minimumMode: 'read-only', reason: '列出工作区目录' }),
             execute: async (args) => fs.list(optionalStringArg(args, 'path') ?? '.'),
         },
         {
-            name: 'fs_search', description: '在 workspace 文本文件中搜索字面字符串',
+            name: 'fs_search', description: '在工作区文本文件中搜索字面字符串',
             parameters: objectSchema({ query: { type: 'string', minLength: 1 }, path: { type: 'string' } }, ['query']),
             isConcurrencySafe: () => true,
-            effect: () => ({ minimumMode: 'read-only', reason: '搜索 workspace 文件' }),
+            effect: () => ({ minimumMode: 'read-only', reason: '搜索工作区文件' }),
             execute: async (args) => fs.search(stringArg(args, 'query'), optionalStringArg(args, 'path') ?? '.'),
         },
     ];
 }
-/** 创建严格 object schema。 */
+/** 创建严格 对象模式。 */
 function objectSchema(properties, required = []) {
     return { type: 'object', properties, required, additionalProperties: false };
 }
@@ -224,7 +224,7 @@ function optionalStringArg(args, name) {
 function clip(text, maximum) {
     return text.length <= maximum ? { text, truncated: false } : { text: text.slice(0, maximum), truncated: true };
 }
-/** 将 Dirent 映射为稳定类型词汇。 */
+/** 将 目录项 映射为稳定类型词汇。 */
 function direntType(entry) {
     if (entry.isDirectory())
         return 'directory';
@@ -234,7 +234,7 @@ function direntType(entry) {
         return 'symlink';
     return 'other';
 }
-/** 读取 Node 系统错误码。 */
+/** 读取 系统错误码。 */
 function nodeCode(error) {
     return typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' ? error.code : undefined;
 }

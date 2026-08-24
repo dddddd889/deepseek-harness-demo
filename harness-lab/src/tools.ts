@@ -15,7 +15,7 @@ export interface PreparedToolCall {
   readonly mode: 'parallel' | 'exclusive'
 }
 
-/** 工具注册表同时拥有模型 schema 和执行函数，但只把 schema 暴露给 LLM。 */
+/** 工具注册表同时拥有模型模式和执行函数，但只把模式暴露给大模型。 */
 export class ToolRegistry {
   readonly #tools = new Map<string, ToolDefinition>()
 
@@ -78,7 +78,7 @@ export class ToolRegistry {
   }
 }
 
-/** 生成与 callId 相关联的模型可见 tool-result message。 */
+/** 生成与调用标识相关联的模型可见工具结果消息。 */
 export function createToolOutcomeMessage(callId: string, outcome: ToolOutcome) {
   return createMessage({
     role: 'user', source: { kind: 'tool', callId },
@@ -86,7 +86,7 @@ export function createToolOutcomeMessage(callId: string, outcome: ToolOutcome) {
   })
 }
 
-/** 教学实现覆盖常用 JSON Schema 子集，并在错误中携带参数路径。 */
+/** 教学实现覆盖常用 JSON 模式子集，并在错误中携带参数路径。 */
 function validateSchema(schema: Readonly<Record<string, JsonValue>>, value: JsonValue, path = '$'): void {
   if (Array.isArray(schema.enum) && !schema.enum.some(candidate => JSON.stringify(candidate) === JSON.stringify(value))) {
     throw new TypeError(`${path} 不在 enum 中`)
@@ -118,7 +118,7 @@ function validateSchema(schema: Readonly<Record<string, JsonValue>>, value: Json
   }
 }
 
-/** 判断 JSON Schema primitive type。 */
+/** 判断 JSON 模式的基本类型。 */
 function matchesType(type: string, value: JsonValue): boolean {
   if (type === 'null') return value === null
   if (type === 'array') return Array.isArray(value)
@@ -132,7 +132,7 @@ function isPlainJsonObject(value: JsonValue): value is { readonly [key: string]:
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** JSON Schema 节点守卫。 */
+/** JSON 模式节点守卫。 */
 function isSchema(value: JsonValue | undefined): value is { readonly [key: string]: JsonValue } {
   return value !== undefined && isPlainJsonObject(value)
 }

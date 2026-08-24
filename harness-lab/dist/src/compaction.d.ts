@@ -11,12 +11,12 @@ export interface CompactResult {
     readonly shadowedTokenCount: number;
     readonly summaryTokens: number;
 }
-/** 从头部选择区间，保留最近预算，并向前移动到完整 tool-call/result 边界。 */
+/** 从头部选择区间，保留最近预算，并向前移动到完整 工具调用与结果边界。 */
 export declare function selectCompactableRange(events: readonly SessionEvent[], retainTokens: number): {
     start: number;
     end: number;
 } | null;
-/** 摘要是日志事务：失败会闭合 bracket，但绝不提交 replacement。 */
+/** 摘要是日志事务：失败会闭合 边界事件，但绝不提交 替换记录。 */
 export declare function compactRange(session: Session, range: {
     readonly start: number;
     readonly end: number;

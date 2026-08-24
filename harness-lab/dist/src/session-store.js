@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { assertJsonValue, snapshotJson } from "./json.js";
 import { Session } from "./session.js";
 import { interruptedTurnClosers } from "./session-repair.js";
-/** 逐事件 checksummed JSONL Store，提供 flush、冷恢复修复与 fork。 */
+/** 逐事件写入带校验和的 JSONL 存储，提供刷盘、冷恢复修复与分叉。 */
 export class JsonlSessionStore {
     root;
     #tracked = new Map();
@@ -38,7 +38,7 @@ export class JsonlSessionStore {
             repair: { repairedTornBytes: inspected.repairedTornBytes, syntheticClosers: inspected.syntheticClosers },
         };
     }
-    /** 读取已提交前缀；完整坏行拒绝，只有 newline-less 尾部可截断。 */
+    /** 读取已提交前缀；完整坏行拒绝，只有缺少换行符的尾部可截断。 */
     async inspect(id, repair = false) {
         validateId(id);
         const path = this.pathFor(id);
@@ -52,7 +52,7 @@ export class JsonlSessionStore {
         lines.pop();
         const headerRecord = parseHeader(lines.shift(), id);
         const events = lines.map((line, index) => parseEvent(line, index));
-        // Session 构造同时验证 lossless JSON 与连续 seq。
+        // 会话构造同时验证无损 JSON 与连续序号。
         const verified = new Session(events).events;
         const closers = repair ? interruptedTurnClosers(verified) : [];
         if (repair && (repairedTornBytes > 0 || closers.length > 0)) {
@@ -84,7 +84,7 @@ export class JsonlSessionStore {
             syntheticClosers: closers.length,
         };
     }
-    /** 从源事件前缀创建独立文件；切在 turn 中间时先合成 interrupted closers。 */
+    /** 从源事件前缀创建独立文件；切在 轮次中间时先合成中断闭合事件。 */
     async fork(sourceId, targetId, atSeq) {
         const source = await this.inspect(sourceId, true);
         const lastSeq = source.events.length - 1;
@@ -113,7 +113,7 @@ export class JsonlSessionStore {
         const outcomes = await Promise.allSettled(sessions.map(session => this.close(session)));
         const failures = outcomes.filter(outcome => outcome.status === 'rejected');
         if (failures.length > 0)
-            throw new AggregateError(failures.map(item => item.reason), 'Session Store 关闭失败');
+            throw new AggregateError(failures.map(item => item.reason), '会话存储关闭失败');
     }
     pathFor(id) {
         validateId(id);
@@ -130,7 +130,7 @@ export class JsonlSessionStore {
             await handle.close();
         }
         try {
-            // hard-link publish 保证目标已存在时失败，绝不覆盖另一会话。
+            // 硬链接发布 保证目标已存在时失败，绝不覆盖另一会话。
             await link(temporary, path);
             const directory = await open(this.root, 'r');
             try {
@@ -170,11 +170,11 @@ export class JsonlSessionStore {
     requireTracking(session) {
         const state = this.#tracked.get(session);
         if (!state)
-            throw new Error('Session 未由此 Store 跟踪');
+            throw new Error('会话未由此存储跟踪');
         return state;
     }
 }
-/** Header 自身也带 checksum，避免身份或 lineage 被静默修改。 */
+/** 头部自身也带校验和，避免身份或谱系 被静默修改。 */
 function headerLine(header) {
     const record = { kind: 'header', header, checksum: checksum(header) };
     return `${JSON.stringify(record)}\n`;
@@ -188,7 +188,7 @@ function checksum(value) {
 }
 function parseHeader(line, expectedId) {
     if (!line)
-        throw new Error('Session header 为空');
+        throw new Error('会话头部为空');
     const value = JSON.parse(line);
     assertJsonValue(value);
     if (value.kind !== 'header' || value.header?.format !== 'harness-lab-jsonl' || value.header.version !== 1) {
@@ -197,7 +197,7 @@ function parseHeader(line, expectedId) {
     if (value.header.id !== expectedId)
         throw new Error(`Session header id 不匹配：${value.header.id}`);
     if (value.checksum !== checksum(value.header))
-        throw new Error('Session header checksum 不匹配');
+        throw new Error('会话头部校验和不匹配');
     return snapshotJson(value);
 }
 function parseEvent(line, index) {
@@ -216,6 +216,6 @@ function parseEvent(line, index) {
 }
 function validateId(id) {
     if (!id)
-        throw new TypeError('Session id 不能为空');
+        throw new TypeError('会话标识不能为空');
 }
 //# sourceMappingURL=session-store.js.map

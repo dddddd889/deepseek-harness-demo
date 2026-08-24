@@ -6,14 +6,14 @@ import { join } from 'node:path'
 import { ToolRegistry } from './tools.ts'
 import { createWorkspaceFsTools, WorkspaceFs } from './workspace-fs.ts'
 
-/** 在系统临时目录创建隔离 workspace，并在断言后可靠清理。 */
+/** 在系统临时目录创建隔离工作区，并在断言后可靠清理。 */
 async function fixture(run: (root: string) => Promise<void>): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), 'harness-fs-test-'))
   try { await run(root) }
   finally { await rm(root, { recursive: true, force: true }) }
 }
 
-test('原子 write/read/list 使用 workspace 相对路径', async () => fixture(async root => {
+test('原子写入、读取与列举使用工作区相对路径', async () => fixture(async root => {
   const fs = await WorkspaceFs.open(root)
   assert.deepEqual(await fs.writeText('src/a.txt', 'hello'), { path: 'src/a.txt', bytes: 5 })
   assert.deepEqual(await fs.readText('src/a.txt'), { path: 'src/a.txt', content: 'hello', truncated: false })
@@ -21,7 +21,7 @@ test('原子 write/read/list 使用 workspace 相对路径', async () => fixture
   assert.equal(await readFile(join(root, 'src/a.txt'), 'utf8'), 'hello')
 }))
 
-test('拒绝 ..、绝对路径和读 symlink 逃逸', async () => fixture(async root => {
+test('拒绝上级路径、绝对路径和读取符号链接逃逸', async () => fixture(async root => {
   const outside = await mkdtemp(join(tmpdir(), 'harness-fs-outside-'))
   try {
     await writeFile(join(outside, 'secret.txt'), 'secret')
@@ -35,7 +35,7 @@ test('拒绝 ..、绝对路径和读 symlink 逃逸', async () => fixture(async 
   }
 }))
 
-test('拒绝通过 symlink 父目录向 workspace 外写入', async () => fixture(async root => {
+test('拒绝通过符号链接父目录向工作区外写入', async () => fixture(async root => {
   const outside = await mkdtemp(join(tmpdir(), 'harness-fs-write-outside-'))
   try {
     await symlink(outside, join(root, 'escape'))
@@ -55,7 +55,7 @@ test('读取硬上限与展示裁剪是两个不同信号', async () => fixture(
   assert.deepEqual(await clipped.readText('large.txt'), { path: 'large.txt', content: '123', truncated: true })
 }))
 
-test('search 不跟随 symlink，并对结果数量显式截断', async () => fixture(async root => {
+test('搜索不跟随符号链接，并对结果数量显式截断', async () => fixture(async root => {
   await mkdir(join(root, 'src'))
   await writeFile(join(root, 'src/a.txt'), 'needle one\nneedle two\n')
   await writeFile(join(root, 'src/b.txt'), 'needle three\n')
@@ -67,7 +67,7 @@ test('search 不跟随 symlink，并对结果数量显式截断', async () => fi
   assert.equal(result.matches.every(match => !match.path.startsWith('alias/')), true)
 }))
 
-test('文件工具通过 Registry 保留 WorkspaceFs 稳定错误码', async () => fixture(async root => {
+test('文件工具通过注册表保留工作区文件系统的稳定错误码', async () => fixture(async root => {
   const fs = await WorkspaceFs.open(root)
   const registry = new ToolRegistry()
   for (const tool of createWorkspaceFsTools(fs)) registry.register(tool)
@@ -79,7 +79,7 @@ test('文件工具通过 Registry 保留 WorkspaceFs 稳定错误码', async () 
   }
 }))
 
-/** 构造只检查稳定 code 的 rejects 校验函数。 */
+/** 构造只检查稳定错误码的拒绝断言函数。 */
 function errorCode(code: string): (error: unknown) => boolean {
   return error => typeof error === 'object' && error !== null && 'code' in error && error.code === code
 }

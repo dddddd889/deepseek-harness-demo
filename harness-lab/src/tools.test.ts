@@ -38,7 +38,7 @@ class QueueProvider implements LlmProvider {
   }
 }
 
-test('Registry 在执行前拒绝坏 JSON、缺字段和额外字段', async () => {
+test('注册表在执行前拒绝损坏的 JSON、缺失字段和额外字段', async () => {
   let executions = 0
   const registry = new ToolRegistry()
   registry.register({ ...sumTool, async execute(args, signal) { executions += 1; return sumTool.execute(args, signal) } })
@@ -57,11 +57,11 @@ test('Registry 在执行前拒绝坏 JSON、缺字段和额外字段', async () 
   ])
 })
 
-test('未知工具和工具异常都归一为关联的 tool/result', async () => {
+test('未知工具和工具异常都归一为关联的工具结果', async () => {
   const registry = new ToolRegistry()
   registry.register({
     name: 'explode', description: '失败', parameters: { type: 'object' },
-    async execute() { throw new TypeError('boom') },
+    async execute() { throw new TypeError('模拟爆炸') },
   })
   const session = new Session()
   session.append('turn/start', { turn: 1 })
@@ -75,7 +75,7 @@ test('未知工具和工具异常都归一为关联的 tool/result', async () =>
   assert.deepEqual(results.map(event => event.data.callId), ['unknown-1', 'explode-1'])
 })
 
-test('相邻 parallel 工具重叠执行，但结果仍按模型顺序提交', async () => {
+test('相邻并行工具重叠执行，但结果仍按模型顺序提交', async () => {
   const registry = new ToolRegistry()
   let active = 0
   let maximumActive = 0
@@ -102,7 +102,7 @@ test('相邻 parallel 工具重叠执行，但结果仍按模型顺序提交', a
   assert.deepEqual(session.events.filter(event => event.type === 'tool/result').map(event => event.data.callId), ['1', '2'])
 })
 
-test('exclusive 工具在前后 parallel 组之间形成屏障', async () => {
+test('独占工具在前后并行组之间形成屏障', async () => {
   const registry = new ToolRegistry()
   const order: string[] = []
   for (const [name, parallel] of [['p1', true], ['exclusive', false], ['p2', true]] as const) {
@@ -125,7 +125,7 @@ test('exclusive 工具在前后 parallel 组之间形成屏障', async () => {
   assert.deepEqual(order, ['p1:start', 'p1:end', 'exclusive:start', 'exclusive:end', 'p2:start', 'p2:end'])
 })
 
-test('Agent 执行工具后自动进入下一 step，模型能看到 tool-result', async () => {
+test('智能体执行工具后自动进入下一步骤，模型能看到工具结果', async () => {
   const provider = new QueueProvider([
     [
       { type: 'tool-call-delta', index: 0, id: 'sum-1', name: 'sum', argumentsDelta: '{"a":2,"b":3}' },
@@ -154,7 +154,7 @@ test('Agent 执行工具后自动进入下一 step，模型能看到 tool-result
   assert.equal(inspectLifecycle(session.events).status, 'idle')
 })
 
-test('maxSteps 防止模型无限调用工具', async () => {
+test('最大步骤数防止模型无限调用工具', async () => {
   const loop: StreamChunk[] = [
     { type: 'tool-call-delta', index: 0, id: 'sum-loop', name: 'sum', argumentsDelta: '{"a":1,"b":1}' },
     { type: 'finish', reason: { kind: 'tool-calls' } },
@@ -173,7 +173,7 @@ test('maxSteps 防止模型无限调用工具', async () => {
   assert.equal(inspectLifecycle(session.events).status, 'idle')
 })
 
-test('取消会等待协作式工具收尾，记录 TOOL_ABORTED 后闭合 turn', async () => {
+test('取消会等待协作式工具收尾，记录工具取消错误后闭合轮次', async () => {
   const provider = new QueueProvider([[
     { type: 'tool-call-delta', index: 0, id: 'slow-1', name: 'slow', argumentsDelta: '{}' },
     { type: 'finish', reason: { kind: 'tool-calls' } },

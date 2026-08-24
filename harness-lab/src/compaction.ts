@@ -18,7 +18,7 @@ export interface CompactResult {
   readonly summaryTokens: number
 }
 
-/** surface 节点已经完成投影，因此这里只做事件到消息的一对一派生。 */
+/** 模型可见面节点已经完成投影，因此这里只做事件到消息的一对一派生。 */
 function messageOf(event: SessionEvent): Message | undefined {
   if (event.type === 'user/message') return event.data
   if (event.type === 'assistant/message') return event.data.message
@@ -26,7 +26,7 @@ function messageOf(event: SessionEvent): Message | undefined {
   return undefined
 }
 
-/** 返回每个 surface 节点之后是否处于完整工具调用边界。 */
+/** 返回每个 模型可见面节点之后是否处于完整工具调用边界。 */
 function balancedBoundaries(surface: readonly SessionEvent[]): readonly boolean[] {
   const pending = new Set<string>()
   return surface.map(event => {
@@ -40,7 +40,7 @@ function balancedBoundaries(surface: readonly SessionEvent[]): readonly boolean[
   })
 }
 
-/** 从头部选择区间，保留最近预算，并向前移动到完整 tool-call/result 边界。 */
+/** 从头部选择区间，保留最近预算，并向前移动到完整 工具调用与结果边界。 */
 export function selectCompactableRange(
   events: readonly SessionEvent[],
   retainTokens: number,
@@ -65,7 +65,7 @@ export function selectCompactableRange(
   return first === undefined || last === undefined ? null : { start: first.seq, end: last.seq }
 }
 
-/** 摘要是日志事务：失败会闭合 bracket，但绝不提交 replacement。 */
+/** 摘要是日志事务：失败会闭合 边界事件，但绝不提交 替换记录。 */
 export async function compactRange(
   session: Session,
   range: { readonly start: number; readonly end: number },
@@ -80,7 +80,7 @@ export async function compactRange(
   const selected = before.slice(startIndex, endIndex + 1)
   const boundaries = balancedBoundaries(before)
   if ((startIndex > 0 && boundaries[startIndex - 1] !== true) || boundaries[endIndex] !== true) {
-    throw new Error('压缩区间会拆开 tool-call/result 原子组')
+    throw new Error('压缩区间会拆开工具调用与结果的原子组')
   }
 
   const id = randomUUID()

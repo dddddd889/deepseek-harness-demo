@@ -1,12 +1,12 @@
 import { HarnessContext } from "./context.js";
-/** Bundle 是有序插件补丁；任何 row 失败都会逆序回滚此前已挂载 rows。 */
+/** 插件包是一组有序插件；任一条目失败时都会逆序回滚此前已挂载的条目。 */
 export class HarnessBundle {
     context = new HarnessContext();
     #disposers = [];
     #mounted = false;
     async mount(plugins) {
         if (this.#mounted)
-            throw new Error('Bundle 已挂载');
+            throw new Error('插件包已挂载');
         this.#mounted = true;
         try {
             for (const plugin of plugins)
@@ -29,7 +29,7 @@ export class HarnessBundle {
         }
         this.#disposers.length = 0;
         if (errors.length > 0)
-            throw new AggregateError(errors, 'Bundle 清理失败');
+            throw new AggregateError(errors, '插件包清理失败');
     }
 }
 //# sourceMappingURL=bundle.js.map

@@ -12,7 +12,7 @@ const book: PriceBook = {
   ],
 }
 
-test('最终 usage 覆盖流式样本，并按请求时刻选择价格', () => {
+test('最终用量覆盖流式样本，并按请求时刻选择价格', () => {
   const session = new Session()
   session.append('request/header', { header: { provider: 'deepseek', model: 'chat' }, reason: 'initial' }, 100)
   session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: { inputTokens: 9, outputTokens: 9 } } }, 101)
@@ -27,7 +27,7 @@ test('最终 usage 覆盖流式样本，并按请求时刻选择价格', () => {
   assert.equal(formatPicoUsd(result.picoUsd), '$0.00000085')
 })
 
-test('未知模型显式进入 unpriced，不被静默当成零成本', () => {
+test('未知模型显式进入未定价列表，不被静默当成零成本', () => {
   const session = new Session()
   session.append('request/header', { header: { provider: 'x', model: 'unknown' }, reason: 'initial' }, 1)
   session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } } })

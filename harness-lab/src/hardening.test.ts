@@ -7,7 +7,7 @@ import { probeRuntime, requireCapability } from './runtime-capabilities.ts'
 
 const valuePlugin = (value: string): Plugin => ({ name: `value-${value}`, apply: async (ctx) => ctx.provide('value', value) })
 
-test('HMR 候选失败时旧 bundle 不闪断', async () => {
+test('热重载候选失败时旧插件包不闪断', async () => {
   const hot = new HotBundle()
   await hot.reload([valuePlugin('v1')])
   const broken: Plugin = { name: 'broken', apply: () => { throw new Error('配置坏了') } }
@@ -19,7 +19,7 @@ test('HMR 候选失败时旧 bundle 不闪断', async () => {
   await hot.dispose()
 })
 
-test('能力探测明确区分强 sandbox 与 process-only 降级', () => {
+test('能力探测明确区分强沙箱与仅进程隔离降级', () => {
   const linux = probeRuntime({ platform: 'linux', bunVersion: '1.3.14', ptyAvailable: false, commandExists: () => false })
   assert.equal(linux.sandbox, 'process-only')
   assert.throws(() => requireCapability(linux, 'pty'), /CAPABILITY_UNAVAILABLE:pty:linux/)

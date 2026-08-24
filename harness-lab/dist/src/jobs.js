@@ -2,7 +2,7 @@ export class JobError extends Error {
     code;
     constructor(message, code) { super(message); this.code = code; }
 }
-/** 进程内 Job 控制面；执行资源仍归 producer，Registry 只拥有身份与生命周期。 */
+/** 进程内后台任务控制面；执行资源仍归生产方，注册表只拥有身份与生命周期。 */
 export class LocalJobRegistry {
     #records = new Map();
     #counters = new Map();
@@ -12,7 +12,7 @@ export class LocalJobRegistry {
     #disposed = false;
     attachController() {
         if (this.#disposed)
-            throw new JobError('Job Registry 已释放', 'JOB_DISPOSED');
+            throw new JobError('后台任务注册表已释放', 'JOB_DISPOSED');
         this.#controllers += 1;
         let active = true;
         return () => {
@@ -24,18 +24,18 @@ export class LocalJobRegistry {
     }
     start(spec) {
         if (this.#disposed)
-            throw new JobError('Job Registry 已释放', 'JOB_DISPOSED');
+            throw new JobError('后台任务注册表已释放', 'JOB_DISPOSED');
         if (!/^[a-z][a-z0-9-]*$/.test(spec.kind))
-            throw new JobError(`Job kind 无效：${spec.kind}`, 'JOB_INVALID');
+            throw new JobError(`后台任务类型无效：${spec.kind}`, 'JOB_INVALID');
         if (spec.label.trim() === '')
-            throw new JobError('Job label 不能为空', 'JOB_INVALID');
+            throw new JobError('后台任务标签不能为空', 'JOB_INVALID');
         if (spec.ownerSession !== undefined && this.#controllers === 0) {
-            throw new JobError('没有 controller 接管 owned job', 'JOB_NO_CONTROLLER');
+            throw new JobError('没有控制器接管有所有者的后台任务', 'JOB_NO_CONTROLLER');
         }
         if (spec.outputLimitBytes !== undefined && (!Number.isSafeInteger(spec.outputLimitBytes) || spec.outputLimitBytes <= 0)) {
-            throw new JobError('outputLimitBytes 必须为正整数', 'JOB_INVALID');
+            throw new JobError('输出字节上限必须为正整数', 'JOB_INVALID');
         }
-        // run 抛错时不消耗 id，也不发布半条记录。
+        // 运行函数抛错时不消耗标识，也不发布半条记录。
         const hooks = spec.run();
         const next = (this.#counters.get(spec.kind) ?? 0) + 1;
         const id = `${spec.kind}-${next}`;
@@ -75,7 +75,7 @@ export class LocalJobRegistry {
             record.reported = true;
             return 'already-finished';
         }
-        // cancel 抛错时状态保持 running，调用方能明确重试或升级。
+        // 取消函数抛错时状态保持运行中，调用方能明确重试或升级。
         record.hooks.cancel(reason);
         record.status = 'stopping';
         record.reported = true;
@@ -84,7 +84,7 @@ export class LocalJobRegistry {
     }
     async wait(id, timeoutMs, callerSession, signal) {
         if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
-            throw new JobError('wait timeout 必须为正数', 'JOB_INVALID');
+            throw new JobError('等待超时时间必须为正数', 'JOB_INVALID');
         const record = this.#authorized(id, callerSession);
         if (record.settled)
             return this.#snapshot(record);
@@ -113,7 +113,7 @@ export class LocalJobRegistry {
         this.#changeListeners.add(listener);
         return () => this.#changeListeners.delete(listener);
     }
-    /** owner 释放会停止并等待其所有 live jobs，然后删除这些 owner-private 记录。 */
+    /** 所有者释放会停止并等待其所有活动任务，然后删除这些 所有者私有记录。 */
     async disposeOwner(ownerSession) {
         const owned = [...this.#records.values()].filter(record => record.ownerSession === ownerSession);
         for (const record of owned) {
@@ -157,9 +157,9 @@ export class LocalJobRegistry {
     }
     #authorized(id, callerSession) {
         const record = this.#records.get(id);
-        // 不区分 unknown/foreign，防止可预测 id 成为跨 owner 枚举侧信道。
+        // 不区分 未知记录或外部记录，防止可预测 标识成为跨所有者 枚举侧信道。
         if (record === undefined || (record.ownerSession !== undefined && record.ownerSession !== callerSession)) {
-            throw new JobError(`Job 不存在或无权访问：${id}`, 'JOB_NOT_FOUND');
+            throw new JobError(`后台任务不存在或无权访问：${id}`, 'JOB_NOT_FOUND');
         }
         return record;
     }

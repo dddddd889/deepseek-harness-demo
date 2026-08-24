@@ -24,7 +24,7 @@ try {
   assert.equal(recovered.repair.syntheticClosers, 1)
   await store.close(recovered.session)
   await access(new URL('../web/index.html', import.meta.url))
-  process.stdout.write('release smoke: ok\n')
+  process.stdout.write('发布冒烟测试：通过\n')
 } finally {
   await rm(root, { recursive: true, force: true })
 }

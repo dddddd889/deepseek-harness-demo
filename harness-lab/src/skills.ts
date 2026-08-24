@@ -18,11 +18,11 @@ export interface SkillDefinition extends SkillSummary {
 
 interface Candidate extends SkillSummary { readonly path: string }
 
-/** 解析课程所需的严格 frontmatter 子集，未知字段保留为无害元数据外信息。 */
+/** 解析课程所需的严格的头部元数据子集，未知字段保留为无害元数据外信息。 */
 function parseSkill(markdown: string, fallbackName: string): { name: string; description: string; modelInvocable: boolean; userInvocable: boolean; content: string } {
-  if (!markdown.startsWith('---\n')) throw new Error('SKILL.md 缺少 YAML frontmatter')
+  if (!markdown.startsWith('---\n')) throw new Error('SKILL.md 缺少 YAML 头部元数据')
   const end = markdown.indexOf('\n---\n', 4)
-  if (end < 0) throw new Error('SKILL.md frontmatter 未闭合')
+  if (end < 0) throw new Error('SKILL.md 头部元数据未闭合')
   const fields = new Map<string, string>()
   for (const line of markdown.slice(4, end).split('\n')) {
     const colon = line.indexOf(':')
@@ -41,7 +41,7 @@ function parseSkill(markdown: string, fallbackName: string): { name: string; des
   }
 }
 
-/** 文件系统 Skills：低 rank 胜出，list 不加载正文，get 才读取最新内容。 */
+/** 文件系统技能：低优先级者胜出，列表操作不加载正文，读取操作才读取最新内容。 */
 export class SkillRegistry {
   readonly #roots: readonly { readonly path: string; readonly rank: number; readonly provider: string }[]
   readonly #winners = new Map<string, Candidate>()

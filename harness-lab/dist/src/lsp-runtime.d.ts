@@ -28,9 +28,9 @@ export declare class LspRuntimeError extends Error {
     readonly code: string;
     constructor(message: string, code: string);
 }
-/** 取最终扩展名；foo.d.ts 路由为 .ts，dotfile 不被误判。 */
+/** 取最终扩展名；例如 foo.d.ts 路由为 .ts，以点开头的文件不会被误判。 */
 export declare function finalExtension(path: string): string;
-/** LSP seam 原子保留 provider id 与全部扩展名。 */
+/** LSP 接口边界会原子保留提供方标识及其全部扩展名。 */
 export declare class LspRuntime {
     #private;
     register(provider: LspProvider): () => void;

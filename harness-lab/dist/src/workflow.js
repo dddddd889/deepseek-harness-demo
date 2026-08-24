@@ -16,14 +16,14 @@ parentPort.on('message', message => {
   }
   if (message.type === 'cancel') {
     cancelled = true
-    for (const slot of pending.values()) slot.reject(new Error(message.reason || 'workflow cancelled'))
+    for (const slot of pending.values()) slot.reject(new Error(message.reason || '工作流已取消'))
     pending.clear()
   }
 })
 const phase = title => { parentPort.postMessage({ type: 'phase', title }) }
 const log = message => { parentPort.postMessage({ type: 'log', message: String(message) }) }
 const agent = options => {
-  if (cancelled) return Promise.reject(new Error('workflow cancelled'))
+  if (cancelled) return Promise.reject(new Error('工作流已取消'))
   const current = ++seq
   return new Promise((resolve, reject) => {
     pending.set(current, { resolve, reject })
@@ -40,7 +40,7 @@ const agent = options => {
   }
 })()
 `;
-/** Worker-thread Workflow：脚本动态 fan-out，Host 掌握子 Agent 与预算。 */
+/** 工作线程中的工作流：脚本动态扇出，宿主掌握子智能体 与预算。 */
 export class WorkflowEngine {
     #subagents;
     #listeners = new Set();
@@ -204,7 +204,7 @@ export class WorkflowEngine {
         }));
         worker.on('exit', code => {
             if (!settled && code !== 0)
-                finishWhenQuiescent({ value: null, stopReason: cancelling ? 'cancelled' : 'error', error: `workflow worker exit ${code}`, agentsStarted });
+                finishWhenQuiescent({ value: null, stopReason: cancelling ? 'cancelled' : 'error', error: `工作流线程退出，状态码 ${code}`, agentsStarted });
         });
         this.#emit({ type: 'start', id, meta: request.meta });
         if (request.signal?.aborted === true)
@@ -213,7 +213,7 @@ export class WorkflowEngine {
     }
     #validate(request) {
         if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.meta.name) || request.meta.description.trim() === '')
-            throw new TypeError('Workflow meta 无效');
+            throw new TypeError('工作流元数据无效');
         const titles = new Set();
         for (const phase of request.meta.phases ?? []) {
             if (phase.title.trim() === '' || titles.has(phase.title))
@@ -225,11 +225,11 @@ export class WorkflowEngine {
                 throw new TypeError(`${name} 必须为正整数`);
         }
         if ((request.maxConcurrentAgents ?? 4) > (request.maxTotalAgents ?? 16))
-            throw new TypeError('maxConcurrentAgents 不能超过 maxTotalAgents');
+            throw new TypeError('最大并发智能体数不能超过智能体总数上限');
     }
     #agentMessage(value) {
         if (!Number.isSafeInteger(value.seq) || typeof value.prompt !== 'string' || value.prompt.trim() === '')
-            throw new TypeError('Workflow agent() 参数无效');
+            throw new TypeError('工作流的智能体调用参数无效');
         return {
             type: 'agent', seq: value.seq, prompt: value.prompt,
             ...typeof value.label === 'string' ? { label: value.label } : {},

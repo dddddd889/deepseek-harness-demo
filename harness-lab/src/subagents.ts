@@ -56,14 +56,14 @@ export class SubagentError extends Error {
   constructor(message: string, code: string) { super(message); this.code = code }
 }
 
-/** 子 Agent 控制面：选择 provider、前置能力校验、配对生命周期与资源收敛。 */
+/** 子智能体控制面：选择提供方、前置能力校验、配对生命周期与资源收敛。 */
 export class SubagentRuntime {
   readonly #providers = new Map<string, SubagentProvider>()
   readonly #listeners = new Set<(event: SubagentLifecycleEvent) => void>()
   readonly #active = new Map<string, SubagentRun>()
 
   register(provider: SubagentProvider): () => void {
-    if (this.#providers.has(provider.name)) throw new SubagentError(`Subagent provider 重复：${provider.name}`, 'SUBAGENT_PROVIDER_CONFLICT')
+    if (this.#providers.has(provider.name)) throw new SubagentError(`子智能体提供方重复：${provider.name}`, 'SUBAGENT_PROVIDER_CONFLICT')
     this.#providers.set(provider.name, provider)
     return () => this.#providers.delete(provider.name)
   }
@@ -79,11 +79,11 @@ export class SubagentRuntime {
     request.signal.throwIfAborted()
     const provider = this.#resolve(providerName)
     const depth = request.parentDepth + 1
-    if (!Number.isSafeInteger(request.parentDepth) || request.parentDepth < 0) throw new SubagentError('parentDepth 无效', 'SUBAGENT_INVALID_REQUEST')
+    if (!Number.isSafeInteger(request.parentDepth) || request.parentDepth < 0) throw new SubagentError('父级深度无效', 'SUBAGENT_INVALID_REQUEST')
     if (request.maxDepth !== undefined) {
       this.#require(provider, 'depthLimit')
       if (!Number.isSafeInteger(request.maxDepth) || request.maxDepth < 0 || depth > request.maxDepth) {
-        throw new SubagentError(`子 Agent 深度 ${depth} 超过上限 ${request.maxDepth}`, 'SUBAGENT_DEPTH_LIMIT')
+        throw new SubagentError(`子智能体深度 ${depth} 超过上限 ${request.maxDepth}`, 'SUBAGENT_DEPTH_LIMIT')
       }
     }
     if (request.outputSchema !== undefined) this.#require(provider, 'outputSchema')
@@ -134,7 +134,7 @@ export class SubagentRuntime {
     return run
   }
 
-  /** 把一次 delegation 包成 owner-private 后台 Job。 */
+  /** 把一次 委派包装成所有者私有的后台任务。 */
   startJob(
     jobs: LocalJobRegistry,
     providerName: string | undefined,
@@ -171,16 +171,16 @@ export class SubagentRuntime {
   #resolve(name?: string): SubagentProvider {
     if (name !== undefined) {
       const provider = this.#providers.get(name)
-      if (provider === undefined || !provider.available()) throw new SubagentError(`Subagent provider 不可用：${name}`, 'SUBAGENT_PROVIDER_UNAVAILABLE')
+      if (provider === undefined || !provider.available()) throw new SubagentError(`子智能体提供方不可用：${name}`, 'SUBAGENT_PROVIDER_UNAVAILABLE')
       return provider
     }
     const available = [...this.#providers.values()].filter(provider => provider.available())
-    if (available.length !== 1) throw new SubagentError('必须显式选择 Subagent provider', available.length === 0 ? 'SUBAGENT_PROVIDER_UNAVAILABLE' : 'SUBAGENT_PROVIDER_AMBIGUOUS')
+    if (available.length !== 1) throw new SubagentError('必须显式选择子智能体提供方', available.length === 0 ? 'SUBAGENT_PROVIDER_UNAVAILABLE' : 'SUBAGENT_PROVIDER_AMBIGUOUS')
     return available[0] as SubagentProvider
   }
 
   #require(provider: SubagentProvider, capability: keyof SubagentCapabilities): void {
-    if (!provider.capabilities[capability]) throw new SubagentError(`provider ${provider.name} 不支持 ${capability}`, 'SUBAGENT_CAPABILITY_UNSUPPORTED')
+    if (!provider.capabilities[capability]) throw new SubagentError(`提供方 ${provider.name} 不支持能力 ${capability}`, 'SUBAGENT_CAPABILITY_UNSUPPORTED')
   }
 
   #emit(event: SubagentLifecycleEvent): void {
@@ -190,7 +190,7 @@ export class SubagentRuntime {
   }
 }
 
-/** 可注入 execute 的本地 provider，便于断点调试完整生命周期。 */
+/** 可注入 执行函数的本地提供方，便于断点调试完整生命周期。 */
 export class InProcessSubagentProvider implements SubagentProvider {
   readonly name: string
   readonly capabilities: SubagentCapabilities = { outputSchema: true, depthLimit: true, toolFilter: true, persona: true }

@@ -38,24 +38,24 @@ export interface TerminalHandle {
     onData(listener: (data: string) => void): () => void;
     terminate(): Promise<void>;
 }
-/** Harness 子进程同款敏感环境名启发式：默认绝不向孩子泄漏凭证或 DSH_*。 */
+/** 框架子进程同款敏感环境名启发式：默认绝不向孩子泄漏凭证或 DSH_*。 */
 export declare const SENSITIVE_ENV_PATTERN: RegExp;
-/** 本地受管进程运行时：拥有所有进程树与 spill 文件的生命周期。 */
+/** 本地受管进程运行时：拥有所有进程树与溢出文件的生命周期。 */
 export declare class LocalProcessRuntime {
     #private;
     private constructor();
     static create(): Promise<LocalProcessRuntime>;
     spawn(spec: ProcessSpec): ManagedProcess;
     run(spec: ProcessSpec): Promise<ProcessOutcome>;
-    /** 使用 Bun 原生 Terminal 分配真实 PTY，不再加载 node-pty 原生扩展。 */
+    /** 使用 Bun 原生终端分配真实伪终端，不再加载第三方伪终端扩展。 */
     spawnTerminal(spec: Omit<ProcessSpec, 'timeoutMs' | 'maxOutputBytes'> & {
         readonly cols?: number;
         readonly rows?: number;
     }): Promise<TerminalHandle>;
-    /** 组合卸载时停止并等待全部孩子，之后删除运行时拥有的 spill。 */
+    /** 组合卸载时停止并等待全部孩子，之后删除运行时拥有的溢出文件。 */
     dispose(): Promise<void>;
 }
-/** 生成清洗后的子进程环境，显式 env 最后覆盖。 */
+/** 生成清洗后的子进程环境，显式环境变量 最后覆盖。 */
 export declare function childEnvironment(explicit?: Readonly<Record<string, string>>): NodeJS.ProcessEnv;
-/** 教学/测试辅助：读取发生截断时的完整 spill。 */
+/** 教学/测试辅助：读取发生截断时的完整 溢出。 */
 export declare function readSpill(output: CollectedOutput): Promise<string | undefined>;

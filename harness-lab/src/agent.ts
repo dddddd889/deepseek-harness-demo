@@ -23,7 +23,7 @@ export interface TurnResult {
   readonly message?: Message
 }
 
-/** 最小 Inbox 驱动 Agent；一次 run 原子认领当时排队的全部用户消息。 */
+/** 最小 收件箱驱动的智能体；一次运行会原子认领当时排队的全部用户消息。 */
 export class HarnessAgent {
   readonly session: Session
   readonly runtime: LlmRuntime
@@ -52,12 +52,12 @@ export class HarnessAgent {
   get status(): AgentStatus { return this.#status }
   get pendingMessages(): number { return this.#inbox.length }
 
-  /** 用户输入只进入 Inbox；真正写入 Session 必须等某个 turn 成功认领。 */
+  /** 用户输入只进入 收件箱；真正写入会话 必须等某个 轮次成功认领。 */
   send(text: string): Message {
     return this.sendContent([{ type: 'text', text }])
   }
 
-  /** 接受已通过 Host 边界验证的富内容；Inbox 仍只保存不可变 Message。 */
+  /** 接受已通过宿主边界验证的富内容；收件箱 仍只保存不可变消息。 */
   sendContent(content: readonly ContentBlock[]): Message {
     if (content.length === 0) throw new TypeError('用户消息 content 不能为空')
     const message = createMessage({ role: 'user', content, source: { kind: 'user' } })
@@ -70,13 +70,13 @@ export class HarnessAgent {
     return () => this.#statusListeners.delete(listener)
   }
 
-  /** 取消当前模型读取；归一化后的 aborted finish 仍会进入 Session。 */
+  /** 取消当前模型读取；归一化后的 已取消终止帧 仍会进入会话。 */
   cancel(reason = new Error('用户取消')): void {
     this.#abort?.abort(reason)
   }
 
   async run(externalSignal?: AbortSignal): Promise<TurnResult | undefined> {
-    if (this.#status === 'running') throw new Error('Agent 已在运行，禁止并发 run')
+    if (this.#status === 'running') throw new Error('智能体正在运行，禁止并发执行')
     if (this.#inbox.length === 0) return undefined
 
     const claimed = this.#inbox.splice(0)
@@ -146,7 +146,7 @@ export class HarnessAgent {
     }
   }
 
-  /** 从已存在日志计算下一个 turn，使恢复后的 Agent 不会重用编号。 */
+  /** 从已存在日志计算下一个轮次，使恢复后的智能体 不会重用编号。 */
   private nextTurn(): number {
     let maximum = 0
     for (const event of this.session.events) {

@@ -15,7 +15,7 @@ export interface McpTransport {
   callTool(name: string, args: JsonValue, signal: AbortSignal): Promise<JsonValue>
 }
 
-/** 公共名稳定限定 server namespace；截断时用原始二元组摘要防碰撞。 */
+/** 公共名稳定限定 服务命名空间；截断时用原始二元组摘要防碰撞。 */
 export function publicMcpToolName(serverName: string, rawName: string): string {
   const normalized = `mcp__${serverName}__${rawName}`.replace(/[^A-Za-z0-9_-]/g, '_')
   if (normalized.length <= 64) return normalized
@@ -23,7 +23,7 @@ export function publicMcpToolName(serverName: string, rawName: string): string {
   return `${normalized.slice(0, 53)}_${hash}`
 }
 
-/** MCP bridge 先完整抓取分页，再原子换代；发现失败保留旧 generation。 */
+/** MCP 桥接器先完整抓取分页，再原子换代；发现失败时保留旧代次。 */
 export class McpToolBridge {
   readonly #serverName: string
   readonly #transport: McpTransport

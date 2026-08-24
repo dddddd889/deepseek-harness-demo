@@ -7,7 +7,7 @@ export interface AppendOptions {
   readonly sourceEventSeqs?: readonly number[]
 }
 
-/** 最小 append-only Session；事件数组是后续持久化和投影的唯一事实源。 */
+/** 最小只追加会话；事件数组是后续持久化和投影的唯一事实源。 */
 export class Session {
   readonly #events: SessionEvent[] = []
   readonly #listeners = new Set<(event: SessionEvent) => void>()
@@ -24,13 +24,13 @@ export class Session {
     return this.#events
   }
 
-  /** 订阅提交后的事件；持久化层用它建立 write-behind 队列。 */
+  /** 订阅提交后的事件；持久化层用它建立后台写入队列。 */
   onAppend(listener: (event: SessionEvent) => void): () => void {
     this.#listeners.add(listener)
     return () => this.#listeners.delete(listener)
   }
 
-  /** 追加一条事件；seq 和 time 由 Session 统一生成。 */
+  /** 追加一条事件；序号和时间由会话统一生成。 */
   append<T extends SessionEventType>(
     type: T,
     data: SessionEventMap[T],
@@ -44,7 +44,7 @@ export class Session {
       data,
       ...options,
     }) as SessionEvent<T>
-    // 泛型变体在此已经由 type/data 的同一 T 绑定；数组保存的是其联合上界。
+    // 泛型变体在此已经由 事件类型与数据的同一泛型参数 绑定；数组保存的是其联合上界。
     this.#events.push(event as unknown as SessionEvent)
     for (const listener of this.#listeners) listener(event as unknown as SessionEvent)
     return event

@@ -4,7 +4,7 @@ export interface ModelPrice {
   readonly provider: string
   readonly model: string
   readonly effectiveFrom: number
-  /** 每百万 token 的微美元价格；乘 token 后恰好得到皮美元。 */
+  /** 每百万词元的微美元价格；乘以词元数后恰好得到皮美元。 */
   readonly inputMicroUsdPerMillion: number
   readonly outputMicroUsdPerMillion: number
   readonly cacheReadMicroUsdPerMillion?: number
@@ -31,8 +31,8 @@ interface UsageSample {
 }
 
 /**
- * cost 是 Session usage × 版本化价目表的派生投影，不写回事实日志。
- * 同一 turn/step 的最终 assistant/message 会覆盖流式 usage 样本，避免重复计费。
+ * 成本是会话用量 × 版本化价目表的派生投影，不写回事实日志。
+ * 同一轮次与步骤的最终助手消息会覆盖流式用量样本，避免重复计费。
  */
 export function projectCost(events: readonly SessionEvent[], book: PriceBook): CostProjection {
   let active: { header: RequestHeader; time: number } | undefined
@@ -75,13 +75,13 @@ function resolvePrice(book: PriceBook, header: RequestHeader, time: number): Mod
     .sort((left, right) => right.effectiveFrom - left.effectiveFrom)[0]
 }
 
-/** 分桶计价；缓存 token 不会再落入普通 input 桶。 */
+/** 分桶计价；缓存词元不会再落入普通输入桶。 */
 function bucketCost(usage: TokenUsage, price: ModelPrice): bigint {
   const cost = usage.inputTokens * price.inputMicroUsdPerMillion
     + usage.outputTokens * price.outputMicroUsdPerMillion
     + (usage.cacheReadTokens ?? 0) * (price.cacheReadMicroUsdPerMillion ?? price.inputMicroUsdPerMillion)
     + (usage.cacheWriteTokens ?? 0) * (price.cacheWriteMicroUsdPerMillion ?? price.inputMicroUsdPerMillion)
-  if (!Number.isSafeInteger(cost)) throw new Error('cost 超出安全整数范围')
+  if (!Number.isSafeInteger(cost)) throw new Error('成本超出安全整数范围')
   return BigInt(cost)
 }
 

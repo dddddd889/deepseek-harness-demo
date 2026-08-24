@@ -7,7 +7,7 @@ import { LocalProcessRuntime, childEnvironment, readSpill } from './local-proces
 import { createShellTool, LocalShell } from './local-shell.ts'
 import { ToolRegistry } from './tools.ts'
 
-/** 为每个测试创建独立 runtime/workspace，并验证 dispose 可完成。 */
+/** 为每个测试创建独立 运行时与工作区，并验证 释放操作可以完成。 */
 async function fixture(run: (runtime: LocalProcessRuntime, root: string) => Promise<void>): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), 'harness-process-test-'))
   const runtime = await LocalProcessRuntime.create()
@@ -18,7 +18,7 @@ async function fixture(run: (runtime: LocalProcessRuntime, root: string) => Prom
   }
 }
 
-test('子进程分别收集 stdout/stderr，非零退出不是基础设施异常', async () => fixture(async (runtime, root) => {
+test('子进程分别收集标准输出与标准错误，非零退出不是基础设施异常', async () => fixture(async (runtime, root) => {
   const result = await runtime.run({
     argv: [process.execPath, '-e', "process.stdout.write('out');process.stderr.write('err');process.exit(7)"],
     cwd: root,
@@ -29,7 +29,7 @@ test('子进程分别收集 stdout/stderr，非零退出不是基础设施异常
   assert.equal(result.timedOut, false)
 }))
 
-test('输出超过内存上限时前缀留在结果，完整内容进入 spill', async () => fixture(async (runtime, root) => {
+test('输出超过内存上限时前缀留在结果，完整内容进入溢出存储', async () => fixture(async (runtime, root) => {
   const result = await runtime.run({
     argv: [process.execPath, '-e', "process.stdout.write('0123456789')"], cwd: root, maxOutputBytes: 4,
   })
@@ -63,25 +63,25 @@ test('默认环境清洗凭证与 DSH_，显式传入值可以覆盖', () => {
 test.skipIf(process.platform === 'win32')('超时对拒绝 SIGTERM 的进程升级到 SIGKILL', async () => fixture(async (runtime, root) => {
   const result = await runtime.run({
     argv: [process.execPath, '-e', "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],
-    // 给测试负载下的子 Bun 足够时间安装 SIGTERM handler，再验证升级分支。
+    // 给测试负载下的子 Bun 足够时间安装 SIGTERM 信号处理器，再验证升级分支。
     cwd: root, timeoutMs: 250, graceMs: 20,
   })
   assert.equal(result.timedOut, true)
   assert.equal(result.signal, 'SIGKILL')
 }))
 
-test('AbortSignal 终止进程并标记 aborted', async () => fixture(async (runtime, root) => {
+test('取消信号终止进程并标记为已取消', async () => fixture(async (runtime, root) => {
   const controller = new AbortController()
   const pending = runtime.run({
     argv: [process.execPath, '-e', 'setInterval(()=>{},1000)'], cwd: root, signal: controller.signal, graceMs: 20,
   })
-  setTimeout(() => controller.abort(new Error('stop')), 20)
+  setTimeout(() => controller.abort(new Error('停止')), 20)
   const result = await pending
   assert.equal(result.aborted, true)
   assert.notEqual(result.signal, null)
 }))
 
-test('runtime.dispose 终止并等待仍存活的后台进程', async () => {
+test('运行时释放时终止并等待仍存活的后台进程', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-dispose-test-'))
   const runtime = await LocalProcessRuntime.create()
   try {
@@ -92,7 +92,7 @@ test('runtime.dispose 终止并等待仍存活的后台进程', async () => {
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test('Shell 固定 cwd，命令失败以结果返回', async () => fixture(async (runtime, root) => {
+test('终端解释器固定工作目录，命令失败以结果返回', async () => fixture(async (runtime, root) => {
   const shell = new LocalShell(runtime, root)
   const result = await shell.run({ command: 'pwd; printf shell_err >&2; exit 3' })
   assert.equal(result.exitCode, 3)
@@ -100,7 +100,7 @@ test('Shell 固定 cwd，命令失败以结果返回', async () => fixture(async
   assert.equal(result.stderr.text, 'shell_err')
 }))
 
-test('shell_exec 工具返回结构化退出与输出', async () => fixture(async (runtime, root) => {
+test('终端执行工具返回结构化退出与输出', async () => fixture(async (runtime, root) => {
   const registry = new ToolRegistry()
   registry.register(createShellTool(new LocalShell(runtime, root)))
   const prepared = registry.prepare({
@@ -114,7 +114,7 @@ test('shell_exec 工具返回结构化退出与输出', async () => fixture(asyn
   }
 }))
 
-test.skipIf(process.platform === 'win32')('真实 PTY 支持写入、resize、输出和退出', async () => fixture(async (runtime, root) => {
+test.skipIf(process.platform === 'win32')('真实伪终端支持写入、调整尺寸、输出和退出', async () => fixture(async (runtime, root) => {
   const terminal = await new LocalShell(runtime, root).spawnTerminal()
   let output = ''
   const off = terminal.onData(data => { output += data })

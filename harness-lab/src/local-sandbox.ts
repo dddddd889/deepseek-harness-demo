@@ -9,7 +9,7 @@ export class SandboxUnavailableError extends Error {
   }
 }
 
-/** 同机进程沙箱 seam；danger 模式直通，受限模式必须返回真正的内核 runner。 */
+/** 同机进程沙箱 接口边界；完全访问模式直通，受限模式必须返回真正的内核执行器。 */
 export class LocalSandbox {
   confine(argv: readonly string[], mode: SandboxMode, workspaceRoot: string): readonly string[] {
     if (mode === 'danger-full-access') return argv
@@ -24,7 +24,7 @@ export class LocalSandbox {
       '(version 1)',
       '(allow default)',
       '(deny file-write*)',
-      // 终端和常见输出 sink 不是普通文件副作用。
+      // 终端和常见输出 日志接收端 不是普通文件副作用。
       '(allow file-write* (literal "/dev/null"))',
       '(allow file-write* (regex #"^/dev/tty"))',
       writeRules,
@@ -33,7 +33,7 @@ export class LocalSandbox {
   }
 }
 
-/** 生成 Seatbelt 字符串字面量。 */
+/** 生成 系统沙箱 字符串字面量。 */
 function seatbeltString(value: string): string {
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
 }

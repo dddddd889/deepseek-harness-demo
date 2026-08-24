@@ -8,7 +8,7 @@ import { Session } from './session.ts'
 const usage1: TokenUsage = { inputTokens: 10, outputTokens: 2, cacheReadTokens: 3 }
 const usage2: TokenUsage = { inputTokens: 12, outputTokens: 4, reasoningTokens: 1 }
 
-/** 创建测试消息，显式 id 让日志重放断言保持确定性。 */
+/** 创建测试消息，显式标识 让日志重放断言保持确定性。 */
 function message(id: string, role: Message['role'], text: string): Message {
   return createMessage({ role, content: text ? [{ type: 'text', text }] : [], source: { kind: 'user' } }) as Message & { id: string }
 }
@@ -32,7 +32,7 @@ function completedLog(): Session {
   return session
 }
 
-test('消息投影忽略 chunk，并保留事件里已有的消息身份', () => {
+test('消息投影忽略流式数据块，并保留事件中已有的消息身份', () => {
   const session = completedLog()
   const messages = deriveMessages(session.events)
   assert.equal(messages.length, 3)
@@ -41,13 +41,13 @@ test('消息投影忽略 chunk，并保留事件里已有的消息身份', () =>
   assert.equal(messages[2], (session.events[7] as SessionEvent<'tool/result'>).data.message)
 })
 
-test('空 assistant 消息只承载 usage，不进入模型历史', () => {
+test('空助手消息只承载用量，不进入模型历史', () => {
   const session = new Session()
   session.append('assistant/message', { turn: 1, step: 1, message: message('empty', 'assistant', ''), usage: usage1 })
   assert.deepEqual(deriveMessages(session.events), [])
 })
 
-test('同一 turn/step 的最终 usage 覆盖流式样本，不重复计费', () => {
+test('同一轮次与步骤的最终用量覆盖流式样本，不重复计费', () => {
   const session = completedLog()
   session.append('assistant/message', { turn: 1, step: 2, message: message('a2', 'assistant', ''), usage: usage1 })
   assert.deepEqual(foldTokenUsage(session.events), {
@@ -65,7 +65,7 @@ test('生命周期投影可判断日志已经完整结束', () => {
   })
 })
 
-test('生命周期损坏时错误指向具体 seq', () => {
+test('生命周期损坏时错误指向具体序号', () => {
   const session = new Session()
   session.append('turn/start', { turn: 1 })
   session.append('step/start', { turn: 1, step: 1 })

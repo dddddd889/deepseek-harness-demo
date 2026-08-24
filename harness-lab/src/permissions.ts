@@ -33,7 +33,7 @@ export class PermissionError extends Error {
   }
 }
 
-/** Session 日志驱动的权限服务；批准只对本次 authorize 返回值有效。 */
+/** 会话日志驱动的权限服务；批准只对本次授权返回值有效。 */
 export class PermissionService {
   readonly #defaultMode: SandboxMode
   readonly #defaultApprovalPolicy: ApprovalPolicy
@@ -56,7 +56,7 @@ export class PermissionService {
   setMode(session: Session, mode: SandboxMode): void { session.append('sandbox/mode', { mode }) }
   setApprovalPolicy(session: Session, policy: ApprovalPolicy): void { session.append('approval/policy', { policy }) }
 
-  /** 校验当前权限或执行一次严格升级审批；任何失败都发生在工具 body 之前。 */
+  /** 校验当前权限或执行一次严格升级审批；任何失败都发生在工具执行体 之前。 */
   async authorize(
     session: Session,
     call: ToolCallBlock,
@@ -77,7 +77,7 @@ export class PermissionService {
         'SANDBOX_DENIED',
       )
     }
-    if (!isSandboxMode(requested)) throw new PermissionError(`未知 sandbox_permissions：${requested}`, 'INVALID_ESCALATION')
+    if (!isSandboxMode(requested)) throw new PermissionError(`未知沙箱权限：${requested}`, 'INVALID_ESCALATION')
     if (rank(requested) <= rank(effective)) {
       throw new PermissionError(`升级目标 ${requested} 不比当前 ${effective} 更宽`, 'INVALID_ESCALATION')
     }
@@ -98,7 +98,7 @@ export class PermissionService {
     justification: string,
     signal: AbortSignal,
   ): Promise<ApprovalOutcome> {
-    if (!hasOpenTurn(session.events)) throw new PermissionError('审批必须发生在 open turn 内', 'APPROVAL_OUTSIDE_TURN')
+    if (!hasOpenTurn(session.events)) throw new PermissionError('审批必须发生在未闭合的轮次内', 'APPROVAL_OUTSIDE_TURN')
     const id = crypto.randomUUID()
     const reason = `escalate sandbox to ${requestedMode}: ${justification}`
     session.append('approval/asked', { id, toolName: call.name, callId: call.id, reason })
@@ -112,7 +112,7 @@ export class PermissionService {
   }
 }
 
-/** 重放审批审计，验证 asked/decided 一一配对。 */
+/** 重放审批审计，验证 询问与决定事件 一一配对。 */
 export function inspectApprovalAudit(events: readonly SessionEvent[]): { readonly pending: readonly string[]; readonly decisions: number } {
   const pending = new Set<string>()
   let decisions = 0
@@ -154,10 +154,10 @@ function stringField(args: JsonValue, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-/** Schema 难以表达的成对约束。 */
+/** 数据模式难以表达的成对约束。 */
 function validateEscalationPair(mode: string | undefined, justification: string | undefined): void {
   if ((mode === undefined) !== (justification === undefined) || justification?.trim().length === 0) {
-    throw new PermissionError('sandbox_permissions 与非空 justification 必须同时提供', 'INVALID_ESCALATION')
+    throw new PermissionError('沙箱权限与非空申请理由必须同时提供', 'INVALID_ESCALATION')
   }
 }
 

@@ -60,11 +60,11 @@ export class LocalAttachmentStore {
             ...input.name === undefined ? {} : { name: basename(input.name).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 255) },
         };
     }
-    /** 冷读取同时复验 id、字节、解码元数据，引用不能替代完整性检查。 */
+    /** 冷读取同时复验 标识、字节、解码元数据，引用不能替代完整性检查。 */
     async readImage(ref) {
         const match = /^sha256:([a-f0-9]{64})$/.exec(ref.attachmentId);
         if (match?.[1] === undefined)
-            throw new AttachmentError('附件 id 无效', 'ATTACHMENT_INVALID_ID');
+            throw new AttachmentError('附件标识无效', 'ATTACHMENT_INVALID_ID');
         const data = await readFile(join(this.#root, match[1].slice(0, 2), match[1]));
         if (createHash('sha256').update(data).digest('hex') !== match[1] || data.byteLength !== ref.bytes) {
             throw new AttachmentError('附件完整性失败', 'ATTACHMENT_CORRUPT');

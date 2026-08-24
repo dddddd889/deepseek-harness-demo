@@ -9,7 +9,7 @@ export interface PendingApproval {
     readonly requestedMode: string;
     readonly createdAt: number;
 }
-/** 网络 UI 与 PermissionService 之间的一次性审批桥；决定第一写胜出。 */
+/** 网络界面与权限服务 之间的一次性审批桥；决定第一写胜出。 */
 export declare class InteractionBroker {
     #private;
     answerer(sessionId: string): ApprovalAnswerer;

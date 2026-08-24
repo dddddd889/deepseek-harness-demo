@@ -8,7 +8,7 @@ export interface ConversationView {
     readonly running: boolean;
     readonly usage: UsageTotals;
 }
-/** 浏览器/SDK 共用投影：严格连续 seq，绝不靠 UI 本地猜测补洞。 */
+/** 浏览器/SDK 共用投影：严格连续序号，绝不靠 界面 本地猜测补洞。 */
 export declare class ClientProjection {
     #private;
     constructor(sessionId: string);
@@ -28,13 +28,13 @@ export interface FollowCallbacks {
     onConnection?(state: 'connecting' | 'connected' | 'reconnecting'): void;
     onError?(error: unknown): void;
 }
-/** 网络 Client：RPC request id 由调用方稳定持有，断线后 SSE 从 lastSeq 继续。 */
+/** 网络客户端：RPC 请求标识由调用方稳定持有，断线后 SSE 从最后序号继续。 */
 export declare class AgentClient {
     #private;
     constructor(baseURL: string, token: string | (() => string), fetchImpl?: typeof fetch);
     rpc<T>(method: string, params: Record<string, unknown>, requestId?: string, signal?: AbortSignal): Promise<T>;
     snapshot(sessionId: string, signal?: AbortSignal): Promise<readonly SessionEvent[]>;
-    /** 一直追随到 signal 取消；网络断开指数退避，协议 gap 先重新 snapshot。 */
+    /** 一直追随到 取消信号触发；网络断开指数退避，协议缺口 先重新获取快照。 */
     follow(sessionId: string, projection: ClientProjection, signal: AbortSignal, callbacks?: FollowCallbacks): Promise<void>;
     events(sessionId: string, after: number, signal?: AbortSignal): AsyncGenerator<SessionEvent>;
 }
