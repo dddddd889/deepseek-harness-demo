@@ -96,6 +96,18 @@
       "cwd": "${workspaceFolder}/harness-lab"
     },
     {
+      "name": "10b · Spill 原理演示",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/spill-principle-demo.ts",
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
+      "name": "10c · Spill 大文件类型演示",
+      "type": "bun", "request": "launch",
+      "program": "${workspaceFolder}/harness-lab/src/spill-file-types-demo.ts",
+      "cwd": "${workspaceFolder}/harness-lab"
+    },
+    {
       "name": "11 · 外部能力",
       "type": "bun", "request": "launch",
       "program": "${workspaceFolder}/harness-lab/src/capabilities.test.ts",

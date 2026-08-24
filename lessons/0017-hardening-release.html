@@ -13,6 +13,18 @@
     <tr><th>解决的问题</th><td>让运行问题可观测、成本可复算、敏感信息可控，并把可靠性要求落实为可重复的发布门禁。</td></tr>
   </tbody></table>
 
+  <h2>完整能力清单</h2>
+  <table><thead><tr><th>能力域</th><th>完整能力</th><th>不能替代什么</th></tr></thead><tbody>
+    <tr><td>会话遥测</td><td>禁用、仅反馈和完整三种模式；选择事件、设置严重级别、脱敏并隔离导出失败。</td><td>不能替代 Session 事实日志。</td></tr>
+    <tr><td>OTel Logs</td><td>把选定会话事件转换为可检索、关联和告警的观测记录并送往 Collector。</td><td>不能用于会话恢复、分叉或权威计费。</td></tr>
+    <tr><td>反馈导出</td><td>仅反馈模式在用户提交反馈后导出对应记录，避免默认采集完整会话。</td><td>不能绕过脱敏与采集策略。</td></tr>
+    <tr><td>成本投影</td><td>按请求时刻匹配提供方、模型和生效价格，将互斥用量桶计算为高精度美元成本。</td><td>未知模型进入未定价列表，不能默认为零成本。</td></tr>
+    <tr><td>运行能力探测</td><td>探测平台、真实伪终端、强沙箱和进程隔离，并提供强制能力检查。</td><td>不支持的强能力不能静默降级。</td></tr>
+    <tr><td>热重载</td><td>先完整启动候选插件包，成功后原子切换，再释放旧包。</td><td>候选失败时旧能力继续服务，不发生闪断。</td></tr>
+    <tr><td>故障注入</td><td>在指定命中次数稳定触发异常或延迟，用于复现提供方和传输故障。</td><td>只影响明确配置的故障点和次数。</td></tr>
+    <tr><td>发布验收</td><td>类型检查、完整测试、构建、CLI 帮助、冒烟运行和资源收敛检查。</td><td>单个成功演示不能替代整套发布门禁。</td></tr>
+  </tbody></table>
+
   <h2>三类数据不要混成一份</h2>
   <pre><code>Session JSONL（权威事实） ──► 恢复 / fork / replay
         │
@@ -70,6 +82,9 @@ bun run verify
     <li><a href="../harness-lab/src/runtime-capabilities.ts">Capability probe</a></li>
     <li><a href="../harness-lab/src/hot-bundle.ts">Transactional HMR</a></li>
     <li><a href="../harness-lab/src/fault-injector.ts">Fault injector</a></li>
+    <li><a href="../harness-lab/src/observability-demo.ts">遥测与成本演示</a></li>
+    <li><a href="../harness-lab/src/hardening-demo.ts">加固能力演示</a></li>
+    <li><a href="../harness-lab/src/release-smoke.ts">发布冒烟入口</a></li>
     <li><a href="../VERIFICATION.md">完整验收矩阵</a></li>
   </ul>
   <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>

@@ -18,6 +18,8 @@
     "demo:permissions": "bun src/permissions-demo.ts",
     "demo:persistence": "bun src/persistence-demo.ts",
     "demo:context": "bun src/context-compaction-demo.ts",
+    "demo:spill": "bun src/spill-principle-demo.ts",
+    "demo:spill-types": "bun src/spill-file-types-demo.ts",
     "demo:capabilities": "bun src/capabilities-demo.ts",
     "demo:orchestration": "bun src/orchestration-demo.ts",
     "demo:headless": "bun src/headless-demo.ts",
