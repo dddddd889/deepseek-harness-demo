@@ -5,6 +5,14 @@
   <h1>第 17 课：可观测、成本与发布加固</h1>
   <p class="lead">最后一层不是再加业务能力，而是证明系统在失败、重载、跨平台和冷启动时仍有清晰边界。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>OpenTelemetry 日志、会话遥测、成本投影、脱敏、故障注入、热重载、跨平台能力探测和发布验收。</td></tr>
+    <tr><th>涉及模块</th><td><code>SessionTelemetry</code>、OTel 导出器、<code>CostProjection</code>、价格表、故障注入器、热重载器和发布脚本。</td></tr>
+    <tr><th>白话解释</th><td>最后给系统装上仪表盘、账单计算器和压力测试，再证明换插件、断网络或换平台时仍能稳住。</td></tr>
+    <tr><th>解决的问题</th><td>让运行问题可观测、成本可复算、敏感信息可控，并把可靠性要求落实为可重复的发布门禁。</td></tr>
+  </tbody></table>
+
   <h2>三类数据不要混成一份</h2>
   <pre><code>Session JSONL（权威事实） ──► 恢复 / fork / replay
         │

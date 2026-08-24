@@ -10,6 +10,14 @@
   <h1>第 5 课：可控流式 LLM 与 DeepSeek Adapter</h1>
   <p class="lead">核心只依赖 StreamChunk 协议。Fake Provider 与真实 DeepSeek Provider 共享同一 Runtime、Assembler 和 Session 落账路径。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>模型提供方路由、流式数据块、消息组装、DeepSeek SSE 适配和用量落账。</td></tr>
+    <tr><th>涉及模块</th><td><code>LlmRuntime</code>、<code>LlmProvider</code>、<code>ContentAssembler</code>、<code>DeepSeekProvider</code>。</td></tr>
+    <tr><th>白话解释</th><td>无论接假模型还是真实 DeepSeek，都先翻译成同一种小数据块，再由统一流水线拼成回答。</td></tr>
+    <tr><th>解决的问题</th><td>隔离不同模型接口和网络协议差异，让流式输出、错误与用量拥有一致且可测试的行为。</td></tr>
+  </tbody></table>
+
   <h2>调用链</h2>
   <pre><code>GenerateOptions
       │

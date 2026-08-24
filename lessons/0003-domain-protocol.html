@@ -10,6 +10,14 @@
   <h1>第 3 课：固定 Agent 领域协议</h1>
   <p class="lead">Agent Loop、持久化、Web Server 和 UI 必须讲同一种语言。本课先固定跨边界数据，再开始写行为。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>消息、内容块、模型请求、工具调用、会话事件及无损 JSON 边界。</td></tr>
+    <tr><th>涉及模块</th><td><code>Message</code>、<code>ContentBlock</code>、<code>StreamChunk</code>、<code>Tool</code>、<code>SessionEvent</code>。</td></tr>
+    <tr><th>白话解释</th><td>先统一词汇和数据格式，让智能体、服务端、存储和网页端不会各说各话。</td></tr>
+    <tr><th>解决的问题</th><td>避免跨模块传输时字段丢失、含义漂移或类型不一致，并为持久化和重放建立稳定契约。</td></tr>
+  </tbody></table>
+
   <h2>协议分层</h2>
   <pre><code>ContentBlock
   ├── text / reasoning

@@ -6,6 +6,14 @@
   <h1>第 15 课：Agent Server</h1>
   <p class="lead">Agent Server 位于 Client 与 Agent Runtime 之间：它不是 Agent Loop 的别名，而是网络信任边界、多 Session 路由器、命令控制面和事件数据面。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>令牌鉴权、JSON-RPC 命令、多会话路由、SSE 事件流、幂等、背压和优雅停机。</td></tr>
+    <tr><th>涉及模块</th><td><code>AgentServer</code>、RPC 分派器、会话宿主注册表、SSE 连接、<code>HeadlessHost</code>。</td></tr>
+    <tr><th>白话解释</th><td>它像智能体运行时的网络前台：先验身份，再把命令送到正确会话，并持续把新事件推给客户端。</td></tr>
+    <tr><th>解决的问题</th><td>让远程客户端安全、幂等地控制多个智能体会话，并在断线、慢消费者和服务重启时保持事件连续。</td></tr>
+  </tbody></table>
+
   <h2>完整分层</h2>
   <pre><code>CLI / Web / SDK Client
         │ Bearer + JSON-RPC / SSE

@@ -6,6 +6,14 @@
   <h1>第 10 课：JSONL 持久化、恢复与 Fork</h1>
   <p class="lead">恢复源是持久化 Session Log，不是 OTel、UI Store 或正在运行的 Agent 对象。本课把“提交了什么”和“什么允许修复”做成字节级协议。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>带校验和的 JSONL、刷盘、冷恢复、崩溃尾部修复、悬空事件闭合和会话分叉。</td></tr>
+    <tr><th>涉及模块</th><td><code>JsonlSessionStore</code>、<code>Session</code>、恢复检查器、事件修复器、分叉逻辑。</td></tr>
+    <tr><th>白话解释</th><td>把会话写成一本逐行落盘的账本；程序崩溃后先验账、补齐可证明的结尾，再让智能体接着工作。</td></tr>
+    <tr><th>解决的问题</th><td>保证进程重启后不会丢失已提交事实，也不会猜测或重复执行结果未知的外部副作用。</td></tr>
+  </tbody></table>
+
   <h2>文件格式</h2>
   <pre><code>{ kind: "header", header: { id, format, version, cwd, parent? }, checksum }
 { kind: "event",  event:  { seq: 0, type, time, data },       checksum }

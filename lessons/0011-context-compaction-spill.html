@@ -6,6 +6,14 @@
   <h1>第 11 课：Token、Surface、Compaction 与 Spill</h1>
   <p class="lead">长会话治理的核心不是删日志，而是保留事实、缩小模型可见 surface，并把大字节移到受控文件中。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>词元计量、上下文压力、模型可见面、摘要压缩、工具结果裁剪和大内容溢出。</td></tr>
+    <tr><th>涉及模块</th><td><code>TokenMeter</code>、上下文投影、<code>Compactor</code>、工具裁剪器、<code>SpillStore</code>。</td></tr>
+    <tr><th>白话解释</th><td>完整账本继续保留，只给模型看一份更短的工作摘要；太大的内容移到文件中按需读取。</td></tr>
+    <tr><th>解决的问题</th><td>防止长会话超过模型窗口或耗尽内存，同时保留审计、恢复和成本重算所需的原始事实。</td></tr>
+  </tbody></table>
+
   <h2>先拆开四个量</h2>
   <table><thead><tr><th>量</th><th>来源</th><th>用途</th><th>是否可计费</th></tr></thead><tbody>
     <tr><td>累计 TokenUsage</td><td>Session 中 provider usage 事件</td><td>历史统计、成本派生</td><td>可以，但需要带版本的价格表</td></tr>
@@ -13,6 +21,22 @@
     <tr><td>projectedTokens</td><td>锚点 + surface 估算变化</td><td>预测下一请求是否超窗</td><td>不可以</td></tr>
     <tr><td>contextWindow</td><td>路由模型能力</td><td>容量分母</td><td>不可以</td></tr>
   </tbody></table>
+  <h3>更直白地理解</h3>
+  <table><thead><tr><th>量</th><th>一句话解释</th><th>具体例子</th></tr></thead><tbody>
+    <tr><td>累计 TokenUsage</td><td>这次会话已经实际花掉多少 Token</td><td>累计输入 8,000、输出 2,000；这是计算实际费用的依据</td></tr>
+    <tr><td>pressureTokens</td><td>上一次模型请求实际有多大</td><td>上次请求输入了 12,000 Token，便以 12,000 作为当前实测起点</td></tr>
+    <tr><td>projectedTokens</td><td>预计下一次模型请求会有多大</td><td>实测起点 12,000，加上新消息和工具结果约 3,000，预计为 15,000</td></tr>
+    <tr><td>contextWindow</td><td>模型一次最多能装多少 Token</td><td>模型上限是 64,000；预计用量接近该值时就应压缩上下文</td></tr>
+  </tbody></table>
+  <pre><code>累计 TokenUsage：已经实际花掉多少
+pressureTokens：  上次请求实际有多大
+projectedTokens： 预计下次请求会有多大
+contextWindow：   模型最多能装多少
+
+projectedTokens 接近或超过 contextWindow
+→ 触发摘要、裁剪工具结果或移除旧消息
+
+费用只根据实际 TokenUsage 计算，不能根据预测值计算。</code></pre>
   <div class="callout"><strong>Cost 存哪里？</strong>本实验与 DeepSeek Harness 都把原始 usage 放在 Session Event，投影可重建累计桶。货币 cost 应由 <code>provider/model + usage + 生效时间/价格表版本</code> 派生；OTel 可复制指标做观测，但不是恢复或账单事实源。</div>
 
   <h2>事实日志与模型 Surface</h2>
@@ -39,12 +63,17 @@ compaction/end(6)
     <li>任何失败都不改变当前 surface。</li>
   </ol>
 
-  <h2>Spill 与 Attachment 不同</h2>
+  <h2>超大工具输出与用户附件有什么区别</h2>
+  <div class="callout"><strong>Spill 就是“超大内容落盘”。</strong>当命令输出、测试日志或工具返回文本太大时，系统不会把完整内容一直放在内存、会话日志或模型上下文中，而是把它写入本地受保护文件。模型只看到内容摘要、总字节数、文件引用和分段读取方法，需要时再按范围读取。</div>
+  <pre><code>工具产生 20 MB 测试日志
+  → 完整日志写入本地受保护文件
+  → 模型只看到前几行、总大小和文件引用
+  → 模型需要更多内容时再分段读取</code></pre>
   <table><thead><tr><th>机制</th><th>对象</th><th>模型看到</th></tr></thead><tbody>
-    <tr><td>Spill</td><td>过大的工具文本输出</td><td>路径/locator、字节数、分段读取提示</td></tr>
-    <tr><td>Attachment</td><td>用户上传的图片等不可变二进制</td><td>内容寻址 attachmentId 与媒体元数据</td></tr>
+    <tr><td>超大内容落盘（Spill）</td><td>过大的命令输出、测试日志或工具返回文本</td><td>内容摘要、总字节数、文件引用和分段读取方法</td></tr>
+    <tr><td>用户附件（Attachment）</td><td>用户上传的图片、PDF 等不可变文件</td><td>附件标识、文件类型、大小等信息</td></tr>
   </tbody></table>
-  <p>本地 spill 使用 session 哈希目录、随机文件名、<code>0700</code> 目录、<code>0600</code> 独占写；实验版额外记录 SHA-256，并在读取时复验。</p>
+  <p>本地超大内容落盘使用会话哈希目录和随机文件名，避免不同会话互相读取或猜测文件路径。目录权限 <code>0700</code> 表示只有当前用户可以访问；文件权限 <code>0600</code> 表示只有当前用户可以读写。实验版还会记录 SHA-256，并在读取时检查文件是否损坏或被修改。</p>
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab
@@ -59,7 +88,18 @@ VS Code F5 → 10 · 上下文压缩
 # LocalSpillStore.saveText/readText：权限与完整性边界</code></pre>
 
   <h2>本阶段验收</h2>
-  <p>独立测试覆盖：pressure 分桶、工具原子边界、replacement 冷重放与链式替换、压缩后压力下降、摘要失败/不缩小拒绝、spill 路径隔离和篡改检测。</p>
+  <p>下面把测试名称中的技术说法和实际验证内容对应起来：</p>
+  <table><thead><tr><th>技术说法</th><th>白话解释</th></tr></thead><tbody>
+    <tr><td>pressure 分桶</td><td>实际 Token 用量和下一次请求的预计用量分开统计，不会算混。</td></tr>
+    <tr><td>工具原子边界</td><td>压缩历史时，工具调用和对应的工具结果必须一起保留，不能只留下其中一半。</td></tr>
+    <tr><td>replacement 冷重放</td><td>程序完全重启后，只读取持久化日志也能恢复出压缩后的模型上下文。</td></tr>
+    <tr><td>链式替换</td><td>已经生成的旧摘要以后还可以再次压缩成更精简的新摘要。</td></tr>
+    <tr><td>压缩后压力下降</td><td>压缩完成后，预计下一次发送给模型的 Token 数确实减少了。</td></tr>
+    <tr><td>摘要失败拒绝</td><td>摘要生成失败时，不修改原来的上下文。</td></tr>
+    <tr><td>摘要不缩小拒绝</td><td>如果摘要和原文一样大甚至更大，就不采用这个摘要。</td></tr>
+    <tr><td>spill 路径隔离</td><td>超大内容按会话分别落盘，一个会话不能读取另一个会话的文件。</td></tr>
+    <tr><td>篡改检测</td><td>读取落盘文件时检查校验值，文件损坏或被修改后会被发现并拒绝使用。</td></tr>
+  </tbody></table>
 
   <h2>源码</h2><ul>
     <li><a href="../harness-lab/src/token-meter.ts">Token Meter</a></li>

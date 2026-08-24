@@ -6,6 +6,14 @@
   <h1>第 12 课：Skills、MCP、Web、LSP 与 Attachment</h1>
   <p class="lead">外部能力不是一锅“工具”：统一目录负责发现，各能力 seam 保留自己的选择、生命周期和信任边界，最后只有模型可调用操作桥接进 Tool Registry。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>技能发现、MCP 工具桥接、网页搜索与抓取、LSP 语义查询和附件存储。</td></tr>
+    <tr><th>涉及模块</th><td><code>CapabilityCatalog</code>、<code>SkillRegistry</code>、<code>McpBridge</code>、<code>WebRuntime</code>、<code>LspRuntime</code>、附件仓库。</td></tr>
+    <tr><th>白话解释</th><td>统一菜单告诉智能体有哪些外部能力，但每种能力仍由自己的适配器和安全规则负责。</td></tr>
+    <tr><th>解决的问题</th><td>避免万能接口模糊生命周期和信任边界，并让外部能力可发现、可换代、可恢复且不泄露本地路径。</td></tr>
+  </tbody></table>
+
   <h2>整体结构</h2>
   <pre><code>Capability Catalog（摘要/所有权）
  ├─ Skills Registry ─ project/user/bundled roots ─ list → get body

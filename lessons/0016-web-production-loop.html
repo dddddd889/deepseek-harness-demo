@@ -6,6 +6,14 @@
   <h1>第 16 课：Web Client 与生产闭环</h1>
   <p class="lead">浏览器不是恢复源。可靠 Web Client 先取权威 snapshot，再用 Session seq 追尾事件；断线只丢连接，不丢会话语义。</p>
 
+  <h2>本课导览</h2>
+  <table><tbody>
+    <tr><th>包含内容</th><td>客户端投影、快照与追尾、命令调用、审批交互、附件上传、鉴权和网页安全头。</td></tr>
+    <tr><th>涉及模块</th><td><code>AgentClient</code>、<code>ClientProjection</code>、Web 静态客户端、交互中介器、附件接口。</td></tr>
+    <tr><th>白话解释</th><td>网页先拿完整账本快照，再只接收后续新事件；页面关掉或网络断开都不会成为数据丢失点。</td></tr>
+    <tr><th>解决的问题</th><td>构建可断线恢复的浏览器体验，并闭合消息、审批和附件从界面到服务端再到会话日志的链路。</td></tr>
+  </tbody></table>
+
   <h2>客户端数据流</h2>
   <pre><code>session.snapshot ─► ClientProjection.reset(events[0..N])
                               │
