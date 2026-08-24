@@ -14,6 +14,18 @@
     <tr><th>解决的问题</th><td>构建可断线恢复的浏览器体验，并闭合消息、审批和附件从界面到服务端再到会话日志的链路。</td></tr>
   </tbody></table>
 
+  <h2>完整能力清单</h2>
+  <table><thead><tr><th>能力</th><th>完整行为</th><th>一致性规则</th></tr></thead><tbody>
+    <tr><td>客户端投影</td><td>从会话事件重建消息、用量、生命周期和模型可见面替换。</td><td>严格检查序号；重复事件幂等，缺口明确失败。</td></tr>
+    <tr><td>快照初始化</td><td>通过 RPC 获取权威快照并一次性重置客户端投影。</td><td>浏览器本地状态不作为恢复源。</td></tr>
+    <tr><td>SSE 追尾</td><td>从快照最后序号连接事件流，持续应用新事件并支持取消追随。</td><td>断线重连从最后已应用序号继续。</td></tr>
+    <tr><td>命令客户端</td><td>创建、恢复、发送、运行、取消和读取快照，携带稳定请求标识与令牌。</td><td>命令响应和事件通知保持双通道。</td></tr>
+    <tr><td>审批闭环</td><td>服务端发布待审批交互，多个客户端可观察并提交决定。</td><td>共享中介器采用第一次有效写入。</td></tr>
+    <tr><td>附件闭环</td><td>浏览器上传图片，服务端验证持久化，消息保存内容引用，鉴权接口负责读取。</td><td>会话事件不嵌入本地路径或无限大字节。</td></tr>
+    <tr><td>网页安全</td><td>同源静态资源、内容安全策略、路径规范化和 API 鉴权。</td><td>静态文件能力不能穿透到服务端任意路径。</td></tr>
+    <tr><td>服务入口</td><td>从 Profile 装配宿主和 Agent Server，提供本地可调试网页生产闭环。</td><td>停机时先停止接入，再刷盘释放。</td></tr>
+  </tbody></table>
+
   <h2>客户端数据流</h2>
   <pre><code>session.snapshot ─► ClientProjection.reset(events[0..N])
                               │
@@ -83,6 +95,7 @@ bun run serve:web -- ./profile.json
     <li><a href="../harness-lab/web/app.js">Browser Client</a></li>
     <li><a href="../harness-lab/src/interactions.ts">Interaction Broker</a></li>
     <li><a href="../harness-lab/src/web-server-entry.ts">生产启动入口</a></li>
+    <li><a href="../harness-lab/src/web-demo.ts">网页生产闭环演示</a></li>
     <li><a href="../harness-lab/src/client-runtime.test.ts">客户端/审批/附件集成测试</a></li>
   </ul>
   <p>下一课是最终加固：遥测、成本投影、故障注入、跨平台降级、HMR、发布构建与完整验收矩阵。</p>

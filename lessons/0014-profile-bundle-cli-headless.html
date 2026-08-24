@@ -14,6 +14,17 @@
     <tr><th>解决的问题</th><td>避免 CLI、测试和服务端各自复制一套初始化逻辑，确保不同产品入口共享相同运行和恢复语义。</td></tr>
   </tbody></table>
 
+  <h2>完整能力清单</h2>
+  <table><thead><tr><th>能力域</th><th>完整能力</th><th>边界</th></tr></thead><tbody>
+    <tr><td>配置合并</td><td>默认值、配置文件、环境变量和命令行覆盖按固定优先级合并。</td><td>未知字段、无效枚举和缺少必填配置立即失败。</td></tr>
+    <tr><td>配置模型</td><td>模型提供方、模型、持久化根目录、工作目录、密钥环境名、基础地址、系统提示和沙箱策略。</td><td>脚本模型必须提供脚本响应。</td></tr>
+    <tr><td>插件包</td><td>按顺序应用插件组成运行时，持有统一释放边界。</td><td>某插件失败时逆序回滚此前插件。</td></tr>
+    <tr><td>宿主装配</td><td>创建存储、模型运行时、插件上下文和交互中介器，并选择真实或覆盖提供方。</td><td>所有产品面复用同一装配根。</td></tr>
+    <tr><td>会话用例</td><td>创建新会话、恢复旧会话、发送消息、运行轮次、取消和关闭刷盘。</td><td>对外暴露用例对象，不泄露内部智能体。</td></tr>
+    <tr><td>命令行</td><td>支持单次任务、交互输入、JSONL 输出、创建或恢复会话、配置覆盖和中断信号。</td><td>参数错误与运行错误映射为明确退出码。</td></tr>
+    <tr><td>独立进程恢复</td><td>一个 CLI 进程创建会话，另一个进程从磁盘恢复并继续连续轮次。</td><td>证明恢复不依赖同进程内存。</td></tr>
+  </tbody></table>
+
   <h2>四层边界</h2>
   <pre><code>CLI argv/stdin/stdout/SIGINT
           │ 翻译
@@ -73,6 +84,8 @@ bun run cli -- --profile ./profile.json --interactive
     <li><a href="../harness-lab/src/bundle.ts">Bundle Composer</a></li>
     <li><a href="../harness-lab/src/headless-host.ts">Headless Host</a></li>
     <li><a href="../harness-lab/src/cli.ts">CLI Adapter</a></li>
+    <li><a href="../harness-lab/src/cli-entry.ts">CLI 进程入口</a></li>
+    <li><a href="../harness-lab/src/headless-demo.ts">无界面宿主演示</a></li>
     <li><a href="../harness-lab/src/headless.test.ts">冷恢复与 CLI 子进程测试</a></li>
   </ul>
   <p>下一课实现 Agent Server：RPC envelope、连接/订阅、幂等命令、背压、鉴权与多 Session 路由。</p>

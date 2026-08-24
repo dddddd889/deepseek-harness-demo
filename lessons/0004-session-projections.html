@@ -18,6 +18,16 @@
     <tr><th>解决的问题</th><td>建立唯一事实源，使界面刷新、进程恢复和状态重建不会依赖易丢失的内存对象。</td></tr>
   </tbody></table>
 
+  <h2>完整能力清单</h2>
+  <table><thead><tr><th>能力</th><th>输入与输出</th><th>边界</th></tr></thead><tbody>
+    <tr><td>事件追加</td><td>为每个会话事件分配连续序号和时间，并通知追加监听器。</td><td>恢复时拒绝序号缺口。</td></tr>
+    <tr><td>模型可见面</td><td>按追加和区间替换操作生成当前送给模型的有效事件面。</td><td>压缩不删除事实日志。</td></tr>
+    <tr><td>消息投影</td><td>从有效事件面重建模型消息历史，忽略纯流式数据块和空助手消息。</td><td>保留事件中已有消息身份。</td></tr>
+    <tr><td>用量投影</td><td>分别累计输入、输出、缓存读取和缓存写入词元。</td><td>同一步骤最终用量覆盖流式样本。</td></tr>
+    <tr><td>生命周期投影</td><td>检查轮次、步骤和工具调用的开始/结束配对，给出当前状态。</td><td>损坏时报告具体事件序号。</td></tr>
+    <tr><td>序列化重放</td><td>事件经过 JSON 往返后，全部投影得到相同结果。</td><td>投影不依赖进程内对象身份。</td></tr>
+  </tbody></table>
+
   <h2>读写边界</h2>
   <pre><code>LLM stream ── usage chunk ─┐
 final assistant/message ──┼──&gt; append-only Session Event Log

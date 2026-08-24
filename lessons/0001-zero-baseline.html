@@ -18,6 +18,14 @@
     <tr><th>解决的问题</th><td>排除环境和工具链噪声，避免后续把安装、编译或调试问题误判成 Harness 设计问题。</td></tr>
   </tbody></table>
 
+  <h2>完整能力清单</h2>
+  <table><thead><tr><th>能力</th><th>具体覆盖</th><th>完成标志</th></tr></thead><tbody>
+    <tr><td>运行基线</td><td>Bun 运行 TypeScript 源码，入口能够稳定退出并返回正确退出码。</td><td>示例输出可重复。</td></tr>
+    <tr><td>类型基线</td><td>严格类型检查覆盖源码与测试，类型错误在运行前暴露。</td><td><code>tsc</code> 无错误。</td></tr>
+    <tr><td>测试基线</td><td>测试可通过，也能通过故意修改断言证明失败路径有效。</td><td><code>bun:test</code> 能红能绿。</td></tr>
+    <tr><td>调试基线</td><td>VS Code 可启动目标、命中源码断点并检查局部变量与调用栈。</td><td>按 F5 能停在断点。</td></tr>
+  </tbody></table>
+
   <h2>当前基线</h2>
   <table>
     <tbody>
@@ -64,6 +72,9 @@ bun test src/context.test.ts
   <div class="callout"><strong>检索练习：</strong>不看路线表，回答“为什么 OTel Logs 不能作为 Session 恢复源？”答案应同时提到完整性、异步导出和权威事件日志。</div>
 
   <h2>一手参考</h2>
+  <ul>
+    <li><a href="../harness-lab/src/demo.ts">最小运行示例</a></li>
+  </ul>
   <p>阅读仓库的 <a href="../deepseek-harness/docs/development.zh.md">开发指南</a>中“首次设置”和“TypeScript 项目布局”两节。遇到任何命令或断点问题，直接继续问我。</p>
 
   <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>

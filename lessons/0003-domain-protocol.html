@@ -18,6 +18,16 @@
     <tr><th>解决的问题</th><td>避免跨模块传输时字段丢失、含义漂移或类型不一致，并为持久化和重放建立稳定契约。</td></tr>
   </tbody></table>
 
+  <h2>完整能力清单</h2>
+  <table><thead><tr><th>协议族</th><th>完整变体</th><th>保证</th></tr></thead><tbody>
+    <tr><td>消息与来源</td><td>用户、模型、工具和系统消息；稳定消息标识与来源元数据。</td><td>创建后与调用方对象隔离。</td></tr>
+    <tr><td>内容块</td><td>文本、推理、工具调用、工具结果和图片引用。</td><td>使用标签联合穷尽处理。</td></tr>
+    <tr><td>流式协议</td><td>内容开始、增量、内容结束、用量和终止帧；成功与失败终止原因。</td><td>提供方差异不穿透运行时。</td></tr>
+    <tr><td>工具协议</td><td>名称、说明、参数模式、并行提示、效果声明和结果投影。</td><td>原始 JSON 参数保留到校验边界。</td></tr>
+    <tr><td>会话协议</td><td>请求头、消息、轮次、步骤、工具、权限、压缩与反馈事件。</td><td>事件类型与数据一一对应。</td></tr>
+    <tr><td>JSON 边界</td><td>有限数字、普通对象、数组、循环引用检查、快照和递归冻结。</td><td>拒绝静默丢失或改变含义的数据。</td></tr>
+  </tbody></table>
+
   <h2>协议分层</h2>
   <pre><code>ContentBlock
   ├── text / reasoning
@@ -89,6 +99,7 @@ fail:  0</code></pre>
     <li><a href="../harness-lab/src/domain.ts">领域协议</a></li>
     <li><a href="../harness-lab/src/json.ts">Lossless JSON 边界</a></li>
     <li><a href="../harness-lab/src/session.ts">最小 Session</a></li>
+    <li><a href="../harness-lab/src/protocol-demo.ts">协议运行示例</a></li>
     <li><a href="../harness-lab/src/domain.test.ts">协议测试</a></li>
     <li><a href="../deepseek-harness/packages/core/session/src/types.ts">Harness Session 权威类型</a></li>
     <li><a href="../deepseek-harness/packages/llm/llm/src/types.ts">Harness LLM 权威类型</a></li>
