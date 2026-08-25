@@ -25,6 +25,25 @@
     <tr><td>真实伪终端</td><td>创建交互终端，支持写入、调整尺寸、读取输出和等待退出。</td><td>释放运行时时关闭仍存活的终端。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：受控本地执行</h2>
+  <p>本地执行层的上游是工具管线，下游是操作系统文件与进程接口；它把文件、进程、命令和交互终端拆成可限制、可取消、可收敛的独立能力。</p>
+  <pre><code>Agent Tool（上游）
+ ├─ 路径 + 文件参数 ─► WorkspaceFs ─► 文件系统
+ └─ command / argv ───► LocalShell ─► ProcessRuntime ─► OS 进程组
+                                           ├─ stdout/stderr（输出）
+                                           ├─ SpillStore（大输出）
+                                           └─ PTY（交互输入输出）
+权限与 Sandbox 横切每一次实际访问</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>编码智能体必须接触真实机器，但“万能 shell”会把路径、凭证、进程和输出风险混在一起，难以限制和审计。</td></tr>
+    <tr><th>输入与输出</th><td>输入是工作区相对路径、命令、参数、环境、终端输入和取消信号；输出是文件内容、搜索结果、退出码、标准流和溢出引用。</td></tr>
+    <tr><th>适用场景</th><td>阅读和修改代码、运行测试、启动开发服务、操作交互式命令行。</td></tr>
+    <tr><th>底层组件</th><td>realpath 与符号链接检查、原子重命名、Bun.spawn、独立进程组、信号升级、内存输出预算和原生 PTY。</td></tr>
+    <tr><th>核心逻辑</th><td>文件访问先解析真实边界；子进程先净化环境再创建进程组；取消先温和终止、超时后强制终止；大输出仅把前缀留在内存。</td></tr>
+    <tr><th>权衡</th><td>拆层增加接口数量，却使路径安全、进程生命周期和交互终端能分别测试和替换。</td></tr>
+    <tr><th>方案对比</th><td>直接调用系统 shell 最灵活但参数和边界不透明；结构化进程接口更安全，确需 shell 语义时再通过 LocalShell 显式进入。</td></tr>
+  </tbody></table>
+
   <h2>分层</h2>
   <pre><code>Agent Tool
   ├── fs_read/write/list/search ──&gt; WorkspaceFs

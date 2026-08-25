@@ -28,6 +28,30 @@
     <tr><td>DeepSeek SSE 翻译</td><td>处理跨网络块边界的数据帧、结束标记、工具增量和互斥缓存用量桶。</td><td>裸异常与取消统一收敛为唯一终止帧。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：模型流式适配层</h2>
+  <p>流式适配层位于外部模型 API 的下游、Agent 模型步骤的上游，负责把 DeepSeek 线协议收敛成 Harness 稳定流协议。</p>
+  <pre><code>GenerateOptions + Message + Tools（输入）
+                 │
+                 ▼
+LlmRuntime ─► Provider ─► DeepSeek HTTP/SSE
+                 │               │ wire data
+                 ◄──── StreamChunk 翻译
+                 │
+                 ▼
+BlockAssembler ─► Message + Usage + Finish（输出）
+                 │
+                 ▼
+              Session / Agent（下游）</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>各模型的请求字段、SSE 帧和用量口径不同；核心运行时不应理解每家提供方的线协议。</td></tr>
+    <tr><th>输入与输出</th><td>输入是模型、消息、工具、系统提示和取消信号；输出是内容增量、用量与唯一终止帧，最终组装成助手消息。</td></tr>
+    <tr><th>适用场景</th><td>实时聊天、推理文本、模型工具调用、提供方替换、网络故障和取消。</td></tr>
+    <tr><th>底层组件</th><td>异步生成器、AbortSignal、HTTP Fetch、SSE 增量解析器、提供方路由表和内容块组装器。</td></tr>
+    <tr><th>核心逻辑</th><td>运行时选择提供方；适配器把任意网络切片还原成 SSE 载荷并翻译；组装器按块索引累计；模型步骤逐块落账并在终止时提交最终消息。</td></tr>
+    <tr><th>权衡</th><td>统一协议无法暴露每个厂商的全部特性，但显著降低 Agent、存储和测试对提供方的耦合。</td></tr>
+    <tr><th>方案对比</th><td>一次性等待完整响应实现简单但首字延迟高且难取消；直接透传厂商 SSE 灵活，却把不稳定协议扩散到所有下游。</td></tr>
+  </tbody></table>
+
   <h2>调用链</h2>
   <pre><code>GenerateOptions
       │

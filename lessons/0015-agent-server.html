@@ -26,6 +26,28 @@
     <tr><td>同源网页与附件</td><td>可挂载静态网页、附件上传和鉴权读取入口。</td><td>静态路径防逃逸，API 始终保留鉴权。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：Agent 网络服务层</h2>
+  <p>Agent Server 的上游是 CLI、Web 和 SDK 客户端，下游是 Headless Host 与 Session；它把进程内用例扩展成经过鉴权、路由、幂等和背压控制的网络协议。</p>
+  <pre><code>Client（Bearer、requestId、command）
+       │ JSON-RPC 控制面（输入）
+       ▼
+Auth ─► Idempotency ─► Session Router ─► HeadlessHost / Agent
+                                         │ append events
+                                         ▼
+Client ◄──── SSE 重放 + 追尾（输出） ◄── Session Log
+       │ after=lastSeq
+       └─ 断线后续传
+附件与静态网页走独立路由，但共享鉴权和路径边界</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>进程内 Agent 没有网络身份、请求重试或慢客户端问题；一旦提供远程访问，这些就成为独立且不可省略的服务层职责。</td></tr>
+    <tr><th>输入与输出</th><td>输入是 Bearer 令牌、RPC 方法、请求标识、参数和 SSE 游标；输出是 RPC 结果/错误、连续事件帧及 HTTP 状态。</td></tr>
+    <tr><th>适用场景</th><td>网页客户端、远程 SDK、多会话守护进程、断线重连和客户端重试。</td></tr>
+    <tr><th>底层组件</th><td>Bun HTTP Server、RPC 分派、令牌校验、幂等缓存、会话宿主映射、SSE 编码、请求与帧预算。</td></tr>
+    <tr><th>核心逻辑</th><td>先鉴权再解析命令；requestId 绑定命令摘要和结果；路由到会话宿主执行；事件先按序号重放，再订阅追加；关闭时停止接入并刷盘。</td></tr>
+    <tr><th>权衡</th><td>RPC 与 SSE 双通道比单 WebSocket 更容易分别重试和缓存，但需要管理两个连接语义。</td></tr>
+    <tr><th>方案对比</th><td>REST 轮询简单但延迟和流量高；WebSocket 全双工灵活但恢复协议更自定义；RPC+SSE 利用 HTTP 语义并以 Session seq 天然续传。</td></tr>
+  </tbody></table>
+
   <h2>完整分层</h2>
   <pre><code>CLI / Web / SDK Client
         │ Bearer + JSON-RPC / SSE

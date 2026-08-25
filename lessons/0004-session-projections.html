@@ -28,6 +28,27 @@
     <tr><td>序列化重放</td><td>事件经过 JSON 往返后，全部投影得到相同结果。</td><td>投影不依赖进程内对象身份。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：事件溯源与投影</h2>
+  <p>Session 事件账本位于 Agent 等事实产生者的下游、持久化和所有读模型的上游，是恢复、观测和客户端同步的权威源。</p>
+  <pre><code>Agent / LLM / Tool / Permission（写入命令结果）
+                    │ append(event)
+                    ▼
+             Session Event Log
+          ┌─────────┼──────────┐
+          ▼         ▼          ▼
+      Messages    Usage    Lifecycle / Surface（读投影）
+          │         │          │
+          └────► 模型、UI、成本、恢复（下游）</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>只保存“当前状态”无法解释状态怎样形成，也难以修复崩溃；保存事实序列可重建任意读模型并保留审计链。</td></tr>
+    <tr><th>输入与输出</th><td>输入是带类型的 Session 事件；输出是连续事件序列以及消息、用量、生命周期和模型可见面的派生视图。</td></tr>
+    <tr><th>适用场景</th><td>长会话、冷恢复、断线续传、成本复算、上下文压缩和故障审计。</td></tr>
+    <tr><th>底层组件</th><td>追加数组、连续序号、事件监听器、纯折叠函数、区间替换操作和生命周期状态机。</td></tr>
+    <tr><th>核心逻辑</th><td>写侧只追加不可变事实；读侧从序号 0 依次折叠。最终用量覆盖流样本，Surface 替换只改变模型视图而不删除事实。</td></tr>
+    <tr><th>权衡</th><td>事件日志占用更多存储且投影需要计算，但获得完整历史、确定重放和新增读模型无需改写旧数据。</td></tr>
+    <tr><th>方案对比</th><td>状态快照读取快却缺少过程；事件日志信息完整但重放成本高；生产系统常以事件为真源、快照作加速缓存。</td></tr>
+  </tbody></table>
+
   <h2>读写边界</h2>
   <pre><code>LLM stream ── usage chunk ─┐
 final assistant/message ──┼──&gt; append-only Session Event Log

@@ -25,6 +25,30 @@
     <tr><td>内核沙箱</td><td>macOS 上以平台沙箱执行真实进程，工作区写入仅开放指定目录。</td><td>策略判断和操作系统强制限制必须同时成立。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：授权决策与强制执行</h2>
+  <p>权限系统的上游是工具意图和会话策略，下游是本地执行层；Session 提供可恢复策略，审批提供用户决策，操作系统沙箱负责不可绕过的最终执行。</p>
+  <pre><code>ToolEffect + arguments（输入）
+            │
+            ▼
+PermissionService ── policy ──► allow / reject
+            │ 需要升级
+            ▼
+InteractionBroker / 用户审批
+            │ allowed-once
+            ▼
+LocalSandbox ─► Process / FS（下游执行）
+            │
+            └── ask/decision/mode events（审计输出）</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>模型不能成为自己权限的裁判；同时只靠用户弹窗也无法阻止已经获准的进程越界访问。</td></tr>
+    <tr><th>输入与输出</th><td>输入是工具效果、当前模式、请求模式、理由、策略和取消信号；输出是允许或拒绝决定、审计事件及沙箱执行配置。</td></tr>
+    <tr><th>适用场景</th><td>只读审查、工作区文件修改、安装依赖、访问工作区外资源和无人值守运行。</td></tr>
+    <tr><th>底层组件</th><td>三级权限偏序、审批响应器、一次性决定、Session 审计投影、macOS sandbox-exec 规则。</td></tr>
+    <tr><th>核心逻辑</th><td>先计算工具最低权限，验证请求是严格升级；策略允许询问时记录 ask，首个有效回答写 decision；执行阶段再由 OS 沙箱限制实际系统调用。</td></tr>
+    <tr><th>权衡</th><td>细粒度审批提升安全与可审计性，但增加交互摩擦；单次授权避免永久放宽，又可能要求重复确认。</td></tr>
+    <tr><th>方案对比</th><td>仅提示用户属于软约束，工具可绕过；仅沙箱缺少业务意图与审计；两者叠加才能同时回答“应不应该”和“能不能”。</td></tr>
+  </tbody></table>
+
   <h2>四层职责</h2>
   <pre><code>Session policy events
   sandbox/mode + approval/policy

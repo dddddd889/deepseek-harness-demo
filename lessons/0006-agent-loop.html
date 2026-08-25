@@ -24,6 +24,27 @@
     <tr><td>空运行</td><td>没有待处理输入时直接返回。</td><td>不产生任何副作用或伪事件。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：Agent Loop 状态机</h2>
+  <p>Agent Loop 位于用户/服务端命令的下游，模型与工具运行时的上游，并用 Session 事件把每次决策变成可恢复事实。</p>
+  <pre><code>User / Server ── send(Message) ─► Inbox
+                                  │ run 原子认领
+                                  ▼
+                         Turn ─► Step ─► LLM
+                                  ▲        │
+                                  │   Tool calls
+                                  └── Tool results
+                                      │
+                          Session events + TurnResult（输出）</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>“调用一次模型”不等于智能体；智能体还要管理输入归属、多步骤推进、并发、取消和所有终止出口。</td></tr>
+    <tr><th>输入与输出</th><td>输入是收件箱消息、Agent 配置和取消信号；输出是轮次结果，以及完整的轮次、步骤、消息、工具和错误事件。</td></tr>
+    <tr><th>适用场景</th><td>单会话问答、连续工具调用、远程取消、并发请求保护和崩溃后继续编号。</td></tr>
+    <tr><th>底层组件</th><td>空闲/运行状态、收件箱队列、轮次与步骤计数器、模型步骤、工具执行器和 AbortController。</td></tr>
+    <tr><th>核心逻辑</th><td><code>run</code> 先原子切换状态并认领当前输入，随后循环执行模型步骤；有工具则执行并继续，无工具或达到边界则按明确原因闭合。</td></tr>
+    <tr><th>权衡</th><td>每个 Agent 串行运行限制单会话吞吐，却避免事件交错和上下文竞态；跨任务并行交给后续子智能体层。</td></tr>
+    <tr><th>方案对比</th><td>递归函数写法简短但难统一取消和步数限制；显式状态机代码稍多，却能穷尽正常、错误、阻塞和取消路径。</td></tr>
+  </tbody></table>
+
   <h2>状态与事件顺序</h2>
   <pre><code>send() ──&gt; Inbox
              │ run() 原子认领

@@ -284,6 +284,7 @@ bun test src/spill-decision.test.ts
 
 相关材料：
 
+- [ContentReference、Spill 与 Sandbox 持久化说明（独立复制版）](content-reference-spill-sandbox-portable.md)
 - [Spill 完整场景文章](spill-complete-scenarios.html)
 - [最小 Spill 原理 Demo](../harness-lab/src/spill-principle-demo.ts)
 - [大文件类型全景 Demo](../harness-lab/src/spill-file-types-demo.ts)

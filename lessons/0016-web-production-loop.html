@@ -26,6 +26,29 @@
     <tr><td>服务入口</td><td>从 Profile 装配宿主和 Agent Server，提供本地可调试网页生产闭环。</td><td>停机时先停止接入，再刷盘释放。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：可恢复客户端投影</h2>
+  <p>Web Client 位于 Agent Server 的下游、用户交互的上游；它不是事实拥有者，而是 Session 事件在浏览器中的可丢弃读模型。</p>
+  <pre><code>用户操作（发送、取消、审批、上传）
+        │ RPC / HTTP（输入）
+        ▼
+Agent Server ─► Session Log
+        │ snapshot(events[0..N])
+        ├────────────────────► ClientProjection.reset
+        │ SSE(after=N)                   │
+        └────────────────────► apply(event)
+                                         ▼
+                                消息、状态、用量 UI（输出）
+断线：丢弃连接，不丢 Session；以 lastSeq 重新追尾</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>浏览器随时刷新、休眠或断网，本地状态不能承担恢复责任；同时用户需要实时看到模型、工具和审批进度。</td></tr>
+    <tr><th>输入与输出</th><td>输入是权威事件快照、SSE 增量和用户命令；输出是可渲染会话视图、RPC 请求、审批决定和附件引用消息。</td></tr>
+    <tr><th>适用场景</th><td>实时聊天界面、长任务进度、跨刷新恢复、多客户端审批和图片输入。</td></tr>
+    <tr><th>底层组件</th><td>AgentClient、ClientProjection、fetch RPC、EventSource/SSE、InteractionBroker、附件上传接口和 CSP。</td></tr>
+    <tr><th>核心逻辑</th><td>先用快照建立完整前缀，再以最后序号追尾；重复事件忽略，缺口立即失败并重新取快照；写命令不直接修改视图，等待权威事件回流。</td></tr>
+    <tr><th>权衡</th><td>事件驱动 UI 存在短暂命令到视图延迟，却避免乐观状态与服务端事实冲突；全量快照简单但大历史成本会增长。</td></tr>
+    <tr><th>方案对比</th><td>本地状态持久化启动快但容易陈旧；服务端渲染一致性高但不适合高频流；快照+增量投影兼顾恢复和实时性。</td></tr>
+  </tbody></table>
+
   <h2>客户端数据流</h2>
   <pre><code>session.snapshot ─► ClientProjection.reset(events[0..N])
                               │
