@@ -25,6 +25,31 @@
     <tr><td>独立进程恢复</td><td>一个 CLI 进程创建会话，另一个进程从磁盘恢复并继续连续轮次。</td><td>证明恢复不依赖同进程内存。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：组合根与无界面宿主</h2>
+  <p>Headless Host 位于部署配置和插件包的下游、CLI、Agent Server 与测试的上游，是所有产品入口共享的唯一装配根。</p>
+  <pre><code>默认值 → 配置文件 → 环境变量 → CLI 覆盖（输入）
+                       │ validate Profile
+                       ▼
+                  HeadlessHost.open
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+     SessionStore   LlmRuntime   HarnessBundle
+          └────────────┼────────────┘
+                       ▼
+          Conversation 用例 API（输出）
+              ┌────────┼────────┐
+              ▼        ▼        ▼
+             CLI   Agent Server  Tests（下游）</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>如果 CLI、服务端和测试分别初始化存储、模型与插件，它们会悄悄形成不同语义，恢复和释放问题难以复现。</td></tr>
+    <tr><th>输入与输出</th><td>输入是分层 Profile、可选提供方覆盖和交互中介器；输出是创建/恢复会话、运行/取消轮次及关闭释放的用例接口。</td></tr>
+    <tr><th>适用场景</th><td>命令行工具、后台服务、集成测试、嵌入式 SDK 和本地演示。</td></tr>
+    <tr><th>底层组件</th><td>严格配置解析器、固定覆盖优先级、HarnessBundle、JSONL 存储、LlmRuntime、HeadlessConversation 和信号处理。</td></tr>
+    <tr><th>核心逻辑</th><td>Profile 只描述部署数据，Bundle 只描述插件图，Host 负责实例化与所有权，CLI 只翻译 argv/stdin/stdout，不复制领域逻辑。</td></tr>
+    <tr><th>权衡</th><td>统一组合根减少入口自由度，却防止配置漂移和生命周期分叉；严格拒绝未知字段会降低向前兼容的宽松度。</td></tr>
+    <tr><th>方案对比</th><td>框架式全局容器方便自动注入但隐藏装配顺序；显式组合根代码更直白，适合调试和证明资源所有权。</td></tr>
+  </tbody></table>
+
   <h2>四层边界</h2>
   <pre><code>CLI argv/stdin/stdout/SIGINT
           │ 翻译

@@ -26,6 +26,28 @@
     <tr><td>路径防护</td><td>会话标识编码为根目录内单一文件名，检查重复标识。</td><td>危险标识不能逃逸目录或覆盖已有会话。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：可证明的崩溃恢复</h2>
+  <p>持久化层位于 Session 内存账本的下游、宿主恢复与 Agent 续跑的上游；它只恢复磁盘上可以通过字节和协议证明的事实。</p>
+  <pre><code>Session.append(event)（输入）
+        │ 串行 write-behind
+        ▼
+Header + JSONL + checksum ── flush/fsync ─► 磁盘事实
+                                             │ 冷启动
+                                             ▼
+字节检查 ─► 半行截断 ─► 生命周期补闭合 ─► Session
+                                             │
+                                             ▼
+                                  投影重建 + Agent 续跑（输出）</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>进程可能在任意字节位置死亡；恢复若猜测未提交数据或重试未知副作用，会把一次崩溃变成重复破坏。</td></tr>
+    <tr><th>输入与输出</th><td>写入输入是会话头和连续事件；恢复输入是原始文件字节，输出是校验后的 Session、修复事件和下一轮编号。</td></tr>
+    <tr><th>适用场景</th><td>服务重启、机器掉电、CLI 跨进程继续、历史分叉和损坏诊断。</td></tr>
+    <tr><th>底层组件</th><td>JSONL、校验和、换行提交标记、串行写后队列、fsync、序号校验、生命周期修复器和安全文件名编码。</td></tr>
+    <tr><th>核心逻辑</th><td>换行定义记录提交边界；完整记录必须逐条通过校验和与序号检查；仅未换行尾部可截断；悬空工具写未知结果而非重试。</td></tr>
+    <tr><th>权衡</th><td>每行校验和与频繁刷盘增加 I/O 成本，却能区分未提交尾部和已提交损坏，并提供明确耐久边界。</td></tr>
+    <tr><th>方案对比</th><td>数据库提供事务与索引但引入服务和迁移复杂度；JSONL 易检查、易教学、适合单会话顺序写，规模增长后可换后端而保留协议。</td></tr>
+  </tbody></table>
+
   <h2>文件格式</h2>
   <pre><code>{ kind: "header", header: { id, format, version, cwd, parent? }, checksum }
 { kind: "event",  event:  { seq: 0, type, time, data },       checksum }
@@ -94,6 +116,8 @@ interrupted closers、恢复后继续编号、fork 隔离、id 路径编码、
     <li><a href="../deepseek-harness/packages/session/session-persistence-jsonl/src/index.ts">Harness 权威 JSONL/Zstd 后端</a></li>
     <li><a href="../deepseek-harness/packages/core/session/src/repair.ts">Harness 权威 interrupted repair</a></li>
   </ul>
+  <h2>拓展阅读</h2>
+  <p><a href="../reference/session-event-log-recovery-and-otel.md">DeepSeek Harness 的 Session Event Log 恢复与 OTel Logs：恢复边界、完整流程、Jobs/Workflow/Subagent 差异与源码依据 →</a></p>
   <p>下一课实现 context/token budget、compaction 和 attachment spill，控制长会话的模型窗口与内存。</p>
   <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
 </main></body></html>

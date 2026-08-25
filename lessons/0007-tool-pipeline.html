@@ -25,6 +25,31 @@
     <tr><td>取消收尾</td><td>取消信号传入工具并等待协作式结束。</td><td>写入取消结果后再闭合步骤与轮次。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：工具执行管线</h2>
+  <p>工具管线位于模型工具调用的下游、真实业务函数和权限系统的上游，是不可信模型输出进入外部世界前的验证与调度边界。</p>
+  <pre><code>模型 tool-call(name, raw JSON, callId)
+                  │ 输入
+                  ▼
+Registry.prepare ─► Schema 校验 ─► Permission
+                                      │ allow
+                                      ▼
+                              Scheduler ─► Tool body
+                                      │
+                                      ▼
+                         ToolOutcome / ToolResult（输出）
+                                      │
+                                      ▼
+                               Session ─► 下一 Step</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>模型产生的是概率性文本，不能直接当成可信函数参数；执行前必须确认名称、结构、权限和并发属性。</td></tr>
+    <tr><th>输入与输出</th><td>输入是工具名、调用标识和原始 JSON；输出是与调用标识关联的成功或失败工具结果消息。</td></tr>
+    <tr><th>适用场景</th><td>文件操作、终端命令、搜索、MCP 工具、多个独立查询并行执行。</td></tr>
+    <tr><th>底层组件</th><td>工具注册表、JSON Schema 子集校验器、PreparedCall、权限效果、批次调度器和结果规范化器。</td></tr>
+    <tr><th>核心逻辑</th><td>先解析校验全部调用，再按并行安全性分组；执行结果无论返回还是抛错都规范化，最后严格按模型顺序提交到 Session。</td></tr>
+    <tr><th>权衡</th><td>严格模式会拒绝部分可自动修正参数，但避免工具主体承担模糊输入和隐式安全决策。</td></tr>
+    <tr><th>方案对比</th><td>让每个工具自行校验自由度高却重复且不一致；统一管线集中策略，代价是要维护一套公共模式能力。</td></tr>
+  </tbody></table>
+
   <h2>完整工具回路</h2>
   <pre><code>step 1 / assistant message
           │ tool-call(name, raw JSON, callId)

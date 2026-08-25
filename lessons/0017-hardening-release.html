@@ -25,6 +25,30 @@
     <tr><td>发布验收</td><td>类型检查、完整测试、构建、CLI 帮助、冒烟运行和资源收敛检查。</td><td>单个成功演示不能替代整套发布门禁。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：生产可信度闭环</h2>
+  <p>发布加固位于全部运行能力的下游、运维与下一次发布的上游；它把事实、观测、成本和故障证据分开，再汇合成发布决策。</p>
+  <pre><code>Session Events + Runtime State + Fault Scenarios（输入）
+          │                 │              │
+          ▼                 ▼              ▼
+ SessionTelemetry      CostProjection   Capability/Fault Probe
+          │ OTel Logs       │ Cost         │ 测试证据
+          └────────────┬────┴──────────────┘
+                       ▼
+          Build + Smoke + Release Gates（输出）
+                       │
+                       ▼
+              运维检索、告警、发布决策（下游）
+权威恢复仍只读取 Session JSONL</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>功能测试通过不代表生产可靠；还必须知道故障时发生了什么、花了多少钱、平台能力是否满足以及升级能否安全回退。</td></tr>
+    <tr><th>输入与输出</th><td>输入是 Session 事件、价格表、运行平台、故障计划和候选插件包；输出是 OTel 记录、成本投影、能力报告、故障证据和发布门禁结果。</td></tr>
+    <tr><th>适用场景</th><td>线上检索告警、费用归因、隐私采集策略、跨平台发布、热升级和故障演练。</td></tr>
+    <tr><th>底层组件</th><td>遥测捕获与脱敏、TelemetrySink、版本化 PriceBook、高精度整数计算、运行能力探测、事务热切换和确定性故障注入。</td></tr>
+    <tr><th>核心逻辑</th><td>从权威事件派生可丢弃遥测和成本；候选插件先启动成功才切换；故障在指定命中次数触发；最终由类型、测试、构建和冒烟共同放行。</td></tr>
+    <tr><th>权衡</th><td>完整遥测提升诊断能力但增加隐私与存储成本；反馈模式更克制却覆盖有限；强发布门禁变慢但降低不可逆线上故障。</td></tr>
+    <tr><th>方案对比</th><td>把日志、账单和恢复混成一库查询方便，却让采样或价格变化破坏事实；分层派生保持职责清晰并允许各自重建。</td></tr>
+  </tbody></table>
+
   <h2>三类数据不要混成一份</h2>
   <pre><code>Session JSONL（权威事实） ──► 恢复 / fork / replay
         │

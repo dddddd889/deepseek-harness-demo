@@ -1,0 +1,791 @@
+# Spill 完整场景：从大内容落盘到恢复、分页与回收
+
+Spill 不是简单地“把字符串写进临时文件”，而是在大内容生产者、事实日志、模型上下文和受控存储之间建立一套可恢复、有上限、可校验的引用协议。
+
+## 文章导览
+
+| 项目 | 内容 |
+|---|---|
+| 包含内容 | Spill 分类、写入事务、引用模型、分页读取、搜索、恢复、分叉、垃圾回收、配额、安全与故障注入。 |
+| 涉及模块 | `LocalSpillStore`、进程输出收集器、Session Event、Tool Result、Web Content Store、Attachment Store、垃圾回收器。 |
+| 白话解释 | 大内容像大件行李：主流程只携带提取单和一小段预览，完整行李进入仓库，需要时凭稳定引用分段领取。 |
+| 解决的问题 | 防止内存、事件日志和模型上下文被大内容撑爆，同时保证崩溃后仍能找到、校验、读取和安全清理完整内容。 |
+
+## 1. 为什么需要 Spill
+
+工具输出、测试日志、网页正文和模型生成内容的大小不可预测。如果完整内容同时存在于进程内存、Session Event、遥测日志和模型输入中，一份 20 MB 输出可能被复制多次，最终同时压垮内存、持久化文件和上下文窗口。
+
+```
+生产者产生 20 MB 内容
+  ├─ 全放内存：进程内存增长
+  ├─ 全写 Session：每次重放都要读取 20 MB
+  ├─ 全送模型：超过上下文窗口
+  └─ 全发遥测：网络与观测成本失控
+
+改为 Spill：
+  完整内容 ──► 受控对象存储
+  小预览 + 元数据 + 稳定引用 ──► Session / 模型 / UI
+```
+
+因此 Spill 的核心目标不是节省磁盘，而是把“大字节的所有权”从主协议中移走，同时保留可找回性和完整性。
+
+## 2. 先区分四种外置内容
+
+| 类型 | 典型内容 | 事实源 | 生命周期 | 推荐引用 |
+| --- | --- | --- | --- | --- |
+| 进程临时溢出 | stdout、stderr、终端录制 | 运行中的进程结果 | 进程运行时释放时可删除 | `ProcessOutputRef` |
+| 会话耐久 Spill | 超大工具结果、测试报告、补丁 | Session Event 中的引用 | 至少保留到所有引用它的会话被删除 | `SpillRef` |
+| 领域对象 | 用户附件、网页内容快照 | 领域 Store 与 Session 引用 | 按附件或网页缓存规则管理 | `AttachmentRef`、`WebContentRef` |
+| 外部对象 | S3 对象、数据库导出、构建制品 | 外部系统 | 由外部保留策略控制 | 带版本和完整性信息的外部引用 |
+
+**关键区别：**临时文件可以随运行时销毁；已经写进可恢复 Session 的引用不能随进程退出删除。生命周期选错，会产生“日志还在、内容没了”的悬空引用。
+
+## 3. 通用架构
+
+```
+内容生产者
+  ├─ Tool
+  ├─ Subprocess
+  ├─ Web Fetch
+  ├─ MCP
+  └─ Agent / Workflow
+          │ 内容超过内联预算
+          ▼
+     Spill Policy
+  字节上限 / 字符上限 / Token 预算 / 内容类型
+          │
+          ▼
+   Domain Content Store
+  ├─ Text Spill Store
+  ├─ Web Content Store
+  └─ Attachment Store
+          │ 共享底层能力
+          ▼
+      Blob Store
+  原子写入 / 摘要 / 私有权限 / 去重 / 校验 / 删除
+          │
+          ├─► SpillRef 写入 Session Event
+          ├─► preview 进入模型可见面
+          └─► read / find / range 按需读取
+```
+
+推荐让多个领域 Store 共享可靠的 Blob Store，但不要让网页快照伪装成附件，也不要让用户附件伪装成进程输出。底层字节机制可以复用，上层身份、权限、分页和保留规则必须分开。
+
+## 4. 何时触发 Spill
+
+触发条件应在内容进入 Session 和模型之前执行，并明确区分硬上限与可见预算。
+
+| 预算 | 作用 | 超限行为 |
+| --- | --- | --- |
+| 生产者硬上限 | 限制网络响应、子进程输出或上传字节 | 停止读取、终止生产者或明确拒绝 |
+| 内联事件上限 | 限制单个 Session Event 的字节数 | 完整内容先 Spill，事件只保存引用 |
+| 模型可见预算 | 限制一次送入模型的内容量 | 返回预览、摘要或相关片段 |
+| 存储配额 | 限制单对象、单会话和全局占用 | 拒绝新对象、清理可回收对象或降级 |
+
+例如网页抓取可采用“原始响应 10 MB、清洗正文 20 万字符、首次模型预览 8000 字符”三层预算。20 万字符不是一次全部送给模型，而是允许形成可分页的完整正文快照。
+
+## 5. 写入必须是一笔事务
+
+```
+1. 接收内容流，同时计算字节数与 SHA-256
+2. 写入同一文件系统中的私有临时文件
+3. 检查单对象和会话配额
+4. flush 文件；耐久场景需要 fsync
+5. 原子改名到最终对象位置
+6. 必要时 fsync 父目录
+7. 构造稳定 SpillRef
+8. 最后才把 SpillRef 追加到 Session Event
+
+禁止顺序：
+先写 Session 引用 → 再异步写内容
+原因：步骤之间崩溃会留下永久悬空引用。
+```
+
+如果对象使用内容寻址，最终位置可以由摘要决定；如果使用随机不可猜文件名，引用中必须携带摘要并限制路径只能由 Store 解释。
+
+## 6. 引用应该包含什么
+
+```
+interface SpillRef {
+  id: string                 // 稳定且不暴露任意路径
+  version: 1
+  scope: "session" | "job" | "runtime"
+  ownerId: string
+  mediaType: string
+  bytes: number
+  sha256: string
+  createdAt: number
+  encoding?: "utf-8"
+  preview?: string
+  retrieval: "range" | "blocks"
+}
+```
+
+| 字段 | 用途 |
+| --- | --- |
+| `id` | 由 Store 解析的稳定标识；模型不能提交任意绝对路径。 |
+| `scope / ownerId` | 决定谁能读取、何时可以回收。 |
+| `bytes / sha256` | 冷读取时验证长度和内容完整性。 |
+| `mediaType / encoding` | 决定解析和分页方式，避免把二进制误当文本。 |
+| `retrieval` | 告诉调用方使用字节范围、字符范围还是结构化块游标。 |
+
+当前实验版 `LocalSpillStore` 的 `locator` 是本地路径，适合教学和本地工具继续读取；生产边界更适合使用不透明标识，由 Store 完成路径解析和所有者鉴权。
+
+## 7. 读取不能重新把全部内容塞回内存
+
+Spill 后如果 `read()` 一次读取完整文件，系统只是把内存问题推迟到下一步。文本至少需要范围读取和搜索；结构化内容适合块游标。
+
+```
+纯文本：
+read(ref, offset=0, limit=8192)
+find(ref, pattern="错误", before=2, after=4)
+tail(ref, lines=200)
+
+结构化网页：
+readBlocks(ref, cursor={ block: 12, offset: 0 }, budget=8000)
+findBlocks(ref, pattern="恢复")
+
+二进制附件：
+readBytes(ref, offset, length)
+或交给支持该媒体类型的专用解析器。
+```
+
+每次读取都必须再次检查调用方是否拥有该引用，并在返回前复验摘要或受信任的对象元数据。读取结果本身仍需要模型可见预算，不能因为数据已经在磁盘就无限返回。
+
+## 8. 五类完整场景
+
+### 8.1 超大工具结果
+
+```
+工具返回 5 MB JSON
+  → Tool Pipeline 判断超过事件内联上限
+  → 完整结果写入会话级 Spill Store
+  → tool/result 记录 schema 摘要、预览、SpillRef
+  → 模型需要字段时用 find/read 继续获取
+  → 会话恢复后引用仍然有效
+```
+
+结构化结果最好同时保存可搜索索引或提供 JSON 路径读取，避免模型只能按字符盲翻页。
+
+### 8.2 子进程 stdout / stderr
+
+```
+子进程持续输出
+  → 内存只保留前 64 KB
+  → 全量字节持续写入临时输出文件
+  → 结束时返回 text、bytes、truncated、spillRef
+  → 若结果写入 Session：把临时对象提升为会话耐久对象
+  → 若仅用于本次运行：Runtime.dispose 时删除
+```
+
+**提升动作很重要：**当前进程运行时的溢出文件会在 `dispose()` 时删除。如果 Session 要长期引用该输出，必须在写事件前复制或原子移动到会话级 Store，不能直接持久化临时路径。
+
+### 8.3 Web 抓取正文
+
+```
+流式读取 HTTP 响应，执行原始字节硬上限
+  → 解析 HTML，移除脚本、样式、导航和页脚
+  → 提取标题、段落、列表、代码块和表格
+  → 正文超过首次可见预算
+  → 完整结构化快照写入 Web Content Store
+  → 返回首批正文块、WebContentRef、nextCursor
+  → web_read / web_find 基于同一不可变快照继续读取
+```
+
+分页必须基于首次抓取形成的不可变快照。每次翻页都重新访问网址会因为网页变化导致游标漂移。
+
+### 8.4 用户附件
+
+```
+上传字节
+  → 检查媒体类型、字节和像素上限
+  → 完整解码并验证声明类型
+  → 内容寻址保存
+  → Session 保存 AttachmentRef
+  → 冷读时重新校验摘要和元数据
+```
+
+附件底层可以复用 Blob Store，但它不是普通 Spill：附件是用户输入，需要自己的媒体元数据、权限和保留语义。
+
+### 8.5 模型或工作流中间产物
+
+```
+子智能体生成大型分析报告
+  → 保存完整报告
+  → 父智能体只收到摘要和引用
+  → 汇合阶段按需读取相关章节
+  → 工作流完成后：
+       会话引用过 → 提升为会话级对象
+       从未持久引用 → 按任务策略清理
+```
+
+所有者关系必须进入引用或 Store 元数据，避免一个子智能体猜测并读取另一个任务的私有 Spill。
+
+## 9. Session 恢复、分叉与删除
+
+```
+Session 恢复
+  → 重放事件得到所有 SpillRef
+  → 不立即加载正文
+  → 第一次读取时校验对象存在、所有者、长度和摘要
+
+Session 分叉
+  → 新会话继承分叉点之前的 SpillRef
+  → 不复制不可变对象
+  → 垃圾回收必须把父子会话都视为引用者
+
+Session 删除
+  → 不能立即盲删对象
+  → 先确认没有其他会话、分叉或任务继续引用
+```
+
+Spill 正文不必在恢复时全部加载；引用本身是事实，正文是按需物化的数据。这样冷恢复时间不会随大内容总量线性增长。
+
+## 10. 垃圾回收：引用还在，文件就不能删
+
+最稳妥的基础方案是“标记—清扫”，因为崩溃、会话分叉和回滚会让实时引用计数容易漂移。
+
+```
+标记阶段
+  → 扫描所有可恢复 Session、Job 和领域索引
+  → 收集仍被引用的对象标识
+
+清扫阶段
+  → 枚举 Store 中全部对象
+  → 保留被标记对象
+  → 未标记且超过宽限期的对象移入回收区
+  → 延迟删除，允许误操作恢复
+
+并发保护
+  → 新对象先进入“未发布”状态
+  → 引用提交后标记为“已发布”
+  → 垃圾回收不得删除本轮扫描后新建的对象
+```
+
+| 策略 | 优点 | 风险 |
+| --- | --- | --- |
+| 按进程退出清理 | 简单 | 只适合临时 Spill，会破坏可恢复引用 |
+| 按时间过期 | 容易控制磁盘 | 活跃但长期未读取的会话可能丢内容 |
+| 引用计数 | 删除及时 | 崩溃、分叉和事务回滚时容易计数错误 |
+| 标记—清扫 | 可从权威事实重新计算 | 扫描成本较高，需要处理并发创建 |
+
+## 11. 配额、背压与拒绝策略
+
+| 配额层级 | 示例 | 到达上限后 |
+| --- | --- | --- |
+| 单次生产 | 一次 HTTP 响应不超过 10 MB | 停止读取并返回明确原因 |
+| 单对象 | 单个文本 Spill 不超过 50 MB | 拒绝对象或要求生产者分片 |
+| 单任务 | 一个 Job 最多 200 MB | 暂停生产者、取消任务或要求清理 |
+| 单会话 | 一个 Session 最多 1 GB | 拒绝新 Spill，并提示用户归档或删除 |
+| 全局 | 存储根目录最多 20 GB | 先回收未引用对象，再拒绝新写入 |
+
+不能在磁盘已满后才处理。流式生产者应支持背压；当写入速度跟不上输出速度或配额即将耗尽时，必须暂停读取、终止生产者或明确失败。
+
+## 12. 安全边界
+
+-   **路径：**模型只提交不透明对象标识；本地路径由 Store 内部解析并验证位于根目录。
+-   **权限：**目录使用 `0700`，文件使用 `0600`；多用户部署还需租户级隔离。
+-   **完整性：**冷读取检查长度和 SHA-256；结构化领域对象还需复验媒体类型与元数据。
+-   **机密：**预览、日志和遥测也要脱敏，不能只保护完整 Spill 文件。
+-   **内容类型：**HTML、图片、压缩文件和文本使用不同解析器与限制，不能依赖文件扩展名。
+-   **拒绝服务：**限制解压比、解析时间、像素数、嵌套深度、对象数量和并发读取数。
+-   **外部引用：**如果引用指向 S3 或数据库，需固定版本、校验 ETag 或摘要，不能只保存会变化的公开网址。
+
+## 13. 故障路径必须逐个定义
+
+| 故障 | 正确结果 |
+| --- | --- |
+| 写临时文件失败 | 不发布引用，工具结果明确失败。 |
+| 对象写完但 Session 引用未提交就崩溃 | 形成未引用孤儿对象，之后由宽限期垃圾回收删除。 |
+| Session 引用已提交但对象未耐久 | 属于协议错误；通过“对象先耐久、引用后提交”避免。 |
+| 读取时文件缺失 | 返回稳定的对象缺失错误，不把空字符串当作结果。 |
+| 摘要或长度不一致 | 报告内容损坏，绝不继续送给模型。 |
+| 分页游标越界 | 返回明确边界错误或空终页，不读取其他对象。 |
+| 配额耗尽 | 先尝试回收；仍不足则拒绝新写入，不删除活跃对象。 |
+| 垃圾回收与新写入并发 | 通过代次、创建时间水位或发布状态避免误删新对象。 |
+
+## 14. DeepSeek Harness、OpenHands 与 Deep Agents 对比
+
+三者都在解决“大结果不能无限进入模型上下文”，但选择的事实源、介入位置和回读方式不同。下面的比较以各项目公开源码和文档为准；其中 OpenHands 没有暴露与另外两者同构的统一 Spill seam，因此对它的描述是公开能力边界的归纳，而不是声称内部不存在任何工具专用落盘逻辑。
+
+| 维度 | DeepSeek Harness | OpenHands | LangChain Deep Agents |
+| --- | --- | --- | --- |
+| 主要介入点 | `tools/post-execute` 的 Spill Policy | 工具 Observation、事件转换与上下文 Condenser | `FilesystemMiddleware` 环绕工具执行 |
+| 大结果处理 | 保留策略生成预览，Spill Store 保存最终文本，工具结果替换为 locator 与读取提示 | 大 Observation 可在模型输入面被裁剪；部分工具把录制或制品写入工作区的 `.agent_tmp` | 超过 Token 阈值后自动写入后端文件系统，ToolMessage 替换为头尾预览和文件路径 |
+| 回读方式 | 后端返回 `retrievalHint`；本地后端通常提示使用文件读取或搜索工具 | 由产生制品的具体工具和 Workspace 接口决定，没有统一 Spill 回读协议 | 使用内置 `read_file(offset, limit)` 分页，或用 `grep` 定位 |
+| 存储抽象 | `ctx.spillStore` 是独立能力 seam，可替换本地或未来远端后端 | Conversation/Event 持久化、Workspace 文件和工具临时制品分别管理 | 复用 BackendProtocol；可落在 State、Store、Filesystem 或 Sandbox 后端 |
+| 恢复关系 | Session Log 保存 locator；分叉继承旧 locator，新 Spill 使用子会话命名空间 | Conversation 从 Event Log 恢复；工具制品是否耐久取决于 Workspace 或工具自身存储 | 消息状态由 LangGraph Checkpoint 恢复；大结果文件是否耐久取决于所选 Backend |
+| 生命周期 | Spill seam 本身不定义删除；保留周期与访问控制交给后端和上层策略 | `.agent_tmp` 与 conversation persistence 明确分离，清理由工具或运行环境负责 | 跟随 Backend 的线程、Store、文件系统或沙箱生命周期 |
+| 主要优势 | 存储、预览和策略职责清晰，Session 语义明确 | 与 Action/Observation 产品行为及具体工具制品自然结合 | 自动化程度高，模型可直接用已有文件工具分段回读 |
+| 主要风险 | locator 的鉴权、读取和删除仍是后端责任 | 不同工具可能采用不同截断和制品策略，缺少统一引用协议 | 文件回读仍需同时限制行长和字符量，否则可能出现再次超限或循环驱逐 |
+
+### 14.1 DeepSeek Harness：能力 seam 与策略分离
+
+```
+工具完整结果
+  → Output Retention 决定模型预览
+  → Spill Policy 在 tools/post-execute 判断是否外置
+  → ctx.spillStore.saveText(owner, source, suggestedName, content)
+  → 后端返回 locator、bytes、retrievalHint
+  → Session 中的工具结果保留短预览和定位信息
+```
+
+DeepSeek Harness 明确规定 Spill Store 只负责保存文本，不负责决定预览、不负责替换工具结果，也不定义统一读取或删除接口。它的优点是 seam 很深、职责很窄；代价是访问控制、保留期、垃圾回收和回读协议仍需由本地后端及上层能力补齐。
+
+### 14.2 OpenHands：事件事实与工具制品分开
+
+```
+工具 Action
+  → 工具执行并产生 Observation / 专用制品
+  → Observation 进入 Event Log
+  → 构造模型输入时执行内容裁剪或 Condenser
+
+工具专用大文件
+  → 可写入 Workspace 的 .agent_tmp
+  → 路径和读取方式由具体工具定义
+  → 不等同于统一的 SpillRef 服务
+```
+
+OpenHands 的中心是 Action/Observation Event Log。上下文过大时可以在模型输入面裁剪 Observation 或使用 Condenser 压缩历史；浏览器录制等工具制品使用约定的 `.agent_tmp`。公开 SDK 中没有与 `ctx.spillStore` 或 Deep Agents 自动驱逐器同构的统一大结果外置接口。因此，它更容易保持产品事件语义，但跨工具的一致引用、分页和垃圾回收需要额外规范。
+
+### 14.3 Deep Agents：自动驱逐到虚拟文件系统
+
+```
+任意普通工具返回大结果
+  → FilesystemMiddleware 估算 Token
+  → 超过 tool_token_limit_before_evict
+  → 写入 /large_tool_results/<tool_call_id>
+  → ToolMessage 替换为头尾预览与路径
+  → 模型使用 read_file(offset, limit) 或 grep 回读
+```
+
+Deep Agents 最大的特点是复用统一文件系统后端：StateBackend 可以把对象放在线程状态中，StoreBackend 可以跨线程持久化，Filesystem 或 Sandbox 后端可以落到真实文件。它还排除自带截断或不适合再次驱逐的文件工具，避免 `read_file` 读出大结果后再次被驱逐形成循环。
+
+### 14.4 三种思路如何组合
+
+```
+采用 DeepSeek Harness 的职责分层
+  ├─ Policy 决定何时 Spill
+  ├─ Store 决定如何耐久保存
+  └─ Session 记录可恢复引用
+
+采用 Deep Agents 的模型体验
+  ├─ 自动生成头尾预览
+  ├─ read(offset, limit) 分页
+  └─ grep / find 定位相关片段
+
+采用 OpenHands 的产品边界
+  ├─ 完整领域 Action / Observation 保持可审计
+  ├─ 工具专用制品保留自己的类型
+  └─ 上下文裁剪与事实持久化分开
+```
+
+对本实验而言，较完整的目标不是复制其中任何一种，而是组合三者：使用独立 Spill seam 和稳定 Session 引用，提供自动分页与搜索体验，同时不把附件、网页快照和工具 Observation 全部压成一种无类型文件。
+
+### 14.5 对比来源
+
+-   [DeepSeek Harness：Spill Storage 子系统](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/spill.md)
+-   [DeepSeek Harness：Spill seam 契约与限制](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/spill/spill/README.md)
+-   [OpenHands SDK：Event、Condenser 与临时制品约定](https://github.com/OpenHands/software-agent-sdk/blob/main/AGENTS.md)
+-   [OpenHands SDK：上下文 Condenser 示例](https://github.com/OpenHands/software-agent-sdk/blob/main/examples/01_standalone_sdk/14_context_condenser.py)
+-   [Deep Agents：FilesystemMiddleware 大结果驱逐](https://github.com/langchain-ai/deepagents/blob/main/libs/deepagents/deepagents/middleware/filesystem.py)
+-   [Deep Agents：Backend、状态与 Checkpoint 架构](https://github.com/langchain-ai/deepagents/blob/main/libs/ARCHITECTURE.md)
+
+## 15. 当前实验已经实现什么
+
+| 位置 | 已实现 | 仍需补全 |
+| --- | --- | --- |
+| `LocalSpillStore` | 会话哈希目录、随机安全文件名、私有权限、长度与 SHA-256、读取复验。 | 不透明标识、范围读取、所有者鉴权、引用持久化、配额和垃圾回收。 |
+| `spillIfNeeded` | 按 UTF-8 字节阈值决定内联或落盘。 | 预览策略、结构化元数据、模型读取工具和 Token 预算。 |
+| 进程输出收集器 | 有限内存前缀、全量临时文件、stdout/stderr 分离、运行时释放清理。 | 将临时对象提升为会话耐久对象，避免持久化临时路径。 |
+| Attachment Store | 完整图片解码、内容寻址、私有权限、去重和冷读复验。 | 统一底层 Blob Store、配额与跨会话垃圾回收。 |
+| Web Runtime | 搜索来源数量截断；抓取结果有 `truncated` 标记。 | 响应字节上限、正文提取、Web Content Store、块分页、搜索和恢复。 |
+
+**结论：**当前代码证明了“超限落盘”和“读取验完整性”两个关键点，但还不是完整的生产级 Spill 子系统。最大的缺口是稳定引用、耐久生命周期、按需读取、配额和垃圾回收。
+
+## 16. 推荐的接口分层
+
+```
+interface BlobStore {
+  put(stream, limits): Promise<BlobRef>
+  read(ref, range): AsyncIterable<Uint8Array>
+  verify(ref): Promise<void>
+  delete(ref): Promise<void>
+}
+
+interface TextSpillStore {
+  saveText(owner, text): Promise<SpillRef>
+  read(ref, offset, limit): Promise<TextPage>
+  find(ref, pattern): Promise<TextMatch[]>
+}
+
+interface WebContentStore {
+  save(snapshot): Promise<WebContentRef>
+  readBlocks(ref, cursor, budget): Promise<WebContentPage>
+  findBlocks(ref, pattern): Promise<WebContentMatch[]>
+}
+
+interface AttachmentStore {
+  save(input, limits): Promise<AttachmentRef>
+  read(ref): Promise<Uint8Array>
+}
+```
+
+`BlobStore` 负责字节可靠性；领域 Store 负责内容结构、权限、读取方式和生命周期。这样可以复用机制，但不会混淆语义。
+
+## 17. 验收清单
+
+-   阈值以下内联，阈值以上只发布预览和稳定引用。
+-   多字节 UTF-8 内容按字节精确计量，不把字符数误当字节数。
+-   崩溃发生在写对象、改名、刷盘和提交引用的每个边界时，恢复结果都明确。
+-   篡改字节、长度、摘要或结构化元数据后，读取明确拒绝。
+-   一个会话不能读取另一个会话或任务的私有对象。
+-   分页和搜索不会一次把完整大对象重新加载到模型可见面。
+-   会话冷恢复和分叉后，历史引用仍能读取相同不可变内容。
+-   删除父会话不会误删仍被子会话引用的对象。
+-   垃圾回收不会删除扫描期间新创建或尚未发布的对象。
+-   单对象、单任务、单会话和全局配额都能稳定拒绝并留下可诊断错误。
+-   临时进程 Spill 在运行时释放后清理，提升为耐久对象后不受临时清理影响。
+-   日志与遥测只记录必要元数据，不泄露正文、凭证或任意本地路径。
+
+## 18. 最终设计原则
+
+1.  **先保存内容，后发布引用。**
+2.  **引用必须稳定、可鉴权、可校验，不能等同于任意路径。**
+3.  **外置之后仍要有界读取，不能重新全量加载。**
+4.  **临时、会话耐久和领域对象必须使用不同生命周期。**
+5.  **Session 保存引用事实；预览和模型可见面可以随预算裁剪。**
+6.  **分叉共享不可变对象；垃圾回收依据全部权威引用。**
+7.  **底层 Blob 能力可以复用，领域类型和安全语义不能混用。**
+
+## 19. 常见问题 QA
+
+### Q1：Spill 是不是把超大内容截断后丢掉？
+
+不是。截断的是进入模型、界面或 Session Event 的内联展示，完整内容应先写入受控存储。调用方获得预览、总大小、稳定引用和继续读取方法。
+
+```
+完整内容：受控存储中保留
+模型可见：短预览 + SpillRef + 读取提示
+truncated=true：展示不完整，不代表完整内容已经丢失
+```
+
+### Q2：为什么不能直接把完整结果写进 Session Event？
+
+因为 Session 是恢复和重放的事实账本。把几十 MB 内容直接写入事件，会让每次刷盘、加载、分叉、投影和网络同步都承担大字节成本。正确做法是让事件保存“这个内容存在、由谁产生、如何定位”的引用事实。
+
+### Q3：Web 抓取限制 2000 字符合理吗？
+
+如果 2000 字符指原始 HTML 或完整正文上限，就不合理。普通网页的标签、脚本、样式和导航通常已经远超 2000 字符。2000 字符只能作为较小的模型预览窗口，不能作为抓取容量。
+
+| 对象 | 适合的限制方式 | 示例量级 |
+| --- | --- | --- |
+| 原始 HTTP 响应 | 按字节限制 | 5–10 MB |
+| 清洗后的网页正文 | 按字符或结构化块限制 | 最多约 20 万字符 |
+| 一次模型预览 | 按 Token 或字符预算限制 | 4000–12000 字符 |
+
+这些数值是推荐起点，不是协议常量；实际配置应根据模型窗口、机器资源和信任等级调整。
+
+### Q4：清洗后的 HTML 正文上限可以设成 20 万字符吗？
+
+可以把 20 万字符作为单个网页结构化正文快照的默认硬上限，但不能一次全部送给模型。超过首次可见预算的部分应存入 `WebContentStore`，通过分页或搜索按需读取。如果正文自身超过 20 万字符，应明确记录原始长度、保存长度和截断原因。
+
+### Q5：解析后的 HTML 怎么分页？
+
+不是按浏览器页码，也不优先按固定字符硬切。HTML 先被转换为标题、段落、列表、代码块和表格等稳定正文块；读取时在预算内尽量返回完整块。
+
+```
+WebContentCursor = {
+  block: 12,   // 第几个结构化正文块
+  offset: 0    // 单个超长块内部的字符偏移
+}
+
+普通情况：按 block 继续
+单个代码块超长：按 block + offset 继续
+```
+
+同一个分页游标必须绑定首次抓取形成的不可变快照，不能每次翻页都重新访问网址，否则网页变化会导致内容错位。
+
+### Q6：网页快照存在哪里，能不能当作附件？
+
+网页快照需要落到耐久内容存储，但领域上不应伪装成普通附件。它更适合使用独立的 `WebContentStore` 和 `WebContentRef`，底层复用 Attachment 或 Spill 的 Blob 存储能力。
+
+| 类型 | 专属元数据 | 专属操作 |
+| --- | --- | --- |
+| Attachment | 媒体类型、字节、图片宽高、用户文件名 | 上传、读取、媒体解析 |
+| WebContent | 网址、抓取时间、标题、正文块数 | 按块读取、搜索、过期和重新抓取 |
+| Text Spill | 所有者、来源工具、字节、摘要 | 范围读取、搜索、提升和回收 |
+
+### Q7：所有 Spill 都应该用同一个 Store 吗？
+
+底层可靠字节能力可以统一，上层领域 Store 不应合并。推荐结构是：
+
+```
+BlobStore：原子写入、摘要、权限、去重、删除
+  ├─ TextSpillStore：文本范围读取与搜索
+  ├─ WebContentStore：结构化块分页与网页过期
+  └─ AttachmentStore：媒体校验与附件读取
+```
+
+这样既复用了可靠性机制，又保留了不同内容的身份、权限、分页和生命周期。
+
+### Q8：进程输出已经有 spillPath，能直接写进 Session 吗？
+
+不能直接长期引用。当前进程输出文件属于 `LocalProcessRuntime`，运行时释放时会删除。如果工具结果需要进入可恢复 Session，必须先把临时文件提升为会话耐久对象，再提交新的稳定引用。
+
+```
+进程临时 spillPath
+  → 校验完整输出
+  → 复制或原子移动到 Session Spill Store
+  → 获得耐久 SpillRef
+  → 最后追加 tool/result 事件
+```
+
+### Q9：为什么要“先保存内容，后提交引用”？
+
+如果顺序相反，Session 可能已经持久化引用，但进程在内容写完前崩溃，恢复后就得到无法修复的悬空引用。对象先耐久、引用后提交时，中途崩溃最多留下一个未引用孤儿对象，可以由垃圾回收安全删除。
+
+### Q10：会话分叉时要复制 Spill 文件吗？
+
+不可变对象不需要复制。子会话继承分叉点之前的引用，新产生的 Spill 使用子会话所有者命名空间。垃圾回收必须同时扫描父会话和所有分叉，只有没有任何权威引用时才能删除对象。
+
+### Q11：为什么不能只设置过期时间自动删？
+
+因为长期未访问不等于不再需要。一个旧会话可能数月后仍需恢复。更可靠的策略是从 Session、Job 和领域索引标记活跃引用，再清扫未引用且超过宽限期的对象；时间只作为清扫条件之一。
+
+### Q12：模型按分页读取后，会不会再次造成上下文溢出？
+
+会，所以每次回读仍必须执行模型可见预算。分页解决的是“可以继续访问完整内容”，不是取消上下文限制。对于日志和网页，优先使用 `find`、`grep` 或块搜索定位相关区域，再读取附近内容，通常比顺序翻完全部页面更可靠。
+
+### Q13：DeepSeek Harness、OpenHands、Deep Agents 谁的 Spill 最完整？
+
+不能简单排名，因为三者的优化目标不同：
+
+-   **DeepSeek Harness** 的 seam 和职责边界最清楚，但统一回读、鉴权和删除仍需后端补齐。
+-   **Deep Agents** 的自动驱逐和文件工具回读体验最直接，但耐久性取决于 Backend，回读仍需防长行和重复驱逐。
+-   **OpenHands** 更强调 Action/Observation 产品事实和工具专用制品，公开 SDK 中没有同构的统一 Spill seam。
+
+本文推荐组合三者优势：DeepSeek Harness 的职责分层、Deep Agents 的分页搜索体验，以及 OpenHands 的领域事件和专用制品边界。
+
+### Q14：当前实验离生产级 Spill 还差什么？
+
+当前已经具备阈值落盘、会话目录隔离、随机安全文件名、私有权限和读取完整性校验。主要缺口是不透明稳定标识、所有者鉴权、范围读取、Web 内容块分页、临时对象提升、配额、引用持久化和垃圾回收。
+
+### Q15：所有内容都要使用 ref 吗？怎样区分什么场景使用 Spill？
+
+不是。只有“内容不适合直接放进当前协议，但以后仍要稳定找回”时才需要引用；只有“原本准备内联的普通大文本被迫外置”时才使用 `SpillRef`。附件、网页快照和工作区文件应使用自己的领域引用。
+
+```
+内容已经有稳定引用？
+  → 直接复用，不重复保存
+
+内容属于附件、网页快照、工作区文件或制品？
+  → 使用专属 Store 和专属 Ref
+
+内容是普通工具文本或进程输出？
+  ├─ 没超过内联预算：inline，不需要 ref
+  └─ 超过内联预算
+       ├─ 需要精确恢复或后续读取：Spill + SpillRef
+       ├─ 可以根据稳定输入重算：保存重算参数
+       ├─ 明确允许丢弃：truncate，并声明发生数据损失
+       └─ 都不满足：reject，不能静默丢弃
+```
+
+| 场景 | 处理方式 | 引用类型 |
+| --- | --- | --- |
+| 2 KB 工具结果 | 直接内联 | - |
+| 5 MB 测试日志，后续可能排错 | 会话耐久 Spill | `SpillRef` |
+| 5 MB 可丢弃调试噪声 | 明确截断 | - |
+| 可低成本重新计算的派生结果 | 保存输入参数或摘要 | - |
+| 用户上传图片 | Attachment Store | `AttachmentRef` |
+| 抓取并解析后的网页正文 | Web Content Store | `WebContentRef` |
+| 已经存在于工作区的源码 | 复用工作区位置 | `WorkspaceFileRef` |
+| 临时 stdout，只在当前进程使用 | 进程临时文件 | 临时引用 |
+| stdout 需要写入可恢复 Session | 先提升为耐久对象，再提交事件 | `SpillRef` |
+
+**关键结论：**`ref` 是“内容在别处但可以稳定找回”的通用思想，不代表所有内容都使用同一个 `SpillRef`。底层 Blob 存储可以复用，但附件、网页、工作区文件和普通 Spill 必须保留各自的元数据、读取方式和生命周期。
+
+完整可执行决策代码见 [Ref 与 Spill 场景决策指南](spill-ref-decision-guide.md)及 [`spill-decision.ts`](../harness-lab/src/spill-decision.ts)。
+
+### Q16：现有 DeepSeek Harness、Deep Agents 和 OpenHands 怎么理解 `ContentReference`？它嵌在 Event Log、投影，还是 UI？
+
+这里把问题中的 DeepAgent 理解为 LangChain Deep Agents，把 DeepHands 理解为 OpenHands。先说结论：**三者没有共同定义一个名为 `ContentReference` 的统一类型**；它只是本文用来概括“完整内容已经外置，消息中保留可回读信息”的跨系统概念。三套系统分别使用 SpillRef、Backend 文件路径和工具专属 Observation 表达这件事。
+
+下面这种结构化 `ContentReference` 是本文用于统一附件、网页快照和 Spill 的演进方案，不是三个上游项目当前共同使用的原生协议：
+
+```
+{
+  "type": "reference",
+  "truncated": true,
+  "reference": {
+    "kind": "spill",
+    "id": "spill:sha256:abc",
+    "bytes": 5242880,
+    "sha256": "abc",
+    "mediaType": "text/plain"
+  }
+}
+```
+
+三者对“内容引用”的实际理解和嵌入位置不同：
+
+| 系统 | 相当于引用的对象 | Event Log / Checkpoint | 模型投影 | UI 展示 |
+| --- | --- | --- | --- | --- |
+| DeepSeek Harness | Spill 策略内部使用包含 `locator`、`bytes`、`retrievalHint` 的 `SpillRef` | 通常保存策略处理后的 `tool/result` 文本，而不是独立的通用 `ContentReference` 内容块 | 看到“头尾预览 + locator + retrievalHint”；模型再用 `read`、`grep` 等工具回读 | 按普通工具结果展示文本；除非产品层另外解析 locator，否则没有通用引用卡片 |
+| Deep Agents | `/large_tool_results/<tool_call_id>` 等 Backend 文件路径，本身没有统一引用类型 | LangGraph checkpoint 保存已经替换过的 `ToolMessage.content`，路径嵌在字符串中 | 看到“文件路径 + 头尾预览 + read_file/grep 提示” | 通常按 ToolMessage 展示；是否能恢复完整内容还取决于 State、Store、Filesystem 或 Sandbox Backend |
+| OpenHands | 具体工具 Observation 中的文件路径、artifact 字段或输出语义；没有跨工具统一的 SpillRef | Event Log 保存结构化 `ActionEvent` / `ObservationEvent`；工具制品由 workspace、`.agent_tmp` 或工具存储另行管理 | Condenser 从事件历史生成模型可见面，可以压缩或省略 Observation 细节 | 根据具体 Observation 类型和 `visualize` 逻辑展示，不依赖统一的 ContentReference 卡片 |
+
+换句话说，三个系统中的“ContentReference”分别可以这样理解：
+
+-   **DeepSeek Harness：**内部确实有结构化 `SpillRef`，但它主要是 SpillStore 与 spill-policy 之间的对象；进入历史和模型上下文前，通常已经转换成包含 locator 与读取提示的工具结果文本。
+-   **Deep Agents：**没有单独的 ContentReference 对象，Backend 文件路径就是引用；路径、预览和读取说明共同写进 `ToolMessage.content`。
+-   **OpenHands：**没有跨工具统一的 Spill 引用；文件或 artifact 的定位信息属于具体 `ObservationEvent` 的领域语义，UI 也按具体 Observation 类型展示。
+
+```
+DeepSeek Harness
+工具大结果 → SpillRef（策略内部）→ 渲染成工具结果文本 → Event Log → 模型/UI
+
+Deep Agents
+工具大结果 → Backend 文件路径 → 写入 ToolMessage.content → Checkpoint → 模型/UI
+
+OpenHands
+工具动作 → 具体 Observation（可能含 artifact/path）→ Event Log
+                                             ├─ Condenser → 模型
+                                             └─ visualize → UI
+```
+
+**因此，引用不必在 Event Log、投影和 UI 中各复制一份。**权威事实只保存一次：现有 DeepSeek Harness 和 Deep Agents 主要把可回读位置渲染进工具消息；OpenHands 则把它留在具体 Observation 的语义中。投影负责控制模型能看到多少，UI 负责把同一事实渲染出来。
+
+如果本项目采用上面的结构化 `ContentReference`，推荐把它作为 Event Log 中消息内容的一个持久化块；模型投影将它转换成有界预览和回读提示，UI 将它渲染成可展开或下载的引用卡片。这是本项目的统一协议设计，不应描述成三个上游项目已经采用的共同实现。
+
+## 20. 最小可运行实现 Demo
+
+这个 Demo 不接 Agent、Tool Registry 或真实 Session Store，只保留 Spill 最重要的五步，因此适合逐行调试原理。
+
+```
+cd harness-lab
+bun run demo:spill
+
+# 或在 VS Code Run and Debug 中选择：
+10b · Spill 原理演示
+```
+
+### 20.1 Demo 完整流程
+
+```
+小内容
+  → 未超过 64 字节
+  → 直接作为 modelText 返回
+
+大内容
+  → 超过 64 字节
+  → 写入私有临时文件并刷盘
+  → 原子改名为 SHA-256 对象
+  → 返回不透明 spill:sha256:... 引用
+  → 模拟 Session Event 只保存预览和引用
+  → 按 48 字节窗口逐页读取
+  → 冷读取校验长度与 SHA-256
+  → 人为篡改文件后明确拒绝
+```
+
+### 20.2 建议断点
+
+| 断点 | 观察内容 | 对应原理 |
+| --- | --- | --- |
+| `inlineOrSpill()` | `bytes` 与 `thresholdBytes` | 内联预算与 Spill 策略属于消费层。 |
+| `SimpleSpillStore.saveText()` | 临时路径、最终路径、`handle.sync()` 和 `rename()` | 先让对象耐久，再允许发布引用。 |
+| 构造 `sessionEvent` | 事件中只有 preview 和 ref，没有完整大文本 | Session 保存引用事实，不保存大字节。 |
+| `readPage()` | `offset`、`limit` 和 `nextOffset` | 外置之后仍然有界读取。 |
+| `verify()` | 实际长度、实际摘要和引用中的期望值 | 引用不能替代冷读取完整性校验。 |
+| `corruptForDemo()` | 篡改前后校验结果 | 损坏内容不能静默进入模型。 |
+
+### 20.3 关键代码缩影
+
+```
+// 1. 策略层决定是否外置
+if (bytes <= thresholdBytes) return { modelText: content }
+const ref = await store.saveText(content)
+return { modelText: preview, ref }
+
+// 2. 对象先完整写入并刷盘
+await handle.writeFile(data)
+await handle.sync()
+await rename(temporaryPath, finalPath)
+
+// 3. Session 最后才保存引用
+const sessionEvent = {
+  type: "tool/result",
+  data: { preview, spillRef: ref }
+}
+
+// 4. 后续按窗口读取
+const page = await store.readPage(ref, offset, 48)
+
+// 5. 冷读验证内容没有被替换
+await store.verify(ref)
+```
+
+**教学简化：**Demo 使用按字节分页，并刻意使用 ASCII 正文，避免把多字节 UTF-8 字符切在中间。生产文本接口应在字节流上维护解码边界，或使用正文块游标；Web 内容优先使用第 5 问描述的结构化块分页。
+
+### 20.4 动手练习
+
+1.  把阈值从 64 改为 512，观察同一内容从 Spill 变成内联。
+2.  把分页窗口从 48 改为 24，观察页数增加但引用不变。
+3.  注释掉 `handle.sync()`，思考进程骤停时“写完”和“耐久”有什么区别。
+4.  尝试把任意绝对路径伪装成 `ref.id`，观察 Store 为什么拒绝。
+5.  把正文改成中文，并思考为什么生产版本不能直接在任意字节位置解码。
+
+完整源码：[Spill 原理演示](../harness-lab/src/spill-principle-demo.ts)。
+
+### 20.5 常见大文件类型全景 Demo
+
+第二个 Demo 使用项目现有 Store 跑通五类内容，重点观察“底层机制可以复用，但领域引用和读取方式不同”。
+
+为了让 Demo 秒级运行，示例把阈值刻意调小，用较短数据触发与真实大文件完全相同的代码路径；实际生产配置仍应采用前文的分层字节、字符和 Token 预算。
+
+```
+cd harness-lab
+bun run demo:spill-types
+
+# 或在 VS Code Run and Debug 中选择：
+10c · Spill 大文件类型演示
+```
+
+| 示例 | 完整内容怎样保存 | 怎样按需使用 | 关键差异 |
+| --- | --- | --- | --- |
+| 测试日志文本 | `LocalSpillStore.saveText()` | 预览进入模型，完整文本按关键词定位 | 适合范围读取、grep 和 tail |
+| JSON 报告 | 规范 JSON 文本写入 Spill Store | 恢复后按字段筛选失败记录 | 应提供 JSON 路径查询，而不只按字符翻页 |
+| HTML 正文快照 | 标题、段落和代码块组成结构化 JSON | 按稳定 block cursor 分页 | 快照绑定网址和抓取时间，不能每页重新抓取 |
+| PNG 二进制附件 | `LocalAttachmentStore` 完整解码后内容寻址 | 按 `attachmentId` 冷读并复验 | 需要媒体类型、像素和尺寸限制 |
+| 子进程 stdout | 输出流持续写入运行时临时文件 | 内存只保留前缀，必要时读取完整临时文件 | 写入 Session 前必须提升为耐久 Spill |
+
+```
+五类内容的共同部分：
+字节上限 → 私有存储 → 引用 → 完整性校验 → 有界回读
+
+不能统一掉的领域部分：
+文本：offset / limit / grep / tail
+JSON：JSON Path / 字段投影
+HTML：block cursor / findBlocks / 过期时间
+图片：媒体解码 / 像素 / 尺寸
+进程输出：流式背压 / stdout-stderr / 临时对象提升
+```
+
+**HTML Demo 的教学简化：**示例为了保持短小，使用 `LocalSpillStore` 保存完整结构化 JSON，恢复时一次解析。生产版 `WebContentStore` 应建立块索引，让 `readBlocks()` 只读取目标块，而不是先把 20 万字符全部加载进内存。
+
+完整源码：[Spill 大文件类型演示](../harness-lab/src/spill-file-types-demo.ts)。
+
+## 相关课程与源码
+
+-   [Ref 与 Spill 场景决策指南（含完整代码）](spill-ref-decision-guide.md)
+-   [最小可运行 Spill 原理 Demo](../harness-lab/src/spill-principle-demo.ts)
+-   [常见大文件类型全景 Demo](../harness-lab/src/spill-file-types-demo.ts)
+-   [第 11 课：Token、Surface、Compaction 与 Spill](../lessons/0011-context-compaction-spill.html)
+-   [第 12 课：Skills、MCP、Web、LSP 与 Attachment](../lessons/0012-external-capabilities.html)
+-   [会话级本地 Spill Store](../harness-lab/src/spill-store.ts)
+-   [进程输出收集与临时溢出](../harness-lab/src/local-process.ts)
+-   [内容寻址附件仓库](../harness-lab/src/attachment-store.ts)
+-   [上下文与 Spill 验收测试](../harness-lab/src/context-compaction.test.ts)
+-   [进程输出溢出测试](../harness-lab/src/local-process.test.ts)
+
+[返回完整路线 →](deepseek-harness-build-roadmap.html)

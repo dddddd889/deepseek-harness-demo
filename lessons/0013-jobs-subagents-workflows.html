@@ -26,6 +26,34 @@
     <tr><td>工作流</td><td>工作线程脚本动态发起子智能体，支持阶段、并发上限、总数上限、扇出扇入和显式结果。</td><td>超限或脚本失控时取消子任务并在宽限期后强制收敛。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：受控并发编排</h2>
+  <p>并发编排位于父 Agent 或工作流请求的下游、后台生产者和子智能体的上游，负责让并行工作具备身份、所有权和确定收敛。</p>
+  <pre><code>Parent Agent / Workflow Script（输入）
+                │ spawn / agent()
+                ▼
+        WorkflowEngine（预算、阶段、并发）
+                │
+                ▼
+        SubagentRuntime（能力与深度校验）
+                │
+                ▼
+        JobRegistry（所有权、输出、状态）
+          ┌─────┼────────┐
+          ▼     ▼        ▼
+       Child A Child B  Child C
+          └─────┴────────┘
+                ▼
+      汇合结果 + 生命周期事件（输出）</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td><code>Promise.all</code> 只能等待并发承诺，无法回答任务属于谁、怎样读流输出、父任务取消后谁负责收尸。</td></tr>
+    <tr><th>输入与输出</th><td>输入是任务启动器、所有者、子智能体请求、工作流脚本和预算；输出是任务快照、流式文本、子结果、工作流结果及生命周期事件。</td></tr>
+    <tr><th>适用场景</th><td>后台构建、并行代码调研、父 Agent 委派、扇出扇入工作流和有限资源池。</td></tr>
+    <tr><th>底层组件</th><td>任务状态机、单消费游标、完成承诺、终止钩子、子智能体提供方、工作线程消息协议和并发信号量。</td></tr>
+    <tr><th>核心逻辑</th><td>先验证能力与预算，再发布稳定运行标识；输出与状态集中进 Job；工作流只通过消息驱动子任务；任何超限或取消都沿所有权树向下收敛。</td></tr>
+    <tr><th>权衡</th><td>集中控制面增加状态管理，却换来资源上限、隔离、可观测和确定清理；并发度限制会牺牲峰值速度以保护系统。</td></tr>
+    <tr><th>方案对比</th><td>裸 Promise 适合短小同进程工作；作业队列适合持久分布式任务；本实现位于两者之间，专注单宿主可取消 Agent 编排。</td></tr>
+  </tbody></table>
+
   <h2>三层职责</h2>
   <pre><code>Workflow Engine（动态脚本、phase、fan-out/fan-in、预算）
       │ agent()
@@ -98,6 +126,9 @@ VS Code F5 → 12c · 工作流
     <li><a href="../harness-lab/src/subagents.test.ts">Subagent 测试</a></li>
     <li><a href="../harness-lab/src/workflow.test.ts">Workflow 测试</a></li>
   </ul>
+  <h2>拓展阅读</h2>
+  <p><a href="../reference/jobs-subagents-workflows-deep-dive.md">Jobs、Subagent 与 Workflow 深度解读：DeepSeek Harness、Deep Agents、OpenHands 的真实实现、差异、限制与完整 QA →</a></p>
+  <p><a href="../reference/session-event-log-recovery-and-otel.md">DeepSeek Harness 的 Session Event Log 恢复与 OTel Logs：Job、Workflow、Subagent 的持久化与冷恢复边界 →</a></p>
   <p>下一课实现 Profile、Bundle、CLI 与 Headless Host，把零散插件装配成可部署产品入口。</p>
   <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
 </main></body></html>

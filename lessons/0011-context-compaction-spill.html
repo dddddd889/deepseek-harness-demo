@@ -26,6 +26,28 @@
     <tr><td>溢出存储</td><td>大文本写入随机私有文件，引用保存长度与摘要，读取时校验完整性。</td><td>引用不能允许路径注入或内容替换。</td></tr>
   </tbody></table>
 
+  <h2>主概念深挖：事实保留与模型视图压缩</h2>
+  <p>上下文治理的上游是 Session 事实日志和实际用量，下游是下一次模型请求：上游历史保持完整，下游模型只接收预算内的有效视图。</p>
+  <pre><code>Session events + provider usage（输入）
+              │
+              ▼
+TokenMeter ─► ContextPressure ─► 是否压缩？
+                                      │ 是
+                                      ▼
+Range Selector ─► Summarizer ─► Surface replace（输出）
+       │                                  │
+       └─ 保证 tool call/result 原子      └─ 下一次 LLM 请求
+大工具输出 ─► SpillStore ─► 短引用进入 Surface</code></pre>
+  <table><tbody>
+    <tr><th>背景与目的</th><td>长会话会同时撞上模型窗口、请求成本和内存上限；直接删历史虽然变短，却破坏恢复和审计。</td></tr>
+    <tr><th>输入与输出</th><td>输入是事实事件、模型可见面、实际用量和窗口预算；输出是压力估计、摘要替换事件及大内容引用。</td></tr>
+    <tr><th>适用场景</th><td>长时间编码会话、超大测试日志、重复压缩、接近上下文窗口上限时。</td></tr>
+    <tr><th>底层组件</th><td>内容估算器、实际用量锚点、可压缩区间选择器、摘要器、事务事件、内容寻址溢出存储。</td></tr>
+    <tr><th>核心逻辑</th><td>用最近实际提示词用量校准估算；只选择闭合原子区间；摘要确实更小时才提交 Surface 替换；完整字节仍留在日志或 SpillStore。</td></tr>
+    <tr><th>权衡</th><td>摘要降低窗口压力但会损失细节且消耗一次模型调用；保留事实使系统可回溯，却增加本地存储。</td></tr>
+    <tr><th>方案对比</th><td>滑动窗口简单但会切断工具因果链；全量摘要容易漂移；事务式区间摘要更复杂，却能保留边界并允许失败回滚。</td></tr>
+  </tbody></table>
+
   <h2>先拆开四个量</h2>
   <table><thead><tr><th>量</th><th>来源</th><th>用途</th><th>是否可计费</th></tr></thead><tbody>
     <tr><td>累计 TokenUsage</td><td>Session 中 provider usage 事件</td><td>历史统计、成本派生</td><td>可以，但需要带版本的价格表</td></tr>
