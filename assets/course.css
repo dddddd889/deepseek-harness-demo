@@ -18,9 +18,27 @@ code { background: #eef1f6; border-radius: 5px; padding: 2px 6px; }
 pre { overflow: auto; background: #151b2b; color: #f2f5ff; border-radius: 12px; padding: 18px; }
 pre code { background: transparent; padding: 0; }
 table { width: 100%; border-collapse: collapse; font-size: .94rem; }
+/* 对比表固定三框架等宽列；窄屏允许横向滚动，不把框架名称挤成竖排。 */
+.comparison-scroll { overflow-x: auto; }
+.framework-matrix { table-layout: fixed; min-width: 780px; }
+.framework-matrix th:first-child { width: 15%; }
+.framework-matrix td { overflow-wrap: anywhere; }
+/* 正文概念只有三列，不沿用章级汇总表的维度列宽。 */
+.concept-comparison .framework-matrix th { width: 33.333%; }
+.concept-comparison { margin: 24px 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: white; scroll-margin-top: 20px; }
+.concept-comparison h3 { margin-top: 0; }
+nav[aria-label="本课阅读导航"] { margin: 20px 0; padding: 12px; background: var(--soft); border-radius: 8px; }
+.course-diagram { margin: 24px 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.course-diagram figcaption { font-weight: 700; margin-bottom: 12px; }
+.course-diagram img { display: block; width: 100%; height: auto; }
+.interactive-domain-diagram { display: block; width: 100%; aspect-ratio: 1600 / 4620; border: 0; }
+.course-diagram p { margin: 12px 0 0; font-size: .9rem; }
 th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 12px 10px; }
 td:empty::before { content: "-"; color: var(--muted); }
 th { color: var(--muted); font-weight: 650; }
+dl { margin: 18px 0 0; }
+dt { margin-top: 18px; font-weight: 700; }
+dd { margin: 5px 0 0 20px; color: var(--muted); }
 .callout { border-left: 4px solid var(--accent); background: var(--soft); padding: 14px 18px; border-radius: 0 10px 10px 0; }
 .check { display: inline-block; color: #19734b; font-weight: 700; }
 .phase { color: var(--accent); font-weight: 700; white-space: nowrap; }

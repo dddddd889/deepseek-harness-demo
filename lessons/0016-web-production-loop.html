@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 16 课：Web Client 与生产闭环</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 16 课：Web Client 与生产闭环</h1>
   <p class="lead">浏览器不是恢复源。可靠 Web Client 先取权威 snapshot，再用 Session seq 追尾事件；断线只丢连接，不丢会话语义。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">connection 管理连接 generation 与握手后的 hostDescription；sessionProjections 为历史和推送提供派生值。</td><td data-framework="deepagents">前端 useStream 暴露 messages、values、subagents 等投影，可渲染协调者与子任务进度。</td><td data-framework="openhands">远程 Conversation 经 HTTP/WebSocket 与 Agent Server 交互，可作为产品界面的后端边界。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">连接失效清除旧能力描述，避免 UI 继续使用过期宿主能力；原下行是 WebSocket。</td><td data-framework="deepagents">这是前端 SDK 的呈现能力，应用仍要连接相应运行服务并定义交互。</td><td data-framework="openhands">此处对比 SDK/服务契约，不把完整 OpenHands Web 产品的全部 UI 功能算进 SDK。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/client/connection/README.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/session/session-projection/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/frontend/overview">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/conversation">官方文档 1</a> · <a href="https://docs.openhands.dev/sdk/arch/agent-server">官方文档 2</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>产品闭环的关键是让界面忠实消费状态与操作结果，而不是再实现一套独立的 agent 状态机。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>系统最外层，把远程会话投影变成可操作界面。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 16 课</figcaption><a href="../assets/diagrams/0016-position.svg"><img src="../assets/diagrams/0016-position.svg" alt="网页与产品闭环在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0016-position.svg">打开大图</a> · <a href="../assets/diagrams/0016-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>用户操作、服务端历史、事件流与连接变化。</td></tr>
+    <tr><th>下游与输出</th><td>消息与工具卡片、审批入口、状态反馈，以及发回服务层的操作。</td></tr>
+    <tr><th>不归本章负责</th><td>浏览器展示态不是执行事实；前端重连不能擅自重复提交有副作用的任务。</td></tr>
+    <tr><th>放进具体场景</th><td>工具仍在执行时刷新页面，前端应恢复历史与当前状态，不再发一次同样的工具请求。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 网页客户端</figcaption>
+    <a href="../assets/diagrams/0016-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0016-modules.svg" alt="网页客户端的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0016-modules.svg">打开大图</a> · <a href="../assets/diagrams/0016-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 网页客户端</figcaption>
+    <a href="../assets/diagrams/0016-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0016-sequence.svg" alt="网页客户端的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0016-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0016-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 网页客户端</figcaption>
+    <a href="../assets/diagrams/0016-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0016-branches.svg" alt="网页客户端的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0016-branches.svg">打开大图</a> · <a href="../assets/diagrams/0016-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,16 +57,17 @@
     <tr><th>解决的问题</th><td>构建可断线恢复的浏览器体验，并闭合消息、审批和附件从界面到服务端再到会话日志的链路。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>完整行为</th><th>一致性规则</th></tr></thead><tbody>
-    <tr><td>客户端投影</td><td>从会话事件重建消息、用量、生命周期和模型可见面替换。</td><td>严格检查序号；重复事件幂等，缺口明确失败。</td></tr>
-    <tr><td>快照初始化</td><td>通过 RPC 获取权威快照并一次性重置客户端投影。</td><td>浏览器本地状态不作为恢复源。</td></tr>
-    <tr><td>SSE 追尾</td><td>从快照最后序号连接事件流，持续应用新事件并支持取消追随。</td><td>断线重连从最后已应用序号继续。</td></tr>
-    <tr><td>命令客户端</td><td>创建、恢复、发送、运行、取消和读取快照，携带稳定请求标识与令牌。</td><td>命令响应和事件通知保持双通道。</td></tr>
-    <tr><td>审批闭环</td><td>服务端发布待审批交互，多个客户端可观察并提交决定。</td><td>共享中介器采用第一次有效写入。</td></tr>
-    <tr><td>附件闭环</td><td>浏览器上传图片，服务端验证持久化，消息保存内容引用，鉴权接口负责读取。</td><td>会话事件不嵌入本地路径或无限大字节。</td></tr>
-    <tr><td>网页安全</td><td>同源静态资源、内容安全策略、路径规范化和 API 鉴权。</td><td>静态文件能力不能穿透到服务端任意路径。</td></tr>
-    <tr><td>服务入口</td><td>从 Profile 装配宿主和 Agent Server，提供本地可调试网页生产闭环。</td><td>停机时先停止接入，再刷盘释放。</td></tr>
+    <tr><td><a href="#concept-0016-1">客户端投影</a></td><td>从会话事件重建消息、用量、生命周期和模型可见面替换。</td><td>严格检查序号；重复事件幂等，缺口明确失败。</td></tr>
+    <tr><td><a href="#concept-0016-2">快照初始化</a></td><td>通过 RPC 获取权威快照并一次性重置客户端投影。</td><td>浏览器本地状态不作为恢复源。</td></tr>
+    <tr><td><a href="#concept-0016-3">SSE 追尾</a></td><td>从快照最后序号连接事件流，持续应用新事件并支持取消追随。</td><td>断线重连从最后已应用序号继续。</td></tr>
+    <tr><td><a href="#concept-0016-4">命令客户端</a></td><td>创建、恢复、发送、运行、取消和读取快照，携带稳定请求标识与令牌。</td><td>命令响应和事件通知保持双通道。</td></tr>
+    <tr><td><a href="#concept-0016-5">审批闭环</a></td><td>服务端发布待审批交互，多个客户端可观察并提交决定。</td><td>共享中介器采用第一次有效写入。</td></tr>
+    <tr><td><a href="#concept-0016-6">附件闭环</a></td><td>浏览器上传图片，服务端验证持久化，消息保存内容引用，鉴权接口负责读取。</td><td>会话事件不嵌入本地路径或无限大字节。</td></tr>
+    <tr><td><a href="#concept-0016-7">网页安全</a></td><td>同源静态资源、内容安全策略、路径规范化和 API 鉴权。</td><td>静态文件能力不能穿透到服务端任意路径。</td></tr>
+    <tr><td><a href="#concept-0016-8">服务入口</a></td><td>从 Profile 装配宿主和 Agent Server，提供本地可调试网页生产闭环。</td><td>停机时先停止接入，再刷盘释放。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：可恢复客户端投影</h2>
@@ -49,6 +93,40 @@ Agent Server ─► Session Log
     <tr><th>方案对比</th><td>本地状态持久化启动快但容易陈旧；服务端渲染一致性高但不适合高频流；快照+增量投影兼顾恢复和实时性。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>浏览器生命周期
+├─ 首次打开 → snapshot 0..N → SSE after=N
+├─ 重复 SSE event → 幂等忽略
+├─ seq 缺口 → 停止应用 → 重新 snapshot
+├─ 刷新/休眠/断网 → 本地状态可丢 → 按 lastSeq 恢复
+├─ 多客户端审批 → 首个有效决定胜出
+├─ 图片上传 → 验证/持久化 → 引用消息
+├─ 静态路径逃逸 → 拒绝
+└─ RPC 未授权 → 不因同源而豁免</code></pre>
+  <table><thead><tr><th>场景</th><th>客户端动作</th><th>权威来源</th></tr></thead><tbody>
+    <tr><td>正常追尾</td><td>增量 apply 事件。</td><td>Agent Server 的 Session 事件。</td></tr>
+    <tr><td>命令等待</td><td>显示请求进行中，但不伪造最终消息。</td><td>事件回流后更新视图。</td></tr>
+    <tr><td>乐观审批冲突</td><td>第二客户端收到已决定结果。</td><td>InteractionBroker 首写。</td></tr>
+    <tr><td>附件恢复</td><td>消息按引用重新加载预览。</td><td>服务端附件仓库和鉴权接口。</td></tr>
+    <tr><td>缓存陈旧</td><td>丢弃本地缓存并取新快照。</td><td>浏览器永不覆盖服务端事实。</td></tr>
+    <tr><td>XSS/资源注入</td><td>受 CSP 和安全渲染限制。</td><td>服务端安全头与客户端转义共同负责。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>同步模型</th><th>实时性</th><th>恢复性</th><th>风险</th></tr></thead><tbody>
+    <tr><td>纯本地状态+乐观更新</td><td>最高。</td><td>低。</td><td>断线和拒绝后难回滚。</td></tr>
+    <tr><td>每次全量轮询快照</td><td>低。</td><td>高。</td><td>历史越长传输越大。</td></tr>
+    <tr><td>快照+SSE 增量</td><td>高。</td><td>高。</td><td>必须严格处理序号。</td></tr>
+    <tr><td>服务端渲染流</td><td>中高。</td><td>服务端控制强。</td><td>丰富交互和本地投影受限。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么命令成功后不直接修改消息列表？</dt><dd>RPC 响应只证明命令处理结果，不一定包含完整事件顺序；等待权威事件可让所有客户端得到同一状态。</dd>
+    <dt>重复事件和序号缺口为什么处理不同？</dt><dd>重复可由重连自然产生且安全忽略；缺口意味着因果事实缺失，继续投影会得到错误状态。</dd>
+    <dt>同源网页为什么仍需要 Bearer？</dt><dd>同源限制浏览器来源，不等于确认使用者身份；本地恶意页面、泄露地址或跨进程调用仍需令牌边界。</dd>
+  </dl>
+
   <h2>客户端数据流</h2>
   <pre><code>session.snapshot ─► ClientProjection.reset(events[0..N])
                               │
@@ -61,6 +139,39 @@ GET /events?after=N ──────────┤
 断线：after=lastSeq 重连
 发现 gap：重新 snapshot，不在 UI 猜事件</code></pre>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0016-1" data-concept="客户端投影">
+  <h3>客户端投影：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>界面展示状态从哪里派生？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">SessionRuntime 管事件窗口和历史分页；ProjectionValueStore 从历史 projections 播种，后续 session/projection 按 seq 高者胜更新。领域值不全塞进 ConversationSnapshot。 <a href="../deepseek-harness/packages/client/runtime/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">前端 useStream 分别暴露 messages、subagents、values 和工具调用状态；应用按这些结构渲染，而不是只拼一条 assistant 文本。 <a href="https://docs.langchain.com/oss/python/deepagents/frontend/overview">依据</a></td>
+    <td data-framework="openhands">ConversationState 与 EventLog 并存，存在仅更新状态而不追加事件的路径；因此不能假定界面所有字段都能仅从消息事件重放得到。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>客户端投影必须覆盖实际事实来源；不能把三套状态结构强行压成同一种消息数组。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0016-2" data-concept="快照初始化">
+  <h3>快照初始化：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>初始请求还没返回，新的事件先到怎么办？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Session/Workspace 列表分别建立基线，期间增量在响应之上回放；投影 seq 与连接代次用于避免旧响应覆盖新状态。 <a href="../deepseek-harness/packages/client/runtime/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">前端 SDK 提供结构化 stream 状态；应用应使用其会话/流模型，不直接套用本课 lastSeq 快照协议。该概览不声明与教学实现相同的初始化竞态算法。 <a href="https://docs.langchain.com/oss/python/deepagents/frontend/overview">依据</a></td>
+    <td data-framework="openhands">远程 Conversation 代理服务端状态和事件；公开架构描述了提交后回调，但不等同本课快照水位与增量缓冲的浏览器实现。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>初始快照和实时事件的交接必须有版本边界；相似 UI 不证明内部交接算法相同。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0016-3" data-concept="SSE 追尾">
+  <h3>SSE 追尾：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>刷新或断线后如何继续接收新事件？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">浏览器双 WebSocket 任一断开都会重建整个 generation，并清空旧 hostDescription；两条流打开且 host.describe 成功才算就绪，没有网络 SSE 回退。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">Agent Server 的 thread stream 支持用最后事件 id 重连；run stream 与 thread stream 的观察范围不同，应按需要选择。 <a href="https://docs.langchain.com/langsmith/streaming">依据</a></td>
+    <td data-framework="openhands">远程 SDK 以 HTTP/WebSocket 连接 Agent Server；本课 EventSource/lastSeq 追尾协议不能直接视作其客户端实现。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>“追尾”是持续观察的需求，SSE 只是本课载体；连接恢复和会话执行恢复仍须分开。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>命令与事件为何双通道</h2>
   <table><thead><tr><th>状态</th><th>来源</th></tr></thead><tbody>
     <tr><td>按钮 pending / 网络错误 / retry</td><td>RPC request 生命周期，易失 UI 状态</td></tr>
@@ -68,6 +179,29 @@ GET /events?after=N ──────────┤
     <tr><td>重复发送是否执行两次</td><td>Server request-id 幂等表</td></tr>
   </tbody></table>
   <p>网络失败后的“重试”必须复用原 request id；换一个 id 就是新命令，而不是 transport retry。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0016-4" data-concept="命令客户端">
+  <h3>命令客户端：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>按钮请求返回后，界面是否应立即认为任务完成？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">生成的 ctx.remote 方法承接一元请求；会话事件另走 Connection 流。调用成功只证明对应方法返回，不等于其触发的整个轮次结束。 <a href="../deepseek-harness/docs/api-gateway.zh.md">依据</a></td>
+    <td data-framework="deepagents">客户端创建 thread/run 并订阅运行输出；提交和消费状态更新是不同操作，不能把拿到 run id 当成结果完成。 <a href="https://docs.langchain.com/langsmith/streaming">依据</a></td>
+    <td data-framework="openhands">Conversation.send_message 与 run 是独立用例，远程实现再映射为网络调用；发送消息不应直接驱动“任务成功”的界面状态。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>界面分别表示提交中、已接受和运行终态，避免把网络响应当业务终态。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0016-8" data-concept="服务入口">
+  <h3>服务入口：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>网页如何连接真正运行 Agent 的服务？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">客户端 runtime 不依赖 React，Connection 搬运 Host 消息；headless profile 不挂载 Web，网页需要相应宿主组合，不能复用一个不存在的 headless HTTP 端口。 <a href="../deepseek-harness/packages/bundle/headless/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">前端 useStream 指定 apiUrl 和 assistantId 连接部署图；create_deep_agent 生成 Agent，不会单独替应用启动网页服务。 <a href="https://docs.langchain.com/oss/python/deepagents/frontend/overview">依据</a></td>
+    <td data-framework="openhands">独立 Agent Server 向应用后端或客户端提供 HTTP/WebSocket API；SDK 服务不等于完整网页产品，页面与服务可以分开部署。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>部署图应明确网页资产、应用后端、Agent 服务与执行环境，不把它们合成一个“Web”。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>审批闭环</h2>
   <pre><code>PermissionService → approval/asked Session Event
@@ -78,6 +212,19 @@ interaction.answer RPC → InteractionBroker first-wins
                       ▼
 PermissionService → approval/decided → 工具执行或拒绝</code></pre>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0016-5" data-concept="审批闭环">
+  <h3>审批闭环：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>刷新后应该显示哪些仍然可回答的审批？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">SessionManager 按请求标识跟踪 requested/resolved 帧；断线清空 pendingInteraction，重连回放只恢复仍 pending 的请求，避免展示已失效按钮。 <a href="../deepseek-harness/packages/client/runtime/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">interrupt 通过检查点保留暂停位置，使用原 thread_id 与 Command(resume) 回传决定；前端须展示当前中断，而非任意历史审批消息。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">确认策略使会话在待确认动作上暂停，由批准/拒绝继续；界面应以当前会话确认状态为准，不应仅靠历史文本推断可操作性。 <a href="https://docs.openhands.dev/sdk/guides/security">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>审批卡片既是展示又是控制入口；历史上问过的问题不一定仍能回答。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>附件闭环</h2>
   <pre><code>Browser File bytes ─ POST /attachments ─► decode + limits + SHA-256 store
 Browser ◄──────────── ImageAttachmentRef（无路径/URL）
@@ -85,6 +232,19 @@ session.send(text, refs) ─► Server 冷读复验每个 ref
                          ─► user/message image block
 恢复 ─► 同一个 durable ref ─► store 复验读取</code></pre>
   <p>模型适配器必须显式声明 image 支持。当前 DeepSeek Chat adapter 会 fail loud，不会静默丢弃图片；离线 scripted/未来 vision adapter 可消费 image block。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0016-6" data-concept="附件闭环">
+  <h3>附件闭环：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>图片被消息引用后，刷新和恢复还能读取吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">attachment-local 用 sha256 不透明 id 指向持久对象，日志只存引用和校验元数据；读取重新验证摘要，历史图片不因后来收紧准入限制而失效。 <a href="../deepseek-harness/packages/attachment/attachment-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">消息模型支持多模态内容，但消息中的图片块与应用上传对象生命周期是两层；应用需保证引用在恢复时仍可访问。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">Workspace 提供上传下载接口，本地复制或远程传输文件；上传到工作区与消息图片引用不是同一个持久对象协议。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>上传成功、模型收到图片和长期可恢复要分别验证，不能用其中一个替代整个附件闭环。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>Web 安全边界</h2>
   <ul>
@@ -94,6 +254,19 @@ session.send(text, refs) ─► Server 冷读复验每个 ref
     <li>CSP、nosniff、no-referrer、frame-ancestors 防御默认开启。</li>
     <li>附件读取同样要求鉴权，durable ref 不是公开 bearer URL。</li>
   </ul>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0016-7" data-concept="网页安全">
+  <h3>网页安全：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>浏览器来源检查能否替代用户认证？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Host/Origin/Fetch-Metadata 栅栏在 RPC 与 WebSocket upgrade 前执行，但明确不是认证；原生与设置等特权方法限制在回环。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">部署的认证与资源授权由 Agent Server auth 层处理；前端应通过相应身份访问 thread 等资源，不能只依赖页面隐藏按钮。 <a href="https://docs.langchain.com/langsmith/auth">依据</a></td>
+    <td data-framework="openhands">Agent Server 可配置 API key 与允许的 CORS origins，并要求安全的网络暴露；CORS 与身份认证分别设置。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>来源、身份、资源权限与内容渲染安全是独立检查项，启用一种不代表其余自动成立。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

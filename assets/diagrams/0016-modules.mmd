@@ -1,0 +1,13 @@
+---
+title: 网页客户端 · 模块关系
+---
+flowchart TD
+  n0["用户"]
+  n1["网页与 AgentClient"]
+  n2["ClientProjection"]
+  n3["RPC 与 SSE"]
+  n4["审批与附件接口"]
+  n0 -->|"交互输入"| n1
+  n1 -->|"折叠权威事件"| n2
+  n1 -->|"发送命令与订阅"| n3
+  n1 -->|"提交决定和图片引用"| n4

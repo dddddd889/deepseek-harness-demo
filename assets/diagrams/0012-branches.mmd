@@ -1,0 +1,9 @@
+---
+title: 外部能力 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"多个提供方未指定"| result0["拒绝猜测"]
+  decision -->|"MCP 分页失败"| result1["保留旧代次"]
+  decision -->|"LSP 扩展冲突"| result2["不发布部分路由"]
+  decision -->|"附件解码或体积非法"| result3["写入前拒绝"]

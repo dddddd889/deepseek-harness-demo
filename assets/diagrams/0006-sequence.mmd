@@ -1,0 +1,15 @@
+---
+title: 智能体循环 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 调用方
+  participant p1 as Agent
+  participant p2 as 模型步骤
+  participant p3 as Session
+  p0->>p1: send 用户消息
+  p0->>p1: run 认领输入
+  p1->>p3: 轮次与步骤开始
+  p1->>p2: 执行模型步骤
+  p2-->>p1: 返回完成或工具请求
+  p1->>p3: 步骤与轮次结束

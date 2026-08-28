@@ -12,6 +12,202 @@
 
   <div class="callout"><strong>每阶段统一完成定义：</strong>有一个可执行入口、一个最小自动测试、一组断点位置、一份可检查状态产物；上一阶段保持通过后才能进入下一阶段。</div>
 
+  <section id="architecture-domains">
+    <h2>全站总体架构：按技术领域阅读</h2>
+    <p>先看系统边界，再按课实现。这里的“领域”指前端、服务端、存储、执行与观测等技术职责，不是新增业务实体，也不代表每个框都要部署成独立服务。以下按 DeepSeek Harness 原实现归纳；下方实验室架构图描述教学代码，两者不混用。</p>
+    <figure class="course-diagram">
+      <figcaption>七个技术领域 · 42 个子系统 · 48 条内部与跨领域连线</figcaption>
+      <object class="interactive-domain-diagram" type="image/svg+xml" data="../assets/diagrams/architecture-domains.svg" aria-label="可交互领域架构图：悬浮或用 Tab 聚焦节点和连线以高亮关联关系"><img src="../assets/diagrams/architecture-domains.svg" alt="七个领域分别展开六组子系统：前端、服务接入、智能体核心、模型工具、持久化、观测和工程底座"></object>
+      <p>悬浮节点：高亮节点与相关连线；悬浮连线或标签：突出两端节点。支持 Tab 键聚焦，移开后恢复。</p>
+      <p><a href="../assets/diagrams/architecture-domains.svg">打开大图</a> · <a href="../assets/diagrams/architecture-domains.mmd">Mermaid 图源</a></p>
+    </figure>
+    <div class="comparison-scroll"><table>
+      <thead><tr><th>技术领域</th><th>负责什么 / 不负责什么</th><th>对应课程</th></tr></thead>
+      <tbody>
+        <tr><th>前端与客户端</th><td>聊天、历史、工具进度、审批交互、连接与投影展示；不是持久事实来源，不在浏览器重跑工具。</td><td><a href="../lessons/0016-web-production-loop.html">第 16 课</a></td></tr>
+        <tr><th>后端：服务接入层（Agent Server 职责）</th><td>承接远程请求、会话路由和事件推送，调用智能体服务；不是 Agent Loop 本身。原实现的 Web 接入由 Host、API 与客户端协议相关插件组合，不直接套用实验室同名类。</td><td><a href="../lessons/0015-agent-server.html">第 15 课</a></td></tr>
+        <tr><th>后端：智能体核心与编排</th><td>Agent Loop、Session、上下文、工具调度及子任务；决定状态推进。Cordis、Profile、Bundle 管理装配和生命周期。</td><td><a href="../lessons/0002-plugin-kernel.html">2</a>、<a href="../lessons/0003-domain-protocol.html">3</a>、<a href="../lessons/0004-session-projections.html">4</a>、<a href="../lessons/0006-agent-loop.html">6</a>、<a href="../lessons/0011-context-compaction-spill.html">11</a>、<a href="../lessons/0013-jobs-subagents-workflows.html">13</a>、<a href="../lessons/0014-profile-bundle-cli-headless.html">14</a></td></tr>
+        <tr><th>模型、工具与执行环境</th><td>模型适配器连接提供方；工具连接文件、Shell、MCP 等能力。审批、策略与沙箱约束执行；远程执行环境不等于会话数据库。</td><td><a href="../lessons/0005-streaming-llm.html">5</a>、<a href="../lessons/0007-tool-pipeline.html">7</a>、<a href="../lessons/0008-local-capabilities.html">8</a>、<a href="../lessons/0009-permissions-sandbox.html">9</a>、<a href="../lessons/0012-external-capabilities.html">12</a></td></tr>
+        <tr><th>数据库与持久化</th><td>SessionPersistence 保存会话头和事件，支持 SQLite 或 JSONL；查询索引、非会话 KV、附件与溢出文件分别管理，不是“一个日志包办所有存储”。</td><td><a href="../lessons/0010-persistence-recovery.html">10</a>、<a href="../lessons/0011-context-compaction-spill.html">11</a>、<a href="../lessons/0012-external-capabilities.html">12</a></td></tr>
+        <tr><th>OTel 与可观测性</th><td>事件经遥测接口进入 OTel Logs，以 OTLP/HTTP 导出到部署方端点；供排障、分析与告警，不负责会话恢复，也不是天然的结算数据库。</td><td><a href="../lessons/0017-hardening-release.html">第 17 课</a></td></tr>
+        <tr><th>工程与交付底座</th><td>构建、测试、VS Code 调试与发布检查覆盖各层；课程顺序不是线上请求的调用顺序。</td><td><a href="../lessons/0001-zero-baseline.html">1</a>、<a href="../lessons/0017-hardening-release.html">17</a></td></tr>
+      </tbody>
+    </table></div>
+    <!-- 领域子系统：开始 -->
+    <nav aria-label="技术领域分支导航"><a href="#domain-frontend">前端与客户端</a> · <a href="#domain-server">后端：服务接入层（Agent Server 职责）</a> · <a href="#domain-core">后端：智能体核心与编排</a> · <a href="#domain-execution">模型、工具与执行环境</a> · <a href="#domain-storage">数据库与持久化</a> · <a href="#domain-observability">OTel 与可观测性</a> · <a href="#domain-foundation">工程、装配与交付底座</a></nav>
+    <p>保留七个领域与 42 个子系统分支；总图增加 48 条内部和跨领域连线。实线分别表示请求、事件回传和存储关系；虚线表示遥测或横切支撑。分支不是执行顺序，连线也不是全部源码依赖。</p>
+    <details class="domain-connections"><summary>查看全部 48 条连线：起点、终点与含义</summary><p>连线表示选取的关键调用或数据关系，不是逐包导入图；领域间穿越处没有圆点就不表示连接。编号与总图一致。</p><table><thead><tr><th>编号 / 类型</th><th>起点 → 终点</th><th>关系</th></tr></thead><tbody>
+      <tr data-edge="R01"><th scope="row">R01 · 装配、检查与调试</th><td>应用外壳与插件装配 → UI 扩展与 React 渲染</td><td>装配插槽</td></tr>
+      <tr data-edge="R02"><th scope="row">R02 · 事件与状态回传</th><td>通信与连接生命周期 → 会话与工作区状态</td><td>同步事件</td></tr>
+      <tr data-edge="R03"><th scope="row">R03 · 事件与状态回传</th><td>会话与工作区状态 → UI 扩展与 React 渲染</td><td>提供状态</td></tr>
+      <tr data-edge="R04"><th scope="row">R04 · 请求与调用</th><td>UI 扩展与 React 渲染 → 对话与任务界面</td><td>渲染对话</td></tr>
+      <tr data-edge="R05"><th scope="row">R05 · 请求与调用</th><td>UI 扩展与 React 渲染 → 工作台与偏好界面</td><td>渲染工作台</td></tr>
+      <tr data-edge="R06"><th scope="row">R06 · 装配、检查与调试</th><td>Web 宿主与资源服务 → 远程调用网关</td><td>承载接口</td></tr>
+      <tr data-edge="R07"><th scope="row">R07 · 装配、检查与调试</th><td>访问与协议边界 → 远程调用网关</td><td>约束访问</td></tr>
+      <tr data-edge="R08"><th scope="row">R08 · 请求与调用</th><td>远程调用网关 → 会话操作与历史入口</td><td>分发操作</td></tr>
+      <tr data-edge="R09"><th scope="row">R09 · 请求与调用</th><td>会话操作与历史入口 → 实时事件下行</td><td>会话订阅</td></tr>
+      <tr data-edge="R10"><th scope="row">R10 · 请求与调用</th><td>智能体与运行生命周期 → 循环与输入调度</td><td>驱动循环</td></tr>
+      <tr data-edge="R11"><th scope="row">R11 · 请求与调用</th><td>循环与输入调度 → 上下文工程</td><td>准备请求</td></tr>
+      <tr data-edge="R12"><th scope="row">R12 · 事件与状态回传</th><td>上下文工程 → 循环与输入调度</td><td>提供上下文</td></tr>
+      <tr data-edge="R13"><th scope="row">R13 · 事件与状态回传</th><td>循环与输入调度 → 会话事实与读模型</td><td>追加事实</td></tr>
+      <tr data-edge="R14"><th scope="row">R14 · 请求与调用</th><td>子智能体与后台任务 → 智能体与运行生命周期</td><td>创建或继续</td></tr>
+      <tr data-edge="R15"><th scope="row">R15 · 请求与调用</th><td>工作流与目标控制 → 子智能体与后台任务</td><td>任务编排</td></tr>
+      <tr data-edge="R16"><th scope="row">R16 · 请求与调用</th><td>工具注册与执行管线 → 审批、权限与隔离</td><td>执行检查</td></tr>
+      <tr data-edge="R17"><th scope="row">R17 · 请求与调用</th><td>审批、权限与隔离 → 本地与远程执行后端</td><td>允许后执行</td></tr>
+      <tr data-edge="R18"><th scope="row">R18 · 请求与调用</th><td>工具注册与执行管线 → 外部工具与知识接入</td><td>接入能力</td></tr>
+      <tr data-edge="R19"><th scope="row">R19 · 事件与状态回传</th><td>本地与远程执行后端 → 结果与大内容处理</td><td>处理结果</td></tr>
+      <tr data-edge="R20"><th scope="row">R20 · 持久化、恢复与产物</th><td>会话持久化接口 → 权威存储后端</td><td>追加提交</td></tr>
+      <tr data-edge="R21"><th scope="row">R21 · 持久化、恢复与产物</th><td>权威存储后端 → 恢复、修复与分叉</td><td>读取历史</td></tr>
+      <tr data-edge="R22"><th scope="row">R22 · 持久化、恢复与产物</th><td>权威存储后端 → 派生查询与搜索</td><td>派生索引</td></tr>
+      <tr data-edge="R23"><th scope="row">R23 · 观测副本导出</th><td>事件与运维信号捕获 → 投影、脱敏与分享策略</td><td>投影脱敏</td></tr>
+      <tr data-edge="R24"><th scope="row">R24 · 观测副本导出</th><td>投影、脱敏与分享策略 → OTel Logs 导出管线</td><td>交接记录</td></tr>
+      <tr data-edge="R25"><th scope="row">R25 · 观测副本导出</th><td>OTel Logs 导出管线 → 接收与观测存储</td><td>OTLP 导出</td></tr>
+      <tr data-edge="R26"><th scope="row">R26 · 装配、检查与调试</th><td>产品装配与配置覆盖 → 插件依赖与资源生命周期</td><td>装配插件</td></tr>
+      <tr data-edge="R27"><th scope="row">R27 · 装配、检查与调试</th><td>构建与协议生成 → 产品装配与配置覆盖</td><td>提供产物</td></tr>
+      <tr data-edge="R28"><th scope="row">R28 · 装配、检查与调试</th><td>自动测试与回归 → 发布与运维检查</td><td>回归检查</td></tr>
+      <tr data-edge="R29"><th scope="row">R29 · 装配、检查与调试</th><td>发布与运维检查 → 产品装配与配置覆盖</td><td>检查配置</td></tr>
+      <tr data-edge="R30"><th scope="row">R30 · 装配、检查与调试</th><td>自动测试与回归 → 构建与协议生成</td><td>校验构建</td></tr>
+      <tr data-edge="R31"><th scope="row">R31 · 请求与调用</th><td>通信与连接生命周期 → 远程调用网关</td><td>HTTP 请求</td></tr>
+      <tr data-edge="R32"><th scope="row">R32 · 事件与状态回传</th><td>实时事件下行 → 通信与连接生命周期</td><td>双 WS 推送</td></tr>
+      <tr data-edge="R33"><th scope="row">R33 · 请求与调用</th><td>会话操作与历史入口 → 智能体与运行生命周期</td><td>会话操作</td></tr>
+      <tr data-edge="R34"><th scope="row">R34 · 请求与调用</th><td>无界面与 SDK 入口 → 智能体与运行生命周期</td><td>无界面调用</td></tr>
+      <tr data-edge="R35"><th scope="row">R35 · 事件与状态回传</th><td>会话事实与读模型 → 实时事件下行</td><td>事件与投影</td></tr>
+      <tr data-edge="R36"><th scope="row">R36 · 请求与调用</th><td>循环与输入调度 → 模型适配与流式协议</td><td>模型请求</td></tr>
+      <tr data-edge="R37"><th scope="row">R37 · 事件与状态回传</th><td>模型适配与流式协议 → 会话事实与读模型</td><td>记录响应</td></tr>
+      <tr data-edge="R38"><th scope="row">R38 · 请求与调用</th><td>循环与输入调度 → 工具注册与执行管线</td><td>调度工具</td></tr>
+      <tr data-edge="R39"><th scope="row">R39 · 事件与状态回传</th><td>结果与大内容处理 → 会话事实与读模型</td><td>记录结果</td></tr>
+      <tr data-edge="R40"><th scope="row">R40 · 持久化、恢复与产物</th><td>会话事实与读模型 → 会话持久化接口</td><td>写入事实</td></tr>
+      <tr data-edge="R41"><th scope="row">R41 · 持久化、恢复与产物</th><td>恢复、修复与分叉 → 智能体与运行生命周期</td><td>恢复会话</td></tr>
+      <tr data-edge="R42"><th scope="row">R42 · 持久化、恢复与产物</th><td>结果与大内容处理 → 附件与溢出产物</td><td>保存产物</td></tr>
+      <tr data-edge="R43"><th scope="row">R43 · 观测副本导出</th><td>会话事实与读模型 → 事件与运维信号捕获</td><td>捕获副本</td></tr>
+      <tr data-edge="R44"><th scope="row">R44 · 事件与状态回传</th><td>会话事实与读模型 → 用量、成本与统计读模型</td><td>派生统计</td></tr>
+      <tr data-edge="R45"><th scope="row">R45 · 装配、检查与调试</th><td>产品装配与配置覆盖 → 非会话数据与配置</td><td>配置路由</td></tr>
+      <tr data-edge="R46"><th scope="row">R46 · 装配、检查与调试</th><td>插件依赖与资源生命周期 → 智能体与运行生命周期</td><td>服务与生命周期</td></tr>
+      <tr data-edge="R47"><th scope="row">R47 · 装配、检查与调试</th><td>本地开发与断点调试 → 循环与输入调度</td><td>断点调试</td></tr>
+      <tr data-edge="R48"><th scope="row">R48 · 装配、检查与调试</th><td>运行时诊断与不变量 → 循环与输入调度</td><td>检查不变量</td></tr>
+    </tbody></table></details>
+    <article id="domain-frontend" class="domain-detail"><h3>1. 前端与客户端</h3>
+    <p><strong>内部关系：</strong>模块加载装配插件；运行时接收连接事件；React 将状态与插槽贡献渲染为业务界面。</p>
+    <table><thead><tr><th>子系统分支</th><th>职责与边界</th><th>实现依据</th></tr></thead><tbody>
+      <tr><th scope="row">应用外壳与插件装配</th><td>外壳启动客户端 Cordis；modules 加载插件，HMR 负责卸载与重载。插件热更新不是会话事件推送。</td><td><a href="../deepseek-harness/packages/client/modules/README.zh.md">modules/README.zh.md</a></td></tr>
+      <tr><th scope="row">通信与连接生命周期</th><td>connection 管理连接代次和握手；业务调用走 HTTP，下行使用 events.mux 与 events.host 两条 WebSocket。</td><td><a href="../deepseek-harness/packages/client/connection/README.zh.md">connection/README.zh.md</a></td></tr>
+      <tr><th scope="row">会话与工作区状态</th><td>SessionRuntime 和 WorkspaceRuntime 管理客户端对象、列表及事件镜像；历史分页和 ProjectionValueStore 不等于持久化数据库。</td><td><a href="../deepseek-harness/packages/client/runtime/README.zh.md">runtime/README.zh.md</a></td></tr>
+      <tr><th scope="row">UI 扩展与 React 渲染</th><td>ui-slots 声明 UI 扩展约定；运行时提供状态源，web-react 绑定订阅与渲染。组件不是通信层。</td><td><a href="../deepseek-harness/packages/client/ui-slots/README.zh.md">ui-slots/README.zh.md</a></td></tr>
+      <tr><th scope="row">对话与任务界面</th><td>业务插件呈现对话、工具结果、待审批或待回答操作，以及子智能体、Jobs、Workflow 状态；实际执行仍在服务端。</td><td><a href="../deepseek-harness/packages/client/ui-conversation/README.zh.md">ui-conversation/README.zh.md</a></td></tr>
+      <tr><th scope="row">工作台与偏好界面</th><td>侧栏和工作区组织会话；模型选择、设置、主题与语言由相应插件贡献。设置界面不持有提供方执行能力。</td><td><a href="../deepseek-harness/packages/client/ui-settings/README.zh.md">ui-settings/README.zh.md</a></td></tr>
+    </tbody></table></article>
+    <article id="domain-server" class="domain-detail"><h3>2. 后端：服务接入层（Agent Server 职责）</h3>
+    <p><strong>内部关系：</strong>浏览器 → HTTP / WebSocket 载体 → 协议与对象解析 → 业务服务；推送反向送回客户端。</p>
+    <table><thead><tr><th>子系统分支</th><th>职责与边界</th><th>实现依据</th></tr></thead><tbody>
+      <tr><th scope="row">Web 宿主与资源服务</th><td>Web 宿主提供 HTTP 服务、前端静态资源和插件资源；原实现不是一个包办一切的 AgentServer 类。</td><td><a href="../deepseek-harness/packages/host/webserver/README.zh.md">webserver/README.zh.md</a></td></tr>
+      <tr><th scope="row">远程调用网关</th><td>Gateway 暴露显式声明的 Remote 方法，将 wire identity 解析为 Host 对象或作用域，再调用拥有该能力的服务。</td><td><a href="../deepseek-harness/docs/api-gateway.zh.md">docs/api-gateway.zh.md</a></td></tr>
+      <tr><th scope="row">会话操作与历史入口</th><td>接入层把会话操作交给运行时或查询服务；history 可能恢复尚未附加的会话，不能假定它永远只读数据库。</td><td><a href="../deepseek-harness/packages/client/connection/README.zh.md">connection/README.zh.md</a></td></tr>
+      <tr><th scope="row">实时事件下行</th><td>events.mux 与 events.host 分别传递对应的服务端帧；浏览器不在这些 WebSocket 上发送业务请求。</td><td><a href="../deepseek-harness/packages/client/connection/README.zh.md">connection/README.zh.md</a></td></tr>
+      <tr><th scope="row">访问与协议边界</th><td>Web 载体的浏览器访问限制不是完整认证系统；远程方法声明和对象解析也不能替代部署层安全设计。</td><td><a href="../deepseek-harness/packages/client/connection/README.zh.md">connection/README.zh.md</a></td></tr>
+      <tr><th scope="row">无界面与 SDK 入口</th><td>Headless 使用同一核心能力建立持久 Agent，但不需要经过 Web 接入层。SDK 入口与浏览器产品载体不混为一谈。</td><td><a href="../deepseek-harness/packages/bundle/headless/README.zh.md">headless/README.zh.md</a></td></tr>
+    </tbody></table></article>
+    <article id="domain-core" class="domain-detail"><h3>3. 后端：智能体核心与编排</h3>
+    <p><strong>内部关系：</strong>输入进入 Inbox → Turn / Step 推进 → 上下文与模型 / 工具交互 → Session 记事实 → 投影消费。</p>
+    <table><thead><tr><th>子系统分支</th><th>职责与边界</th><th>实现依据</th></tr></thead><tbody>
+      <tr><th scope="row">智能体与运行生命周期</th><td>Agent 接口与注册表提供运行对象；agent-loop 是具体驱动器。恢复入口调用持久化服务，而不是从观测平台重建。</td><td><a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">agent-loop/README.zh.md</a></td></tr>
+      <tr><th scope="row">循环与输入调度</th><td>Loop 领取输入、推进模型与工具步骤并处理停止；Turn 与 Step 是持久事件边界，不只是界面上的一条消息。</td><td><a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">agent-loop/README.zh.md</a></td></tr>
+      <tr><th scope="row">会话事实与读模型</th><td>Session 保存有序事实；模型历史与客户端读模型分别派生。消息呈现、原始事件、统计投影不是同一种数据。</td><td><a href="../deepseek-harness/packages/core/session/README.zh.md">session/README.zh.md</a></td></tr>
+      <tr><th scope="row">上下文工程</th><td>系统提示词与工具 schema 组装后参与请求；Token 测量、Compaction 和结果修剪控制上下文，外置产物由存储能力承接。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+      <tr><th scope="row">子智能体与后台任务</th><td>subagents 提供创建与继续接口；Jobs 登记后台工作。两者的对象和生命周期不同，不统一简化为一次工具调用。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+      <tr><th scope="row">工作流与目标控制</th><td>工作流引擎负责脚本编排；目标、计划、用户问题等插件参与运行控制。具体能力是否启用取决于装配。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+    </tbody></table></article>
+    <article id="domain-execution" class="domain-detail"><h3>4. 模型、工具与执行环境</h3>
+    <p><strong>内部关系：</strong>Loop 调模型或工具；工具经审批 / 策略约束后调用能力后端；结果返回 Session 与下一步上下文。</p>
+    <table><thead><tr><th>子系统分支</th><th>职责与边界</th><th>实现依据</th></tr></thead><tbody>
+      <tr><th scope="row">模型适配与流式协议</th><td>LLM 服务注册适配器，固定单次调用配置；分片、完成与用量按协议返回。模型选择界面不直接执行提供方请求。</td><td><a href="../deepseek-harness/packages/llm/llm/README.zh.md">llm/README.zh.md</a></td></tr>
+      <tr><th scope="row">工具注册与执行管线</th><td>ToolRuntime 统一注册和执行；pre-execute、guard、execute、post-execute 等阶段分离策略和能力实现。</td><td><a href="../deepseek-harness/packages/core/tools/README.zh.md">tools/README.zh.md</a></td></tr>
+      <tr><th scope="row">审批、权限与隔离</th><td>approval 等待用户决策，sandboxPolicy 表达策略，sandbox 约束进程。用户点击允许不意味着跳过全部执行限制。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+      <tr><th scope="row">本地与远程执行后端</th><td>文件系统、进程和终端各有服务边界，可选择本地或隔离环境实现；工作目录内容与会话记录独立存在。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+      <tr><th scope="row">外部工具与知识接入</th><td>MCP 接入工具，Skills 提供技能内容，Web 与 LSP 有各自服务接口；它们不是同一个网络调用层。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+      <tr><th scope="row">结果与大内容处理</th><td>执行结果可携带附件或外置引用；保留、修剪和存储职责分离。重放引用不会自动重新执行工具来补内容。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+    </tbody></table></article>
+    <article id="domain-storage" class="domain-detail"><h3>5. 数据库与持久化</h3>
+    <p><strong>内部关系：</strong>Session → 持久化接口 → SQLite 或 JSONL；查询索引从事实派生，资源内容和非会话数据另行保存。</p>
+    <table><thead><tr><th>子系统分支</th><th>职责与边界</th><th>实现依据</th></tr></thead><tbody>
+      <tr><th scope="row">会话持久化接口</th><td>SessionPersistence 定义追加、加载、列举和持久化屏障；逻辑事实约定独立于物理格式。</td><td><a href="../deepseek-harness/packages/session/session-persistence/README.zh.md">session-persistence/README.zh.md</a></td></tr>
+      <tr><th scope="row">权威存储后端</th><td>SQLite 将头与事件存入 sessions / events 表，以事务提交；JSONL 是另一种实现。默认选择 JSONL 不代表 SQLite 只能做缓存。</td><td><a href="../deepseek-harness/packages/session/session-persistence-sqlite/README.zh.md">session-persistence-sqlite/README.zh.md</a></td></tr>
+      <tr><th scope="row">恢复、修复与分叉</th><td>恢复从配置的后端读取，并处理崩溃留下的轮次；Fork 保留谱系与继承边界。未知工具结果不应盲目重试。</td><td><a href="../deepseek-harness/packages/session/session-persistence/README.zh.md">session-persistence/README.zh.md</a></td></tr>
+      <tr><th scope="row">派生查询与搜索</th><td>session-query-sqlite 管理派生索引，不承担权威持久化；不能指向会话存储数据库，默认组合不启用内容搜索。</td><td><a href="../deepseek-harness/packages/session-query/session-query-sqlite/README.zh.md">session-query-sqlite/README.zh.md</a></td></tr>
+      <tr><th scope="row">非会话数据与配置</th><td>ctx.storage 路由非会话领域 KV 的 JSON / SQLite 后端；settings 与 credentials 是另外的服务边界，不能把所有配置都说成存入事件表。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+      <tr><th scope="row">附件与溢出产物</th><td>attachments 与 spillStore 管理实际内容；事件记录引用。备份和恢复需覆盖被引用产物，不只是 events 表。</td><td><a href="../deepseek-harness/docs/capability-seams.zh.md">docs/capability-seams.zh.md</a></td></tr>
+    </tbody></table></article>
+    <article id="domain-observability" class="domain-detail"><h3>6. OTel 与可观测性</h3>
+    <p><strong>内部关系：</strong>捕获 → 投影与脱敏 → OTel Logs SDK → OTLP 接收端；用量统计是另一条读模型分支。</p>
+    <table><thead><tr><th>子系统分支</th><th>职责与边界</th><th>实现依据</th></tr></thead><tbody>
+      <tr><th scope="row">事件与运维信号捕获</th><td>遥测协调器捕获会话事实副本和运维记录；实时跟随或按需回放由后端模式决定，不改变原始会话事实。</td><td><a href="../deepseek-harness/packages/session/session-telemetry/README.zh.md">session-telemetry/README.zh.md</a></td></tr>
+      <tr><th scope="row">投影、脱敏与分享策略</th><td>默认 DISABLED；FULL 全量跟随，FEEDBACK_ONLY 按已记录反馈触发。脱敏是扩展点，默认没有规则，部署方须自行配置。</td><td><a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">session-telemetry-otel/README.zh.md</a></td></tr>
+      <tr><th scope="row">OTel Logs 导出管线</th><td>记录交给 OTel SDK 的日志管线，经 OTLP/HTTP 导出；排队、重试及丢失策略属于 SDK。不是把恢复记录直接搬进 Trace。</td><td><a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">session-telemetry-otel/README.zh.md</a></td></tr>
+      <tr><th scope="row">接收与观测存储</th><td>接收端由部署方配置，不能假定已部署某个 Collector 或数据库；观测副本可能缺失，不是会话恢复依据。</td><td><a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">session-telemetry-otel/README.zh.md</a></td></tr>
+      <tr><th scope="row">用量、成本与统计读模型</th><td>用量等原始字段随事件保存，相应消费者计算展示值；sessionStats 提供轮步与时延统计，不应称为完整财务结算账本。</td><td><a href="../deepseek-harness/packages/session/session-stats/README.zh.md">session-stats/README.zh.md</a></td></tr>
+      <tr><th scope="row">运行时诊断与不变量</th><td>invariants 提供包拥有的不变量注册，帮助定位运行时违约；测试与发布检查属于工程底座，不归 OTel 导出器负责。</td><td><a href="../deepseek-harness/packages/runtime-diagnostics/invariants/README.zh.md">invariants/README.zh.md</a></td></tr>
+    </tbody></table></article>
+    <article id="domain-foundation" class="domain-detail"><h3>7. 工程、装配与交付底座</h3>
+    <p><strong>内部关系：</strong>以下能力横切前述领域，不是请求必须经过的最后一站；课程使用 VS Code 调试，原实现按自身工具链构建。</p>
+    <table><thead><tr><th>子系统分支</th><th>职责与边界</th><th>实现依据</th></tr></thead><tbody>
+      <tr><th scope="row">插件依赖与资源生命周期</th><td>各领域以插件贡献服务和可逆副作用；插件卸载撤销对应注册，不需要修改一个特权内核。</td><td><a href="../deepseek-harness/docs/architecture.zh.md">docs/architecture.zh.md</a></td></tr>
+      <tr><th scope="row">产品装配与配置覆盖</th><td>Profile、Bundle、Patch 叠加：base、web-app、headless 和配置覆盖决定实际启用能力；图中的能力目录不表示每次启动都全部挂载。</td><td><a href="../deepseek-harness/docs/architecture.zh.md">docs/architecture.zh.md</a></td></tr>
+      <tr><th scope="row">构建与协议生成</th><td>构建产物与远程协议生成确保两端接口匹配；客户端模块加载消费已构建的插件资源。</td><td><a href="../deepseek-harness/docs/api-gateway.zh.md">docs/api-gateway.zh.md</a></td></tr>
+      <tr><th scope="row">自动测试与回归</th><td>原仓库与实验室分别使用自身测试入口；课程逐步加入取消、崩溃、重连与恢复等回归场景，不等于已验证所有生产组合。</td><td><a href="../deepseek-harness/package.json">package.json</a></td></tr>
+      <tr><th scope="row">本地开发与断点调试</th><td>课程入口用 VS Code 启动调试，结合断点、事件和状态产物检查行为；客户端 HMR 是另一条开发辅助链路。</td><td><a href="../deepseek-harness/packages/client/hmr/README.zh.md">hmr/README.zh.md</a></td></tr>
+      <tr><th scope="row">发布与运维检查</th><td>课程交付检查覆盖各领域；数据库和产物备份、遥测授权与访问限制需要分别核对，不能以一个绿色测试代替全部验证。</td><td><a href="../deepseek-harness/docs/architecture.zh.md">docs/architecture.zh.md</a></td></tr>
+    </tbody></table></article>
+    <!-- 领域子系统：结束 -->
+    <h3>数据库不是只有一种角色</h3>
+    <table><thead><tr><th>数据</th><th>存在哪里</th><th>是否用于恢复会话</th></tr></thead><tbody>
+      <tr><td>会话头、原始事件</td><td>SessionPersistence：SQLite 的 sessions / events 表，或 JSONL 后端；默认组合选择 JSONL，不表示数据库不受支持。</td><td>是，恢复读取已配置后端；活动会话先在内存推进，flush 是持久化屏障。</td></tr>
+      <tr><td>会话搜索索引</td><td>session-query-sqlite 的独立派生数据库；默认组合 openAt: never，不启用内容搜索。</td><td>否，可重建，不能与权威持久化数据库共用路径。</td></tr>
+      <tr><td>非会话领域数据</td><td>ctx.storage 与领域路由选择的 JSON / SQLite KV 后端。</td><td>不是会话事件恢复来源；其自身数据需要相应的持久化与备份。</td></tr>
+      <tr><td>附件、溢出内容</td><td>对应能力的存储后端；事件保留引用。</td><td>完整取回内容还依赖引用指向的产物，不能只备份事件。</td></tr>
+      <tr><td>用量、成本与统计</td><td>事件携带的相关原始字段随会话后端保存，汇总由相应投影或消费者计算；独立计费账本是另一个需求。</td><td>可从已记录字段重算，不假定每个提供方都有完整价格或成本字段。</td></tr>
+      <tr><td>观测记录</td><td>OTel SDK 队列 → 配置的 OTLP 接收端 → 部署方观测存储；具体存储产品未固定。</td><td>否；可能禁用、延迟或丢失，不用它替代持久化。</td></tr>
+    </tbody></table>
+    <h3>把各层放进一次真实操作</h3>
+    <p><strong>正常对话：</strong>网页提交输入 → 接入层调用智能体 → Loop 请求模型、经权限检查执行工具 → Session 追加事件 → 客户端收到投影更新；持久化按批次写入，遥测在启用时走独立导出链路。</p>
+    <p><strong>重启恢复：</strong>后端从配置的 SessionPersistence 加载会话头和事件，处理被中断的轮次并重建投影；不会从 OTel 接收端或搜索索引恢复。使用 SQLite 时，这条路径直接读数据库，不需要先找 JSONL。</p>
+    <p><strong>边界情况：</strong>浏览器断线不等于后端任务已经停止；恢复未确认的有副作用工具调用不能盲目重试。OTel 默认 DISABLED，FULL 与 FEEDBACK_ONLY 的导出时机也不同。Headless 装配无需 Web 服务接入层。</p>
+    <p>原实现依据：<a href="../deepseek-harness/docs/architecture.zh.md">核心与装配</a> · <a href="../deepseek-harness/packages/session/session-persistence/README.zh.md">持久化接口</a> · <a href="../deepseek-harness/packages/session/session-persistence-sqlite/README.zh.md">SQLite 权威存储</a> · <a href="../deepseek-harness/packages/session-query/session-query-sqlite/README.zh.md">查询索引</a> · <a href="../deepseek-harness/packages/storage/storage/README.zh.md">非会话存储</a> · <a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">OTel Logs</a>。</p>
+  </section>
+
+  <!-- 三框架总表：开始 -->
+  <section id="framework-overview">
+  <h2>17 课横向对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>每一行是同一个章节主题，三列分别回答三套框架如何实现。DeepSeek 指原仓库而非实验室；DeepAgents 指 LangChain DeepAgents；OpenHands 指当前 Software Agent SDK。资料核对日期：2026-08-28。点击章节进入详细边界、证据链接与系统定位图。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>章节 / 同一问题</th><th scope="col">DeepSeek Harness</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody>
+    <tr data-chapter="0001"><th scope="row"><a href="../lessons/0001-zero-baseline.html#framework-comparison">1. 工程基线</a></th><td>原仓库使用 pnpm 工作区，区分 Host/Client 构建，脚本包含 TypeScript 构建与 Vitest 测试。 <a href="../deepseek-harness/package.json">依据</a></td><td>通过 create_deep_agent 组合已有模型、工具和上下文能力，属于可嵌入应用的库入口。 <a href="https://docs.langchain.com/oss/python/deepagents/overview">依据</a></td><td>Software Agent SDK 提供可组合的 Agent、Conversation、LLM 等构件；服务端和工具另有包。 <a href="https://docs.openhands.dev/sdk/arch/sdk">依据</a></td></tr>
+    <tr data-chapter="0002"><th scope="row"><a href="../lessons/0002-plugin-kernel.html#framework-comparison">2. 插件内核</a></th><td>Cordis 通过 Context、服务注入和插件作用域组合能力，并将注册资源与插件生命周期绑定。 <a href="../deepseek-harness/docs/cordis-tutorial/02-lifecycle-and-effects.zh.md">依据</a></td><td>create_deep_agent 的 middleware 扩展模型与工具调用行为，backend 提供可替换执行能力。 <a href="https://docs.langchain.com/oss/python/deepagents/customization">依据</a></td><td>Plugin 将 skills、hooks、MCP 配置、agent 定义和命令打包分发。 <a href="https://docs.openhands.dev/sdk/guides/plugins">依据</a></td></tr>
+    <tr data-chapter="0003"><th scope="row"><a href="../lessons/0003-domain-protocol.html#framework-comparison">3. 领域协议</a></th><td>SessionEventMap 区分持久事件；surface 标记哪些事件参与模型消息派生。远程方法由 Typert 映射 Host 对象与 wire identity。 <a href="../deepseek-harness/packages/core/session/src/types.ts">依据</a></td><td>DeepAgents 建立在 LangChain/LangGraph 之上；消息、工具与图状态是组合基础，流接口另提供消息、工具和子任务投影。 <a href="https://docs.langchain.com/oss/python/deepagents/overview">依据</a></td><td>以不可变 Pydantic Event 建立类型约束；MessageEvent、ActionEvent、ObservationEvent 等各自表达不同事实。 <a href="https://docs.openhands.dev/sdk/arch/events">依据</a></td></tr>
+    <tr data-chapter="0004"><th scope="row"><a href="../lessons/0004-session-projections.html#framework-comparison">4. 会话与投影</a></th><td>Session 是仅追加日志；LLM 历史由 surface 派生，sessionProjections 在已提交事件上驱动注册投影。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td><td>LangGraph 保存线程级图状态；DeepAgents 流接口把运行内容投影为 messages、values、tool_calls 和 subagents。 <a href="https://docs.langchain.com/oss/python/deepagents/event-streaming">依据</a></td><td>ConversationState 管理会话状态，EventLog 保存追加事件；Conversation 组织更新和回调。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td></tr>
+    <tr data-chapter="0005"><th scope="row"><a href="../lessons/0005-streaming-llm.html#framework-comparison">5. 流式模型接口</a></th><td>ctx.llm 注册适配器，prepareCall 固定本次适配器与配置；流协议含 usage、finish 等事件。 <a href="../deepseek-harness/packages/llm/llm/src/types.ts">依据</a></td><td>接受支持工具调用的 LangChain chat model；provider:model 字符串由模型集成解析，也可传已配置模型对象。 <a href="https://docs.langchain.com/oss/python/deepagents/models">依据</a></td><td>LLM 封装 LiteLLM，提供 completion/responses、流式调用、重试和用量统计。 <a href="https://docs.openhands.dev/sdk/arch/llm">依据</a></td></tr>
+    <tr data-chapter="0006"><th scope="row"><a href="../lessons/0006-agent-loop.html#framework-comparison">6. 智能体循环</a></th><td>agent-loop 是唯一具体驱动器；通过 ctx.agents 创建或恢复，管理 inbox、turn、step，并调用 llm/tools 服务。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td><td>create_deep_agent 基于 LangChain/LangGraph 运行时组合模型、工具和中间件，使用 invoke 或流式入口运行。 <a href="https://docs.langchain.com/oss/python/deepagents/overview">依据</a></td><td>Agent.step 根据 Conversation 状态推进；产生 Action/Observation 或消息，Conversation 负责运行编排。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td></tr>
+    <tr data-chapter="0007"><th scope="row"><a href="../lessons/0007-tool-pipeline.html#framework-comparison">7. 工具流水线</a></th><td>ToolRuntime 管理 schema/执行器，依次处理 pre-execute、单调 guard、execute、post-execute、finalizeContent、result。 <a href="../deepseek-harness/packages/core/tools/README.zh.md">依据</a></td><td>通过 tools 参数和中间件接入工具；interrupt_on 可将敏感调用交给人工决策。 <a href="https://docs.langchain.com/oss/python/deepagents/customization">依据</a></td><td>ToolDefinition、Action、Observation 与 ToolExecutor 形成类型化输入输出，Agent 再包装为事件。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td></tr>
+    <tr data-chapter="0008"><th scope="row"><a href="../lessons/0008-local-capabilities.html#framework-comparison">8. 本地能力</a></th><td>fs、subprocess、shell、terminals 是独立服务，存在 local、sandbox 或 E2B 等实现组合。 <a href="../deepseek-harness/docs/capability-seams.zh.md">依据</a></td><td>FilesystemBackend 操作本机文件，LocalShellBackend 还支持 execute；CompositeBackend 可按路径路由。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td><td>Workspace 抽象本地与远程执行环境，工具在选定环境中执行；RemoteWorkspace 连接 Agent Server。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td></tr>
+    <tr data-chapter="0009"><th scope="row"><a href="../lessons/0009-permissions-sandbox.html#framework-comparison">9. 权限与沙箱</a></th><td>approval、sandboxPolicy、sandbox 分别承接审批、策略和进程沙箱；工具 guard 提供不可放宽的拒绝。 <a href="../deepseek-harness/docs/capability-seams.zh.md">依据</a></td><td>interrupt_on 借助 LangGraph 中断与 checkpointer 暂停敏感工具；隔离执行可接 sandbox backend。 <a href="https://docs.langchain.com/oss/python/deepagents/human-in-the-loop">依据</a></td><td>SecurityAnalyzer 给动作评估风险，ConfirmationPolicy 决定是否等待确认；执行环境由 Workspace 承载。 <a href="https://docs.openhands.dev/sdk/arch/security">依据</a></td></tr>
+    <tr data-chapter="0010"><th scope="row"><a href="../lessons/0010-persistence-recovery.html#framework-comparison">10. 持久化与恢复</a></th><td>ctx.agents.resume 经 sessionPersistence 加载日志并重建；持久化 seam 有 JSONL 和 SQLite 实现。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td><td>从 LangGraph checkpointer 按 thread_id 恢复图状态；Store 保存跨线程数据，二者职责不同。 <a href="https://docs.langchain.com/oss/python/langgraph/persistence">依据</a></td><td>同一 conversation_id 与 persistence_dir 加载 base_state.json 和 events/ 下的事件文件。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td></tr>
+    <tr data-chapter="0011"><th scope="row"><a href="../lessons/0011-context-compaction-spill.html#framework-comparison">11. 上下文压缩与外置</a></th><td>compaction 与工具结果修剪通过插件介入；spillStore 与 spill-policy 分别管理外置存储和策略。 <a href="../deepseek-harness/docs/capability-seams.zh.md">依据</a></td><td>内置上下文机制把大工具内容外置到 backend，并在历史过长时生成摘要。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td><td>Condenser 生成 Condensation，后续 View 过滤被遗忘事件并插入摘要；可组合 PipelineCondenser。 <a href="https://docs.openhands.dev/sdk/arch/condenser">依据</a></td></tr>
+    <tr data-chapter="0012"><th scope="row"><a href="../lessons/0012-external-capabilities.html#framework-comparison">12. 外部能力与知识</a></th><td>技能提供方注册到 ctx.skills；web、lsp 等能力有自己的 seam，MCP 则通过对应包接入。 <a href="../deepseek-harness/docs/capability-seams.zh.md">依据</a></td><td>支持 skills 与 memory 配置；LangChain MCP adapters 可将 MCP 工具接入 tools 列表。 <a href="https://docs.langchain.com/oss/python/deepagents/customization">依据</a></td><td>MCP 工具被发现并转换为工具定义；Plugin 还可分发 skills 与 MCP 配置。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td></tr>
+    <tr data-chapter="0013"><th scope="row"><a href="../lessons/0013-jobs-subagents-workflows.html#framework-comparison">13. 任务与子智能体编排</a></th><td>subagents 提供创建与继续的接口，jobs 负责后台任务登记，workflowEngine 提供脚本编排；进程内子 agent 通过 ctx.agents 创建。 <a href="../deepseek-harness/docs/capability-seams.zh.md">依据</a></td><td>task 把工作委派到具有独立上下文的子智能体；stream.subagents 可观察每次委派的状态和输出。 <a href="https://docs.langchain.com/oss/python/deepagents/subagents">依据</a></td><td>TaskToolSet 创建或恢复子 Conversation，同步等待结果；可用 task ID 继续已有任务。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td></tr>
+    <tr data-chapter="0014"><th scope="row"><a href="../lessons/0014-profile-bundle-cli-headless.html#framework-comparison">14. 配置、组合与无界面入口</a></th><td>headless 的 cordis.patch.yml 叠加 base，runner 建立持久 Agent，flush 后输出结果并退出。 <a href="../deepseek-harness/packages/bundle/headless/README.zh.md">依据</a></td><td>HarnessProfile 调整提示词、工具可见性和中间件；ProviderProfile 处理模型构造参数。 <a href="https://docs.langchain.com/oss/python/deepagents/profiles">依据</a></td><td>Agent/LLM/Conversation 可程序化构建，LLM 配置支持环境或 JSON；需要远程访问时再引入 Agent Server。 <a href="https://docs.openhands.dev/sdk/arch/sdk">依据</a></td></tr>
+    <tr data-chapter="0015"><th scope="row"><a href="../lessons/0015-agent-server.html#framework-comparison">15. 智能体服务层</a></th><td>Host/API Proxy 与 Typert Gateway 暴露服务；浏览器以 HTTP POST 调用，events.mux/events.host 两条 WebSocket 下行。 <a href="../deepseek-harness/docs/api-gateway.zh.md">依据</a></td><td>库内的图可以放入服务应用；LangSmith Deployment 的 Agent Server 是额外运行和部署层。 <a href="https://docs.langchain.com/langsmith/deployment">依据</a></td><td>openhands-agent-server 是独立服务包，以 HTTP 和 WebSocket 暴露 Conversation 与工作区能力；RemoteWorkspace 连接它。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td></tr>
+    <tr data-chapter="0016"><th scope="row"><a href="../lessons/0016-web-production-loop.html#framework-comparison">16. 网页与产品闭环</a></th><td>connection 管理连接 generation 与握手后的 hostDescription；sessionProjections 为历史和推送提供派生值。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td><td>前端 useStream 暴露 messages、values、subagents 等投影，可渲染协调者与子任务进度。 <a href="https://docs.langchain.com/oss/python/deepagents/frontend/overview">依据</a></td><td>远程 Conversation 经 HTTP/WebSocket 与 Agent Server 交互，可作为产品界面的后端边界。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td></tr>
+    <tr data-chapter="0017"><th scope="row"><a href="../lessons/0017-hardening-release.html#framework-comparison">17. 观测、成本与发布加固</a></th><td>session-telemetry-otel 把会话记录送入 OTel Logs；会话中的 assistant/message 完成锚点可携带用量。 <a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">依据</a></td><td>可接 LangSmith tracing 观察运行；线程状态由 checkpointer 保存，外置文件由所选 backend 承担。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td><td>当前 SDK 经 Laminar 插桩支持 OpenTelemetry Traces；ConversationStats 聚合各 usage_id 的 token 与 cost，持久化包含统计状态。 <a href="https://docs.openhands.dev/sdk/guides/observability">依据</a></td></tr>
+  </tbody></table></div>
+  </section>
+  <!-- 三框架总表：结束 -->
+
+  <section id="site-architecture">
+  <h2>实验室实现架构（教学代码）</h2>
+  <p>当前默认链路与独立教学扩展分开标示。工具执行、编排和遥测需要显式装配，不应从课程能力清单推断为全部已接入 Web 宿主。</p>
+  <figure class="course-diagram"><figcaption>产品入口、Agent Server、运行时、事实存储与扩展边界</figcaption>
+    <a href="../assets/diagrams/site-architecture.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/site-architecture.svg" alt="DeepSeek Harness 实验室全站总体架构图"></a>
+    <p><a href="../assets/diagrams/site-architecture.svg">打开大图</a> · <a href="../assets/diagrams/site-architecture.mmd">Mermaid 图源</a></p>
+  </figure>
+  </section>
+
   <h2>路线总表</h2>
   <table>
     <thead><tr><th>阶段</th><th>新增能力</th><th>最小演示</th><th>主要调试证据</th></tr></thead>

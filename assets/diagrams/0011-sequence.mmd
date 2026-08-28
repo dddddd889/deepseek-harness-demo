@@ -1,0 +1,15 @@
+---
+title: 上下文治理 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 调用方
+  participant p1 as 压缩器
+  participant p2 as 摘要器
+  participant p3 as Session
+  p0->>p1: 选择闭合区间
+  p1->>p3: 压缩开始事件
+  p1->>p2: 请求摘要
+  p2-->>p1: 返回摘要
+  p1->>p1: 检查大小与边界
+  p1->>p3: 替换可见面并闭合审计

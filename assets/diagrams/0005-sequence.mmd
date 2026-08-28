@@ -1,0 +1,15 @@
+---
+title: 流式模型 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 模型步骤
+  participant p1 as 运行时
+  participant p2 as 提供方
+  participant p3 as Session
+  p0->>p1: stream 请求
+  p1->>p2: 调用提供方
+  p2-->>p1: 返回增量数据块
+  p1-->>p0: 规范化流块
+  p0->>p3: 追加 chunk
+  p0->>p3: 提交最终消息与用量

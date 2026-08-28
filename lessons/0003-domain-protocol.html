@@ -7,8 +7,51 @@
   <link rel="stylesheet" href="../assets/course.css">
 </head>
 <body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 3 课：固定 Agent 领域协议</h1>
   <p class="lead">Agent Loop、持久化、Web Server 和 UI 必须讲同一种语言。本课先固定跨边界数据，再开始写行为。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">SessionEventMap 区分持久事件；surface 标记哪些事件参与模型消息派生。远程方法由 Typert 映射 Host 对象与 wire identity。</td><td data-framework="deepagents">DeepAgents 建立在 LangChain/LangGraph 之上；消息、工具与图状态是组合基础，流接口另提供消息、工具和子任务投影。</td><td data-framework="openhands">以不可变 Pydantic Event 建立类型约束；MessageEvent、ActionEvent、ObservationEvent 等各自表达不同事实。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">持久事件、进程内控制事件和远程 RPC 是不同边界。</td><td data-framework="deepagents">流投影不是自定义领域账本的替代品；应用新增字段仍要定义语义。</td><td data-framework="openhands">只有可转换事件参与 LLM 消息生成；内部状态通知不等于模型消息。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/core/session/src/types.ts">原仓库依据 1</a> · <a href="../deepseek-harness/docs/api-gateway.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/overview">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/deepagents/event-streaming">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/events">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>共同点是避免把所有东西塞进聊天字符串；区别是 DeepSeek 的日志表层、DeepAgents 的图状态、OpenHands 的类型化事件分别承担核心约束。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>横跨循环、状态、工具与远程接口的共同语言层。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 3 课</figcaption><a href="../assets/diagrams/0003-position.svg"><img src="../assets/diagrams/0003-position.svg" alt="领域协议在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0003-position.svg">打开大图</a> · <a href="../assets/diagrams/0003-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>用户输入、模型分片、工具请求及生命周期变化。</td></tr>
+    <tr><th>下游与输出</th><td>有明确身份、类型和语义的消息或事件，供第 4 课状态层及第 15 课接口层消费。</td></tr>
+    <tr><th>不归本章负责</th><td>协议描述发生了什么，不负责执行副作用；运行时对象也不应直接跨网络。</td></tr>
+    <tr><th>放进具体场景</th><td>工具调用与结果需要关联身份，恢复时才能判断哪个调用已完成，UI 才能更新正确卡片。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 领域协议</figcaption>
+    <a href="../assets/diagrams/0003-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0003-modules.svg" alt="领域协议的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0003-modules.svg">打开大图</a> · <a href="../assets/diagrams/0003-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 领域协议</figcaption>
+    <a href="../assets/diagrams/0003-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0003-sequence.svg" alt="领域协议的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0003-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0003-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 领域协议</figcaption>
+    <a href="../assets/diagrams/0003-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0003-branches.svg" alt="领域协议的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0003-branches.svg">打开大图</a> · <a href="../assets/diagrams/0003-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -18,14 +61,15 @@
     <tr><th>解决的问题</th><td>避免跨模块传输时字段丢失、含义漂移或类型不一致，并为持久化和重放建立稳定契约。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>协议族</th><th>完整变体</th><th>保证</th></tr></thead><tbody>
-    <tr><td>消息与来源</td><td>用户、模型、工具和系统消息；稳定消息标识与来源元数据。</td><td>创建后与调用方对象隔离。</td></tr>
-    <tr><td>内容块</td><td>文本、推理、工具调用、工具结果和图片引用。</td><td>使用标签联合穷尽处理。</td></tr>
-    <tr><td>流式协议</td><td>内容开始、增量、内容结束、用量和终止帧；成功与失败终止原因。</td><td>提供方差异不穿透运行时。</td></tr>
-    <tr><td>工具协议</td><td>名称、说明、参数模式、并行提示、效果声明和结果投影。</td><td>原始 JSON 参数保留到校验边界。</td></tr>
-    <tr><td>会话协议</td><td>请求头、消息、轮次、步骤、工具、权限、压缩与反馈事件。</td><td>事件类型与数据一一对应。</td></tr>
-    <tr><td>JSON 边界</td><td>有限数字、普通对象、数组、循环引用检查、快照和递归冻结。</td><td>拒绝静默丢失或改变含义的数据。</td></tr>
+    <tr><td><a href="#concept-0003-1">消息与来源</a></td><td>用户、模型、工具和系统消息；稳定消息标识与来源元数据。</td><td>创建后与调用方对象隔离。</td></tr>
+    <tr><td><a href="#concept-0003-2">内容块</a></td><td>文本、推理、工具调用、工具结果和图片引用。</td><td>使用标签联合穷尽处理。</td></tr>
+    <tr><td><a href="#concept-0003-3">流式协议</a></td><td>内容开始、增量、内容结束、用量和终止帧；成功与失败终止原因。</td><td>提供方差异不穿透运行时。</td></tr>
+    <tr><td><a href="#concept-0003-4">工具协议</a></td><td>名称、说明、参数模式、并行提示、效果声明和结果投影。</td><td>原始 JSON 参数保留到校验边界。</td></tr>
+    <tr><td><a href="#concept-0003-5">会话协议</a></td><td>请求头、消息、轮次、步骤、工具、权限、压缩与反馈事件。</td><td>事件类型与数据一一对应。</td></tr>
+    <tr><td><a href="#concept-0003-6">JSON 边界</a></td><td>有限数字、普通对象、数组、循环引用检查、快照和递归冻结。</td><td>拒绝静默丢失或改变含义的数据。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：稳定领域协议</h2>
@@ -46,6 +90,36 @@
     <tr><th>权衡</th><td>严格协议限制任意对象和隐式字段，但换来传输、存储、重放和多语言客户端的一致语义。</td></tr>
     <tr><th>方案对比</th><td>直接共享类实例保留行为却无法跨进程；松散字典灵活但错误延迟到运行时；标签联合在扩展成本和可靠性之间更均衡。</td></tr>
   </tbody></table>
+
+  <h2>场景穷举</h2>
+  <pre><code>边界数据进入协议
+├─ 合法标签变体 → 快照、冻结、传输
+├─ 未知标签 → 消费者明确拒绝
+├─ NaN / Infinity / undefined → JSON 边界拒绝
+├─ 循环引用 → 路径化错误，不进入日志
+└─ 新增变体 → 编译期 assertNever 暴露遗漏消费者</code></pre>
+  <table><thead><tr><th>场景</th><th>例子</th><th>协议行为</th></tr></thead><tbody>
+    <tr><td>正常</td><td>文本、推理、工具调用、结果和图片在一次消息中混合。</td><td>通过标签保持顺序和各自字段。</td></tr>
+    <tr><td>边界</td><td>空文本、空内容数组、极深 JSON 或大整数。</td><td>由领域不变量和 JSON 表达能力分别判断。</td></tr>
+    <tr><td>失败</td><td>工具参数不是合法 JSON，或值含函数、BigInt。</td><td>保留原始参数到工具边界；不可表达事件不写入 Session。</td></tr>
+    <tr><td>演进</td><td>新增音频内容块或新终止原因。</td><td>版本化协议并让穷尽分派暴露旧消费者。</td></tr>
+    <tr><td>误用</td><td>把类实例、异常对象直接塞进事件。</td><td>无损 JSON 守卫拒绝隐式丢字段或原型语义。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>演进能力</th><th>跨边界能力</th><th>风险</th></tr></thead><tbody>
+    <tr><td>共享类实例</td><td>方法封装强。</td><td>弱，跨进程需另写映射。</td><td>原型和对象身份无法重放。</td></tr>
+    <tr><td>松散字典</td><td>随意加字段。</td><td>强。</td><td>错误晚发现、同名异义。</td></tr>
+    <tr><td>标签联合+无损 JSON</td><td>新增变体显式。</td><td>强，可传输可存储。</td><td>协议变更需要同步消费者。</td></tr>
+    <tr><td>Protobuf/JSON Schema</td><td>跨语言和生成工具更强。</td><td>强。</td><td>构建链更重，教学源码不如 TypeScript 直观。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么工具参数保留原始 JSON 字符串？</dt><dd>模型产生的语法错误本身是需要审计和重放的事实；若领域层提前解析，坏输入会被丢失或改写。</dd>
+    <dt>深冻结是不是多余？</dt><dd>TypeScript 的 readonly 只约束编译期；调用方仍可能持有同一对象并在事件写入后修改它。</dd>
+    <dt>所有字段都应该进入通用元数据吗？</dt><dd>不应该。高频且影响行为的字段应进入正式协议，只有真正开放、可忽略的数据才适合元数据，否则类型系统无法保护消费者。</dd>
+  </dl>
 
   <h2>协议分层</h2>
   <pre><code>ContentBlock
@@ -71,6 +145,69 @@ append-only Session</code></pre>
   </table>
 
   <div class="callout"><strong>为什么工具参数先保留字符串？</strong>模型产生的是原始 JSON 字符串。只有 Tool Registry 知道目标 schema，解析、校验和规范化必须留到工具执行阶段；事件账本保留原文才能忠实复盘模型行为。</div>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0003-1" data-concept="消息与来源">
+  <h3>消息与来源：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>用户、模型与工具的消息身份如何表达？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Session 派生带标识的消息，assistant 消息保留 provider/model 来源；事件身份和消息身份不是同一坐标。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">HumanMessage、AIMessage、ToolMessage 等表达角色，tool_call_id 关联调用结果；角色不等于任意业务来源元数据。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">MessageEvent/ActionEvent/ObservationEvent 分开表达消息、行动和反馈，event source 与 LLM role 有区别。 <a href="https://docs.openhands.dev/sdk/arch/events">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>比较来源时要区分谁生成、消息扮演什么角色、属于哪个调用。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0003-2" data-concept="内容块">
+  <h3>内容块：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>文本、推理、图片与工具调用如何进入消息？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">领域类型定义不同内容块，派生消息保留完整冻结内容；提供方私有回放信息不会被任意压平成字符串。 <a href="../deepseek-harness/packages/core/session/src/types.ts">依据</a></td>
+    <td data-framework="deepagents">LangChain 消息可带标准或提供方原生内容块；图片等多模态格式取决于模型集成。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">LLMConvertibleEvent 把事件内容转换成模型消息；并非每一种内部事件都能直接发给模型。 <a href="https://docs.openhands.dev/sdk/arch/events">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>统一为聊天文本会丢失结构；但三者内容块格式本身也不能直接互换。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0003-3" data-concept="流式协议">
+  <h3>流式协议：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>半条模型输出如何与完整消息区分？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">LLM StreamChunk 联合类型区分内容增量、usage、finish；循环完成锚点另写 assistant/message。 <a href="../deepseek-harness/packages/llm/llm/src/types.ts">依据</a></td>
+    <td data-framework="deepagents">模型流产生 AIMessageChunk，可累加成完整消息；运行事件流还可包含工具和图状态变化。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">LLM 封装提供流式调用能力，Agent 再把解析出的行动或消息放进事件历史；网络 chunk 不等于 Conversation Event。 <a href="https://docs.openhands.dev/sdk/arch/llm">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>传输增量、消息组装与领域事件是三层协议，不能共享一个“message”类型糊过去。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0003-4" data-concept="工具协议">
+  <h3>工具协议：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>参数和结果分别在哪一层校验？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ToolRuntime 注册 schema 与执行器，执行前快照参数，规范化结果后才发布只读通知。 <a href="../deepseek-harness/packages/core/tools/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">@tool 根据类型提示生成输入 schema，也可指定 Pydantic/JSON schema；工具结果通过工具消息返回。 <a href="https://docs.langchain.com/oss/python/langchain/tools">依据</a></td>
+    <td data-framework="openhands">Action 是校验后的输入，Observation 是结构化输出，ToolExecutor 执行业务。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>DeepSeek 的统一调用流水线、LangChain 的工具 schema、OpenHands 的 Action/Observation 划分不是同一个接口。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0003-5" data-concept="会话协议">
+  <h3>会话协议：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>历史记录和执行状态是否只有一个事实来源？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Session 追加事实，surface 与消息均由日志派生，seq 连续性是核心约束。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">检查点保留图状态与下一节点；线程内的消息只是状态的一部分。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">EventLog 与 ConversationState 并存，既有事件追加也有不追加事件的字段更新。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>三种协议分别以日志、图状态、状态加事件为中心，重放语义必须分别定义。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0003-6" data-concept="JSON 边界">
+  <h3>JSON 边界：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>跨存储边界能否携带运行时对象？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Session 校验 JSON 数据并创建脱离、深冻结快照；不能靠 TypeScript readonly 保证持久事实不变。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">checkpointer 使用 SerializerProtocol；JsonPlusSerializer 能处理多种类型，不等同于只接受本课 JSON 联合类型。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">Event 是不可变 Pydantic 模型，持久事件可通过 model_validate_json 读取；执行器等运行对象不应被当成事件内容。 <a href="https://docs.openhands.dev/sdk/arch/events">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>“可序列化”的允许集合不同；协议升级前要验证 round-trip，不是只验证类型检查。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

@@ -1,0 +1,13 @@
+---
+title: 本地能力 · 模块关系
+---
+flowchart TD
+  n0["工具适配器"]
+  n1["本地能力层"]
+  n2["WorkspaceFs"]
+  n3["LocalProcessRuntime"]
+  n4["LocalShell 与 PTY"]
+  n0 -->|"调用文件或进程能力"| n1
+  n1 -->|"约束路径读写"| n2
+  n1 -->|"管理进程与输出"| n3
+  n1 -->|"命令解释与交互"| n4

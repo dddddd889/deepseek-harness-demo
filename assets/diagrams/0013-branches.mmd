@@ -1,0 +1,9 @@
+---
+title: 并发编排 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"能力或深度不满足"| result0["启动前拒绝"]
+  decision -->|"并发名额不足"| result1["等待可用名额"]
+  decision -->|"总量超限或父取消"| result2["取消已启动子任务"]
+  decision -->|"工作线程失控"| result3["宽限期后终止"]

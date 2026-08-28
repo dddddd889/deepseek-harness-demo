@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 12 课：Skills、MCP、Web、LSP 与 Attachment</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 12 课：Skills、MCP、Web、LSP 与 Attachment</h1>
   <p class="lead">外部能力不是一锅“工具”：统一目录负责发现，各能力 seam 保留自己的选择、生命周期和信任边界，最后只有模型可调用操作桥接进 Tool Registry。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">技能提供方注册到 ctx.skills；web、lsp 等能力有自己的 seam，MCP 则通过对应包接入。</td><td data-framework="deepagents">支持 skills 与 memory 配置；LangChain MCP adapters 可将 MCP 工具接入 tools 列表。</td><td data-framework="openhands">MCP 工具被发现并转换为工具定义；Plugin 还可分发 skills 与 MCP 配置。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">能力集合由组合配置决定，不表示所有提供方默认启动。</td><td data-framework="deepagents">技能文本与可执行工具是两种输入；MCP 连接配置不代替业务授权。</td><td data-framework="openhands">外部工具进入统一 Action/Observation 边界，而不是另建一套聊天协议。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/docs/capability-seams.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/mcp/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/customization">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/langchain/mcp">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/tool-system">官方文档 1</a> · <a href="https://docs.openhands.dev/sdk/guides/plugins">官方文档 2</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>对比重点是外部能力如何归一到工具或上下文接口，以及谁拥有连接、权限和结果解释。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>工具层与上下文层连接外部服务、技能和知识的扩展边界。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 12 课</figcaption><a href="../assets/diagrams/0012-position.svg"><img src="../assets/diagrams/0012-position.svg" alt="外部能力与知识在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0012-position.svg">打开大图</a> · <a href="../assets/diagrams/0012-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>工具调用、任务需要的知识、外部能力配置。</td></tr>
+    <tr><th>下游与输出</th><td>MCP 或其他服务结果、按需载入的技能内容，回到工具结果或模型上下文。</td></tr>
+    <tr><th>不归本章负责</th><td>外部服务返回内容是数据，不自动成为可信系统指令；远程连接也需要自己的凭据和生命周期。</td></tr>
+    <tr><th>放进具体场景</th><td>先载入代码审查技能，再调用外部检索工具；技能告诉如何做，工具负责获取事实，两者不混用。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 外部能力</figcaption>
+    <a href="../assets/diagrams/0012-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0012-modules.svg" alt="外部能力的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0012-modules.svg">打开大图</a> · <a href="../assets/diagrams/0012-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 外部能力</figcaption>
+    <a href="../assets/diagrams/0012-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0012-sequence.svg" alt="外部能力的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0012-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0012-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 外部能力</figcaption>
+    <a href="../assets/diagrams/0012-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0012-branches.svg" alt="外部能力的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0012-branches.svg">打开大图</a> · <a href="../assets/diagrams/0012-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,15 +57,16 @@
     <tr><th>解决的问题</th><td>避免万能接口模糊生命周期和信任边界，并让外部能力可发现、可换代、可恢复且不泄露本地路径。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力域</th><th>完整能力</th><th>边界</th></tr></thead><tbody>
-    <tr><td>统一能力目录</td><td>登记技能、工具、网页搜索、网页抓取、LSP 和附件摘要；稳定排序并随释放撤销。</td><td>目录只负责发现，不吞并各协议运行时。</td></tr>
-    <tr><td>技能</td><td>扫描多优先级根目录，解析元数据，按名称选胜出者，区分模型调用与用户调用。</td><td>路径必须留在技能资源根目录内。</td></tr>
-    <tr><td>MCP</td><td>完整遍历工具分页，检测游标循环，生成服务器限定名，原子替换工具代次并转发原始名称。</td><td>发现失败时继续保留上一代工具。</td></tr>
-    <tr><td>网页搜索</td><td>注册多个提供方，按显式配置或唯一可用者选择，并限制结果数量。</td><td>多候选时拒绝依赖注册顺序猜测。</td></tr>
-    <tr><td>网页抓取</td><td>独立于搜索选择提供方，返回地址、状态、内容类型、文本和截断标志。</td><td>提供方可用性在执行时检查。</td></tr>
-    <tr><td>LSP</td><td>原子占用扩展名路由，支持定义、引用、实现和悬停查询；复合扩展取最终扩展名。</td><td>冲突时不泄露部分路由，不开放任意 JSON-RPC。</td></tr>
-    <tr><td>附件</td><td>严格解码图片、限制类型与字节数、按内容寻址持久化并鉴权读取。</td><td>模型只看到持久引用，不看到本地路径。</td></tr>
+    <tr><td><a href="#concept-0012-1">统一能力目录</a></td><td>登记技能、工具、网页搜索、网页抓取、LSP 和附件摘要；稳定排序并随释放撤销。</td><td>目录只负责发现，不吞并各协议运行时。</td></tr>
+    <tr><td><a href="#concept-0012-2">技能</a></td><td>扫描多优先级根目录，解析元数据，按名称选胜出者，区分模型调用与用户调用。</td><td>路径必须留在技能资源根目录内。</td></tr>
+    <tr><td><a href="#concept-0012-3">MCP</a></td><td>完整遍历工具分页，检测游标循环，生成服务器限定名，原子替换工具代次并转发原始名称。</td><td>发现失败时继续保留上一代工具。</td></tr>
+    <tr><td><a href="#concept-0012-4">网页搜索</a></td><td>注册多个提供方，按显式配置或唯一可用者选择，并限制结果数量。</td><td>多候选时拒绝依赖注册顺序猜测。</td></tr>
+    <tr><td><a href="#concept-0012-5">网页抓取</a></td><td>独立于搜索选择提供方，返回地址、状态、内容类型、文本和截断标志。</td><td>提供方可用性在执行时检查。</td></tr>
+    <tr><td><a href="#concept-0012-6">LSP</a></td><td>原子占用扩展名路由，支持定义、引用、实现和悬停查询；复合扩展取最终扩展名。</td><td>冲突时不泄露部分路由，不开放任意 JSON-RPC。</td></tr>
+    <tr><td><a href="#concept-0012-7">附件</a></td><td>严格解码图片、限制类型与字节数、按内容寻址持久化并鉴权读取。</td><td>模型只看到持久引用，不看到本地路径。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：异构能力目录与协议接缝</h2>
@@ -48,6 +92,39 @@
     <tr><th>权衡</th><td>专用接缝增加类型和适配器数量，却保留选择策略、资源所有权、错误语义与最小权限。</td></tr>
     <tr><th>方案对比</th><td>全部包装成函数调用最统一但丢失资源与协议生命周期；目录加专用运行时属于控制面统一、数据面分治。</td></tr>
   </tbody></table>
+
+  <h2>场景穷举</h2>
+  <pre><code>能力发现与调用
+├─ 单一可用 provider → 自动选择
+├─ 多候选无配置 → 拒绝猜测
+├─ Skills 同名 → 按根优先级选胜者
+├─ MCP 多页 → 全部抓取后原子发布
+├─ MCP 发现失败/游标环 → 保留旧代次
+├─ LSP 扩展冲突 → 整个 provider 注册失败
+├─ Attachment 合法 → 内容寻址持久引用
+└─ Attachment 超限/坏编码 → 写入前拒绝</code></pre>
+  <table><thead><tr><th>能力域</th><th>正常</th><th>失败/恢复</th></tr></thead><tbody>
+    <tr><td>Skills</td><td>扫描项目、用户、内置根并选择最高优先级。</td><td>坏元数据隔离；资源路径越界拒绝。</td></tr>
+    <tr><td>MCP</td><td>分页完成后把限定名工具一次性换代。</td><td>传输或分页失败时旧工具继续可用。</td></tr>
+    <tr><td>Web</td><td>显式或唯一提供方执行并施加结果上限。</td><td>配置缺失、不可用、多候选均明确失败。</td></tr>
+    <tr><td>LSP</td><td>按最终扩展名路由四种语义操作。</td><td>任一扩展冲突则不发布任何部分映射。</td></tr>
+    <tr><td>Attachment</td><td>验证后按内容哈希存储，消息只留引用。</td><td>冷恢复仍可按引用读取，不泄露本地路径。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>架构</th><th>统一程度</th><th>语义保真</th><th>结果</th></tr></thead><tbody>
+    <tr><td>所有能力都是 Tool</td><td>最高。</td><td>低，发现、资源和生命周期被压平。</td><td>原型简单，生产边界模糊。</td></tr>
+    <tr><td>各能力完全独立</td><td>最低。</td><td>最高。</td><td>模型和用户无法统一发现。</td></tr>
+    <tr><td>统一目录+专用 Runtime</td><td>控制面统一。</td><td>数据面保真。</td><td>本课程选择，类型较多但职责清楚。</td></tr>
+    <tr><td>外部服务网关</td><td>跨语言统一。</td><td>取决于网关协议。</td><td>适合多节点，增加网络与运维成本。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么多提供方不能按注册顺序选择？</dt><dd>注册顺序会随插件加载、热重载和测试改变；隐式选择让相同配置产生不同外部行为。</dd>
+    <dt>MCP 为什么要完整分页后再发布？</dt><dd>边抓边发布会在中途失败时留下半代工具集合，模型看到的能力取决于故障发生位置。</dd>
+    <dt>附件为什么不直接 base64 写进每条消息？</dt><dd>会让事件日志和网络重放无限膨胀；内容寻址可去重、限额、鉴权并让消息保持稳定小引用。</dd>
+  </dl>
 
   <h2>整体结构</h2>
   <pre><code>Capability Catalog（摘要/所有权）
@@ -76,6 +153,19 @@
   → 插件释放时同时撤销摘要和真实实现</code></pre>
   <p><strong>白话解释：</strong>目录像商场导览牌，只告诉你店名、类型和位置；做饭、修手机和寄快递仍由各自店铺完成。这样既能统一发现，也不会把不同能力的安全规则压扁成一个万能函数。</p>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0012-1" data-concept="统一能力目录">
+  <h3>统一能力目录：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>目录统一后，是否也统一所有执行协议？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">原版有 tools、skills、web、lsp 等各自的服务注册表；实验室 Capability Catalog 是教学聚合层，不要当作原版唯一能力总线。 <a href="../deepseek-harness/docs/capability-seams.zh.md">依据</a></td>
+    <td data-framework="deepagents">tools 向模型暴露可调用能力，skills/backend 另行配置；create_deep_agent 的配置入口统一，不表示内部协议相同。 <a href="https://docs.langchain.com/oss/python/deepagents/customization">依据</a></td>
+    <td data-framework="openhands">ToolRegistry 把工具规格解析成 ToolDefinition；技能由 AgentContext 管理，工具目录不替代上下文管理。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>可以统一展示菜单，但工具调用、技能读取、环境操作仍各有契约。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>Skills：先发现摘要，再按需读取正文</h2>
   <p><code>SkillRegistry</code> 从项目、用户和内置目录扫描 <code>SKILL.md</code>。刷新阶段读取头部元数据形成摘要；真正选中某个技能后，<code>get()</code> 才重新读取正文，并在渲染时附带资源基目录。</p>
   <pre><code>project / user / bundled roots
@@ -93,6 +183,19 @@
     <tr><td>技能文件指向根目录外</td><td>拒绝发现</td><td>防止通过符号链接读取越界文件</td></tr>
   </tbody></table>
   <p><strong>解决的问题：</strong>模型不必在每次请求中携带所有技能全文，同时又能让项目规则覆盖通用规则，并确保不同调用入口只看到获准使用的技能。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0012-2" data-concept="技能">
+  <h3>技能：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>技能什么时候进入上下文，谁触发读取？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ctx.skills 分开 list 摘要与 get 定义，并维护 modelInvocable/userInvocable；提供方注册与加载受作用域约束。 <a href="../deepseek-harness/packages/skill/skill/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">启动时载入 SKILL.md 的名称与描述，任务相关时再读正文；来源通过 skills 路径配置并由 backend 读取。 <a href="https://docs.langchain.com/oss/python/deepagents/skills">依据</a></td>
+    <td data-framework="openhands">Skill 支持常驻、关键词、任务或路径触发；PathTrigger 在匹配文件操作的 Observation 中注入，不是模型主动调用。 <a href="https://docs.openhands.dev/sdk/arch/skill">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>不能只比较文件名；渐进披露、用户/模型可调用性与确定性触发规则是不同维度。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>MCP：发现、换代与调用</h2>
   <p><code>McpToolBridge</code> 把远端 MCP 工具翻译成 Harness 的 <code>ToolDefinition</code>。模型看到带服务命名空间的公开名，真正发给 MCP 服务端的仍是原始工具名。</p>
@@ -121,6 +224,19 @@ MCP 服务端收到：read-file</code></pre>
     <tr><td>调用阶段取消</td><td>取消信号沿工具注册表传给 MCP 传输层</td></tr>
   </tbody></table>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0012-3" data-concept="MCP">
+  <h3>MCP：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>外部工具如何发现、命名，并进入执行边界？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">mcp-client 把工具以 mcp__server__name 注册到 ctx.tools，支持 stdio/streamable-http；列表变化重新同步，注册冲突回滚该服务器世代。 <a href="../deepseek-harness/packages/mcp/mcp-client/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangChain MCP adapters 把 MCP 工具转为 LangChain 工具，再传给 DeepAgents；会话和传输由适配器管理。 <a href="https://docs.langchain.com/oss/python/langchain/mcp">依据</a></td>
+    <td data-framework="openhands">MCP 发现结果转换为工具定义，调用仍通过 Action/Observation 进入 Agent；并非绕过现有工具系统。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>协议兼容不意味着热更新事务相同；DeepSeek 的世代回滚不能直接推定另两者也采用。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>Web：搜索与抓取是两种能力</h2>
   <p><code>WebRuntime</code> 分别管理搜索提供方和抓取提供方。搜索负责从查询词得到来源集合；抓取负责读取一个确定网址的正文和状态码。两者可以由不同提供方实现。</p>
   <pre><code>search("DeepSeek harness", 5)
@@ -142,6 +258,29 @@ fetch("https://example/doc")
   </tbody></table>
   <p><strong>解决的问题：</strong>避免插件注册顺序悄悄改变联网行为，也防止提供方忽略调用方结果上限后把过量数据送进模型上下文。</p>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0012-4" data-concept="网页搜索">
+  <h3>网页搜索：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>搜索查询由谁路由到供应商？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">web-search-exa 等实现注册到 web 服务，搜索提供方与工具入口分离，可替换供应商。 <a href="../deepseek-harness/packages/web/web-search-exa/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">可把搜索函数或集成工具传给 tools；框架负责工具调用，搜索供应商由应用选择，不是固定绑定 DeepSeek 搜索。 <a href="https://docs.langchain.com/oss/python/langchain/tools">依据</a></td>
+    <td data-framework="openhands">通过自定义 ToolDefinition 或 MCP 搜索工具接入；输入输出遵循工具契约，不能把网页浏览器当成搜索索引。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>搜索返回候选资料；它与按 URL 读取正文的抓取能力应分别定义。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0012-5" data-concept="网页抓取">
+  <h3>网页抓取：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>从 URL 到正文在哪一层处理？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">web-fetch-http 是 web 能力的 HTTP 抓取实现，和搜索提供方分开装配。 <a href="../deepseek-harness/packages/web/web-fetch-http/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">抓取可以作为自定义工具接入；内容抽取、访问限制和返回长度由该工具实现，不由 tools 参数自动赋予。 <a href="https://docs.langchain.com/oss/python/langchain/tools">依据</a></td>
+    <td data-framework="openhands">可用工具执行器或 MCP 提供抓取，返回 Observation；工具框架的类型校验不等于已经完成 SSRF 防护。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>对比抓取必须继续下钻到实现；仅列“支持工具”不能证明网络访问安全或正文质量。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>LSP：按文件扩展名路由语义查询</h2>
   <p><code>LspRuntime</code> 只暴露跳转定义、查找引用、跳转实现和悬停说明四类语义操作。调用方不直接发送任意 JSON-RPC，因此语言服务的进程协议不会泄露进 Agent 工具契约。</p>
   <pre><code>query(filePath="src/app.d.TS", operation="hover")
@@ -157,6 +296,19 @@ fetch("https://example/doc")
     <tr><td>释放提供方</td><td>一次撤销该提供方占用的全部扩展路由</td></tr>
   </tbody></table>
   <p><strong>解决的问题：</strong>把多语言服务收敛成稳定的语义接口，防止扩展名冲突、半注册状态和底层协议细节扩散。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0012-6" data-concept="LSP">
+  <h3>LSP：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>语义导航是专用服务，还是普通工具扩展？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ctx.lsp 是独立语义导航 seam，lsp-stdio 等提供方连接语言服务器，tool-lsp 再面向模型暴露。 <a href="../deepseek-harness/docs/capability-seams.zh.md">依据</a></td>
+    <td data-framework="deepagents">本次文档未建立与 ctx.lsp 一一对应的专用注册表；可通过自定义工具接入语言服务器，这是扩展路径，不是已验证内置功能。 <a href="https://docs.langchain.com/oss/python/langchain/tools">依据</a></td>
+    <td data-framework="openhands">可用 ToolExecutor/MCP 封装语言服务器；本次工具系统依据不证明存在与实验室相同的文件扩展名路由器。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>DeepSeek 有专用 LSP 分层；另两者这里能确认的是扩展接缝，不应凭框架名补出未核实的内置 LSP。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>Attachment：上传、内容寻址与恢复</h2>
   <p><code>LocalAttachmentStore</code> 接收图片字节，但不会相信文件名、扩展名或调用方声明的媒体类型。保存前必须完整解码，并同时检查字节数、像素数和真实格式。</p>
@@ -178,6 +330,19 @@ fetch("https://example/doc")
   → 全部一致才返回图片字节</code></pre>
   <p>Session Event 只持久化 <code>attachmentId</code>、真实媒体类型、字节数和尺寸。路径或临时授权网址不进入协议；会话分叉继承历史引用，不复制不可变附件对象。</p>
   <p><strong>解决的问题：</strong>防止伪造扩展名、解压炸弹、路径穿越和磁盘内容被替换，同时让附件可以跨进程恢复并按内容去重。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0012-7" data-concept="附件">
+  <h3>附件：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>图片字节、会话引用和模型输入如何分离？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">attachment-local 用 sha256 标识寻址，对象位于 DSH_HOME/attachments/v1/objects 下；持久引用与事件日志分离。 <a href="../deepseek-harness/packages/attachment/attachment-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangChain 消息支持图片等内容块；DeepAgents backend 可读文件。消息兼容不代表自动获得 DeepSeek 式内容寻址附件库。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">Workspace 提供上传下载，消息/事件可以承载图像内容；工作区文件接口与会话专属附件寻址不是同一承诺。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>应分别验证字节是否持久、引用是否可恢复、模型适配器是否能解析；三者不能只比较“支持图片”。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>一次综合调用怎样穿过五类能力</h2>
   <pre><code>用户：“阅读附件里的报错，结合项目规则和源码找到定义，再搜索官方资料。”

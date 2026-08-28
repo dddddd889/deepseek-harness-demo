@@ -1,0 +1,9 @@
+---
+title: 观测与加固 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"Sink 导出异常"| result0["隔离、不阻塞会话"]
+  decision -->|"价格未知"| result1["进入未定价列表"]
+  decision -->|"候选插件启动失败"| result2["保留旧插件包"]
+  decision -->|"必需平台能力缺失"| result3["明确拒绝"]

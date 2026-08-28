@@ -1,0 +1,9 @@
+---
+title: 上下文治理 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"区间拆开工具因果"| result0["拒绝压缩"]
+  decision -->|"摘要生成失败"| result1["闭合审计、不替换"]
+  decision -->|"摘要不够小"| result2["拒绝替换"]
+  decision -->|"有效短摘要"| result3["提交可重放替换事件"]

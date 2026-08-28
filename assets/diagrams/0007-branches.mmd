@@ -1,0 +1,9 @@
+---
+title: 工具执行 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"JSON 或模式错误"| result0["不进入工具主体"]
+  decision -->|"权限拒绝"| result1["关联调用标识的失败结果"]
+  decision -->|"工具抛出异常"| result2["规范化错误结果"]
+  decision -->|"取消执行"| result3["协作收尾后闭合事件"]

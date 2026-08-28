@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 7 课：工具管线与多 Step Agent</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 7 课：工具管线与多 Step Agent</h1>
   <p class="lead">模型只产生原始 tool-call；Registry 才拥有 schema 和函数。工具结果落账后，Agent 使用同一 Session 投影发起下一 step。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">ToolRuntime 管理 schema/执行器，依次处理 pre-execute、单调 guard、execute、post-execute、finalizeContent、result。</td><td data-framework="deepagents">通过 tools 参数和中间件接入工具；interrupt_on 可将敏感调用交给人工决策。</td><td data-framework="openhands">ToolDefinition、Action、Observation 与 ToolExecutor 形成类型化输入输出，Agent 再包装为事件。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">guard 的拒绝不能被后续监听器改为允许；工具呈现模式与权限仍分离。</td><td data-framework="deepagents">拦截与审批需要显式配置，不能只因工具进入列表就认为已受业务策略保护。</td><td data-framework="openhands">工具系统本身不持有 Conversation 状态，也不负责把结果变成会话事件。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/core/tools/README.zh.md">原仓库依据 1</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/customization">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/deepagents/human-in-the-loop">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/tool-system">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>DeepSeek 强调统一策略流水线；DeepAgents 强调中间件组合；OpenHands 强调 Action→Observation 合约。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>模型提出行动之后、真实能力执行之前的统一调用边界。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 7 课</figcaption><a href="../assets/diagrams/0007-position.svg"><img src="../assets/diagrams/0007-position.svg" alt="工具流水线在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0007-position.svg">打开大图</a> · <a href="../assets/diagrams/0007-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>循环给出的工具名、参数、调用身份和取消信号。</td></tr>
+    <tr><th>下游与输出</th><td>经校验和策略处理的结果，回到会话与下一次模型请求。</td></tr>
+    <tr><th>不归本章负责</th><td>工具描述不是权限许可；本地文件和远程 MCP 都必须遵守各自执行边界。</td></tr>
+    <tr><th>放进具体场景</th><td>模型要求写文件，先验证参数、审批、执行，再规范化结果；不能把参数解析成功当作已执行。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 工具执行</figcaption>
+    <a href="../assets/diagrams/0007-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0007-modules.svg" alt="工具执行的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0007-modules.svg">打开大图</a> · <a href="../assets/diagrams/0007-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 工具执行</figcaption>
+    <a href="../assets/diagrams/0007-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0007-sequence.svg" alt="工具执行的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0007-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0007-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 工具执行</figcaption>
+    <a href="../assets/diagrams/0007-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0007-branches.svg" alt="工具执行的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0007-branches.svg">打开大图</a> · <a href="../assets/diagrams/0007-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,15 +57,16 @@
     <tr><th>解决的问题</th><td>阻止坏参数和未知工具进入业务函数，统一异常结果，并安全地支持并行工具与连续模型步骤。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>具体覆盖</th><th>失败语义</th></tr></thead><tbody>
-    <tr><td>工具注册</td><td>保存模型可见模式与执行函数，列出稳定工具定义。</td><td>未知工具返回关联调用标识的工具结果。</td></tr>
-    <tr><td>参数准备</td><td>解析原始 JSON，并校验类型、必填字段、枚举、数组、对象和额外字段。</td><td>执行函数在校验通过前绝不运行。</td></tr>
-    <tr><td>结果规范化</td><td>成功值、业务失败和抛出异常统一转成结构化工具结果消息。</td><td>错误码、名称和消息可重放。</td></tr>
-    <tr><td>并行调度</td><td>相邻安全调用可重叠执行，独占工具在前后并行组之间形成屏障。</td><td>提交顺序始终遵循模型调用顺序。</td></tr>
-    <tr><td>权限接缝</td><td>执行前读取工具效果，交给权限服务决定是否允许或升级。</td><td>工具主体不自行绕过审批。</td></tr>
-    <tr><td>多步骤回路</td><td>结果落账后重新投影消息并调用下一模型步骤。</td><td>最大步骤数阻止无限工具循环。</td></tr>
-    <tr><td>取消收尾</td><td>取消信号传入工具并等待协作式结束。</td><td>写入取消结果后再闭合步骤与轮次。</td></tr>
+    <tr><td><a href="#concept-0007-1">工具注册</a></td><td>保存模型可见模式与执行函数，列出稳定工具定义。</td><td>未知工具返回关联调用标识的工具结果。</td></tr>
+    <tr><td><a href="#concept-0007-2">参数准备</a></td><td>解析原始 JSON，并校验类型、必填字段、枚举、数组、对象和额外字段。</td><td>执行函数在校验通过前绝不运行。</td></tr>
+    <tr><td><a href="#concept-0007-3">结果规范化</a></td><td>成功值、业务失败和抛出异常统一转成结构化工具结果消息。</td><td>错误码、名称和消息可重放。</td></tr>
+    <tr><td><a href="#concept-0007-4">并行调度</a></td><td>相邻安全调用可重叠执行，独占工具在前后并行组之间形成屏障。</td><td>提交顺序始终遵循模型调用顺序。</td></tr>
+    <tr><td><a href="#concept-0007-5">权限接缝</a></td><td>执行前读取工具效果，交给权限服务决定是否允许或升级。</td><td>工具主体不自行绕过审批。</td></tr>
+    <tr><td><a href="#concept-0007-6">多步骤回路</a></td><td>结果落账后重新投影消息并调用下一模型步骤。</td><td>最大步骤数阻止无限工具循环。</td></tr>
+    <tr><td><a href="#concept-0007-7">取消收尾</a></td><td>取消信号传入工具并等待协作式结束。</td><td>写入取消结果后再闭合步骤与轮次。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：工具执行管线</h2>
@@ -50,6 +94,37 @@ Registry.prepare ─► Schema 校验 ─► Permission
     <tr><th>方案对比</th><td>让每个工具自行校验自由度高却重复且不一致；统一管线集中策略，代价是要维护一套公共模式能力。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>工具调用批次
+├─ 全部安全并行 → 同时执行，按模型顺序提交
+├─ safe, exclusive, safe → 两侧并行组被屏障隔开
+├─ JSON/Schema 错 → body 不执行，返回校验结果
+├─ 工具抛错 → 规范化 ToolError
+├─ 权限拒绝 → 规范化权限结果
+└─ cancel → 等待协作结束，写取消结果</code></pre>
+  <table><thead><tr><th>场景</th><th>调度</th><th>结果语义</th></tr></thead><tbody>
+    <tr><td>单个只读工具</td><td>直接执行。</td><td>成功值投影为工具消息。</td></tr>
+    <tr><td>多个独立查询</td><td>并行重叠执行。</td><td>提交顺序仍等于模型调用顺序。</td></tr>
+    <tr><td>写工具夹在中间</td><td>形成前后屏障。</td><td>避免读写次序被并发打乱。</td></tr>
+    <tr><td>坏参数</td><td>准备阶段停止。</td><td>错误携带参数路径，工具 body 零调用。</td></tr>
+    <tr><td>未知执行结果</td><td>进程崩溃后不在本层自动重试。</td><td>由恢复层记录 TOOL_OUTCOME_UNKNOWN。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>吞吐</th><th>顺序保证</th><th>复杂度</th></tr></thead><tbody>
+    <tr><td>全部串行</td><td>低。</td><td>最强。</td><td>最低，适合工具很少。</td></tr>
+    <tr><td>全部 Promise.all</td><td>高。</td><td>弱，副作用易乱序。</td><td>表面低、故障成本高。</td></tr>
+    <tr><td>安全并行+独占屏障</td><td>中高。</td><td>显式可控。</td><td>需工具声明并行安全性。</td></tr>
+    <tr><td>事务调度器</td><td>取决于冲突检测。</td><td>可提供更强原子性。</td><td>要求工具支持事务或补偿。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>并行安全性为什么由工具声明？</dt><dd>调度器看不到函数内部副作用，只能由工具作者提供最小事实；默认值应保守为不可并行。</dd>
+    <dt>为什么结果按模型顺序提交而不是完成顺序？</dt><dd>模型下一步按调用顺序关联 callId；完成顺序会让重放随机器时序漂移。</dd>
+    <dt>工具异常应该让 Agent 崩溃吗？</dt><dd>通常不应。工具失败是模型可以观察并修正的业务结果；只有框架不变量损坏才应升级为基础设施错误。</dd>
+  </dl>
+
   <h2>完整工具回路</h2>
   <pre><code>step 1 / assistant message
           │ tool-call(name, raw JSON, callId)
@@ -74,12 +149,88 @@ append tool/call ──&gt; execute ──&gt; normalize ──&gt; append tool/
     <tr><td>无限工具循环</td><td>MAX_STEPS</td><td>否</td></tr>
   </tbody></table>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0007-1" data-concept="工具注册">
+  <h3>工具注册：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>工具名称、schema 与实现由谁绑定？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ToolRuntime 注册定义并返回随 fiber 清理的 disposer；同层重名拒绝，agent scope 可遮蔽全局工具。 <a href="../deepseek-harness/packages/core/tools/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">@tool 以函数名或显式名称生成工具，类型提示/docstring 提供 schema 与描述，再传入 agent。 <a href="https://docs.langchain.com/oss/python/langchain/tools">依据</a></td>
+    <td data-framework="openhands">ToolRegistry 按 Tool 规格解析 ToolDefinition，定义绑定 Action/Observation 与执行器。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>注册表的动态作用域、构造时工具列表和规格解析是不同目录维护方式。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0007-2" data-concept="参数准备">
+  <h3>参数准备：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>坏 JSON 或不合法参数在哪里停下？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">execute 对参数快照冻结；无效参数走规范结果路径，不进入策略或工具主体。 <a href="../deepseek-harness/packages/core/tools/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">工具 args_schema 可由类型提示、Pydantic 或 JSON schema 定义，输入约束归工具契约。 <a href="https://docs.langchain.com/oss/python/langchain/tools">依据</a></td>
+    <td data-framework="openhands">JSON 参数先验证为 Action 模型，再交 ToolExecutor；执行器不应自己猜参数含义。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>语法解析、类型验证和权限检查是不同失败点，应留下可区分的结果。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0007-3" data-concept="结果规范化">
+  <h3>结果规范化：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>业务返回值如何变成模型可见内容？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">post-execute 后经定义的 finalizeContent，再发布 tools/result；最终观察者不能重新执行工具。 <a href="../deepseek-harness/packages/core/tools/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">工具可返回普通值或 ToolMessage；调用身份把返回内容关联到模型发起的 tool call。 <a href="https://docs.langchain.com/oss/python/langchain/tools">依据</a></td>
+    <td data-framework="openhands">Observation.to_llm_content 决定模型内容，Agent 再包装为 ObservationEvent。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>业务结果、模型内容、持久事件需要分层，不能让 UI 展示格式反向定义执行结果。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0007-5" data-concept="权限接缝">
+  <h3>权限接缝：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>谁能阻止工具真正执行？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">pre-execute 后执行单调 guard，拒绝不能被后续监听器放宽；没有审批服务时 ask 退化为拒绝。 <a href="../deepseek-harness/packages/core/tools/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">interrupt_on 在指定工具调用前暂停，配置允许的 approve/edit/reject 等决定。 <a href="https://docs.langchain.com/oss/python/deepagents/human-in-the-loop">依据</a></td>
+    <td data-framework="openhands">SecurityAnalyzer 给出风险，ConfirmationPolicy 决定是否进入待确认状态。 <a href="https://docs.openhands.dev/sdk/arch/security">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>权限不是工具描述的一部分，也不能靠“模型知道规则”代替执行前门禁。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0007-6" data-concept="多步骤回路">
+  <h3>多步骤回路：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>工具结果如何影响下一次模型选择？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">工具调用/结果进入 Session，下一步从派生消息构造模型请求。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">ToolMessage 把结果关联回 AIMessage 的调用，图可继续模型推理。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">ObservationEvent 进入历史，后续 step 将可转换事件组成模型消息。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>三者都回馈结果，但必须维持各自调用关联与消息协议，不能只追加一段 stdout。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>并发调度</h2>
   <pre><code>parallel A ─┐
 parallel B ─┴─ 同时执行 ── 按 A、B 顺序提交结果
 exclusive C ─ 单独执行，形成屏障
 parallel D ─ 下一并发组</code></pre>
   <div class="callout"><strong>执行顺序不等于提交顺序。</strong>安全工具的 body 可以重叠，但 Session seq、tool/result 和下一模型上下文必须保持模型原始 call 顺序。</div>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0007-4" data-concept="并行调度">
+  <h3>并行调度：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>多个工具何时可以同时执行？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">isConcurrencySafe 明确为 true 才进入有界滚动池，独占调用构成屏障；持久结果保持模型顺序。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">底层 LangGraph ToolNode 管理一批工具调用的并行执行、错误处理与运行时注入；这是工具节点调度，不等于 DeepSeek 按 isConcurrencySafe 分类的独占屏障协议。 <a href="https://reference.langchain.com/python/langgraph.prebuilt/tool_node/ToolNode">依据</a></td>
+    <td data-framework="openhands">Agent.tool_concurrency_limit 控制并行，默认 1；文档明确标为实验性，共享状态工具要自行保证安全。 <a href="https://docs.openhands.dev/sdk/guides/parallel-tool-execution">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>设置并发上限与判断某个调用是否可并发是两项机制，不应直接比较线程数。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0007-7" data-concept="取消收尾">
+  <h3>取消收尾：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>一组工具取消时，哪些结果仍需保留？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">取消阻止新分派并等待已启动调用结算；未分派调用与已执行失败有不同错误，保留已经完成的结果上下文。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">PatchToolCallsMiddleware 可在运行中断、工具未返回时修复消息历史；修复配对不证明外部进程已停止。 <a href="https://docs.langchain.com/oss/python/deepagents/human-in-the-loop">依据</a></td>
+    <td data-framework="openhands">暂停与重新 run 是会话控制接口；不能由此推出批量取消与 DeepSeek 相同的结果顺序和未启动错误码。 <a href="https://docs.openhands.dev/sdk/guides/convo-pause-and-resume">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>结果配对修复与副作用停稳要分别验收，不能靠补一条错误消息证明取消安全。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与断点</h2>
   <pre><code>cd harness-lab

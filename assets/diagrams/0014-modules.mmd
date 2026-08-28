@@ -1,0 +1,13 @@
+---
+title: 无界面宿主 · 模块关系
+---
+flowchart TD
+  n0["CLI 或服务端"]
+  n1["HeadlessHost"]
+  n2["Profile"]
+  n3["HarnessBundle"]
+  n4["存储与模型运行时"]
+  n0 -->|"调用会话用例"| n1
+  n1 -->|"读取严格配置"| n2
+  n1 -->|"装配基础服务"| n3
+  n1 -->|"创建恢复与模型执行"| n4

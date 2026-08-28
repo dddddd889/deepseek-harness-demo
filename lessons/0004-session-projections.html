@@ -7,8 +7,51 @@
   <link rel="stylesheet" href="../assets/course.css">
 </head>
 <body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 4 课：Session 事件账本与投影</h1>
   <p class="lead">Session Event Log 是事实源；消息历史、Token 汇总和运行状态都是可以删除并从日志重建的投影。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">Session 是仅追加日志；LLM 历史由 surface 派生，sessionProjections 在已提交事件上驱动注册投影。</td><td data-framework="deepagents">LangGraph 保存线程级图状态；DeepAgents 流接口把运行内容投影为 messages、values、tool_calls 和 subagents。</td><td data-framework="openhands">ConversationState 管理会话状态，EventLog 保存追加事件；Conversation 组织更新和回调。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">SessionStore 本身是内存服务，持久化由独立后端完成。</td><td data-framework="deepagents">读取流投影与保存线程状态是两件事；持久状态需要 checkpointer。</td><td data-framework="openhands">既有纯状态更新，也有事件更新，不能假设所有状态都仅由 EventLog 折叠。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/core/session/README.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/session/session-projection/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/event-streaming">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/langgraph/persistence">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/conversation">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>恢复设计取决于权威状态在哪里：日志派生、图检查点、状态加事件，不能只看三者都有“历史消息”。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>位于智能体运行与存储、界面之间的状态中心。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 4 课</figcaption><a href="../assets/diagrams/0004-position.svg"><img src="../assets/diagrams/0004-position.svg" alt="会话与投影在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0004-position.svg">打开大图</a> · <a href="../assets/diagrams/0004-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>第 6 课循环产生的消息、步骤与工具事实。</td></tr>
+    <tr><th>下游与输出</th><td>给模型的历史、给界面的视图以及给第 10 课存储的持久记录。</td></tr>
+    <tr><th>不归本章负责</th><td>内存会话不自动等于落盘；界面投影不应成为恢复事实源。</td></tr>
+    <tr><th>放进具体场景</th><td>刷新页面后，消息卡片可从会话事实重建，而不必依赖浏览器之前保留的组件状态。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 账本与投影</figcaption>
+    <a href="../assets/diagrams/0004-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0004-modules.svg" alt="账本与投影的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0004-modules.svg">打开大图</a> · <a href="../assets/diagrams/0004-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 账本与投影</figcaption>
+    <a href="../assets/diagrams/0004-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0004-sequence.svg" alt="账本与投影的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0004-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0004-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 账本与投影</figcaption>
+    <a href="../assets/diagrams/0004-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0004-branches.svg" alt="账本与投影的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0004-branches.svg">打开大图</a> · <a href="../assets/diagrams/0004-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -18,14 +61,15 @@
     <tr><th>解决的问题</th><td>建立唯一事实源，使界面刷新、进程恢复和状态重建不会依赖易丢失的内存对象。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>输入与输出</th><th>边界</th></tr></thead><tbody>
-    <tr><td>事件追加</td><td>为每个会话事件分配连续序号和时间，并通知追加监听器。</td><td>恢复时拒绝序号缺口。</td></tr>
-    <tr><td>模型可见面</td><td>按追加和区间替换操作生成当前送给模型的有效事件面。</td><td>压缩不删除事实日志。</td></tr>
-    <tr><td>消息投影</td><td>从有效事件面重建模型消息历史，忽略纯流式数据块和空助手消息。</td><td>保留事件中已有消息身份。</td></tr>
-    <tr><td>用量投影</td><td>分别累计输入、输出、缓存读取和缓存写入词元。</td><td>同一步骤最终用量覆盖流式样本。</td></tr>
-    <tr><td>生命周期投影</td><td>检查轮次、步骤和工具调用的开始/结束配对，给出当前状态。</td><td>损坏时报告具体事件序号。</td></tr>
-    <tr><td>序列化重放</td><td>事件经过 JSON 往返后，全部投影得到相同结果。</td><td>投影不依赖进程内对象身份。</td></tr>
+    <tr><td><a href="#concept-0004-1">事件追加</a></td><td>为每个会话事件分配连续序号和时间，并通知追加监听器。</td><td>恢复时拒绝序号缺口。</td></tr>
+    <tr><td><a href="#concept-0004-2">模型可见面</a></td><td>按追加和区间替换操作生成当前送给模型的有效事件面。</td><td>压缩不删除事实日志。</td></tr>
+    <tr><td><a href="#concept-0004-3">消息投影</a></td><td>从有效事件面重建模型消息历史，忽略纯流式数据块和空助手消息。</td><td>保留事件中已有消息身份。</td></tr>
+    <tr><td><a href="#concept-0004-4">用量投影</a></td><td>分别累计输入、输出、缓存读取和缓存写入词元。</td><td>同一步骤最终用量覆盖流式样本。</td></tr>
+    <tr><td><a href="#concept-0004-5">生命周期投影</a></td><td>检查轮次、步骤和工具调用的开始/结束配对，给出当前状态。</td><td>损坏时报告具体事件序号。</td></tr>
+    <tr><td><a href="#concept-0004-6">序列化重放</a></td><td>事件经过 JSON 往返后，全部投影得到相同结果。</td><td>投影不依赖进程内对象身份。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：事件溯源与投影</h2>
@@ -49,6 +93,35 @@
     <tr><th>方案对比</th><td>状态快照读取快却缺少过程；事件日志信息完整但重放成本高；生产系统常以事件为真源、快照作加速缓存。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>事件重放
+├─ 连续且闭合 → 得到完整消息/用量/生命周期
+├─ 重复事件 → 在网络客户端按 seq 去重
+├─ seq 缺口 → 拒绝继续，重新取权威前缀
+├─ open turn/step → 生命周期显示运行中或交给恢复修复
+└─ surface replace → 只改变模型视图，原事件仍可审计</code></pre>
+  <table><thead><tr><th>场景</th><th>投影结果</th><th>关键原因</th></tr></thead><tbody>
+    <tr><td>正常一轮</td><td>消息、最终用量和闭合生命周期一致。</td><td>所有投影读取同一事件序列。</td></tr>
+    <tr><td>流式用量</td><td>中间样本可展示，最终样本覆盖同一步骤。</td><td>避免一个请求被重复计费。</td></tr>
+    <tr><td>空助手消息</td><td>用量进入统计，消息不进入模型历史。</td><td>传输可能只有 usage 而没有内容。</td></tr>
+    <tr><td>压缩替换</td><td>模型看到摘要，审计仍看到原始消息。</td><td>事实面和模型可见面职责不同。</td></tr>
+    <tr><td>损坏日志</td><td>生命周期投影指出具体序号并失败。</td><td>不猜测缺失事件的含义。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>读取</th><th>审计/恢复</th><th>适用条件</th></tr></thead><tbody>
+    <tr><td>只存当前状态</td><td>最快。</td><td>无法解释过程和重建旧视图。</td><td>无历史要求的简单 CRUD。</td></tr>
+    <tr><td>事件日志实时重放</td><td>历史越长越慢。</td><td>最完整、最确定。</td><td>本实验和中等长度会话。</td></tr>
+    <tr><td>事件日志+快照缓存</td><td>从快照后增量重放。</td><td>快照可删，事件仍是真源。</td><td>大规模生产会话。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么投影不能偷偷修复坏日志？</dt><dd>每个投影若各自猜测，会得到互相矛盾的状态；修复必须在统一恢复边界产生显式事件。</dd>
+    <dt>为什么 Surface 不是另一个可变消息数组？</dt><dd>可变数组无法说明哪些历史被何次压缩替换；事件化 replace 才能重放压缩链。</dd>
+    <dt>投影计算太慢怎么办？</dt><dd>增加带事件序号的缓存或快照，但缓存必须可删除并从权威日志重建，不能反客为主。</dd>
+  </dl>
+
   <h2>读写边界</h2>
   <pre><code>LLM stream ── usage chunk ─┐
 final assistant/message ──┼──&gt; append-only Session Event Log
@@ -69,6 +142,69 @@ tool call/result ─────────┘                 │
   </table>
 
   <div class="callout"><strong>投影不是备份。</strong>投影缓存丢失不会丢会话；事件日志丢失才会。恢复时先加载日志、验证 seq 连续，再重放投影。</div>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0004-1" data-concept="事件追加">
+  <h3>事件追加：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>追加是否先提交，再通知观察者？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">append 快照/校验/冻结后同步提交，再隔离观察者失败；已挂接会话拒绝重入追加。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">图节点通过状态更新推进，checkpoint 保存更新后的状态与 writes；不能直接视为 Session.append。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">Conversation 管理原子有序更新，成功提交后触发 callbacks；追加日志用于消息和行动事件。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>通知顺序影响观察一致性，但三者的提交单位分别是事件、图步骤、会话更新。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0004-2" data-concept="模型可见面">
+  <h3>模型可见面：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>原始历史是否全部直接送给模型？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">surface 只保留模型消息相关表层，替换后 replaceGeneration 改变；原始日志仍保留。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">中间件整理消息、摘要和外置引用后构造模型上下文；不直接套用 surface 节点模型。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">View 从事件生成可用历史，并根据 Condensation 忽略被摘要替代的事件。 <a href="https://docs.openhands.dev/sdk/arch/condenser">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>三者都有“所存≠所见”，但可见视图的更新协议不同。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0004-3" data-concept="消息投影">
+  <h3>消息投影：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>聊天列表与模型消息如何重建？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">deriveMessages 增量处理 surface；表层重写会重建投影，不回退到原始日志直接拼消息。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">stream.messages 展示消息投影，stream.values 展示状态；两者是不同消费视角。 <a href="https://docs.langchain.com/oss/python/deepagents/event-streaming">依据</a></td>
+    <td data-framework="openhands">LLMConvertibleEvent 有消息转换接口；UI 可消费其他内部事件，但它们不一定有 LLM 消息表示。 <a href="https://docs.openhands.dev/sdk/arch/events">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>聊天卡片、运行状态和模型输入应分别投影，不能让一种消息数组包办所有用途。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0004-4" data-concept="用量投影">
+  <h3>用量投影：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>累计消耗和当前窗口占用是否同一个数？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">tokenMeter 同时管理压力与表层估算，contextBreakdown 是启发式组成，不等于 provider 计费规模。 <a href="../deepseek-harness/packages/llm/token-meter/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">AIMessage usage_metadata 来自模型回报；压缩消息历史并不会撤销已经发生的 token 消耗。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">ConversationStats 可按 usage_id 汇总累计 token/cost；它不同于 Condenser 的历史视图大小。 <a href="https://docs.openhands.dev/sdk/guides/metrics">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>压缩应让窗口压力下降，但不应让已付出的历史使用量倒退。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0004-5" data-concept="生命周期投影">
+  <h3>生命周期投影：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>running、idle 等状态从哪里得到？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">turn/step 事实与 agent 控制事件区分；重放检查轮次、步骤和工具配对闭合。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">图快照包含 next/tasks 等执行信息；子任务流还暴露 started/completed/failed/interrupted。 <a href="https://docs.langchain.com/oss/python/deepagents/event-streaming">依据</a></td>
+    <td data-framework="openhands">execution_status 属于 ConversationState，状态更新不必产生同一类消息事件。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>不能把“最后一条聊天消息”当运行状态；状态可能有独立的权威渠道。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0004-6" data-concept="序列化重放">
+  <h3>序列化重放：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>重放历史是否会再次执行工具？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Session 载入事实后 deriveMessages 是投影计算，不因读取旧 tool/result 再执行工具。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangGraph replay 从检查点继续时会重新执行之后的节点；这与纯状态读取不同。 <a href="https://docs.langchain.com/oss/python/langgraph/use-time-travel">依据</a></td>
+    <td data-framework="openhands">Event JSON 可读取并转换消息，不需要运行 Agent；Conversation.run 才是另一个执行入口。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>replay 一词尤其容易误导：纯重放投影和重新执行后续计算必须分开。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与断点</h2>
   <pre><code>cd harness-lab

@@ -1,0 +1,15 @@
+---
+title: 本地能力 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 调用方
+  participant p1 as 本地运行时
+  participant p2 as 操作系统
+  participant p3 as 输出存储
+  p0->>p1: 提交路径或进程参数
+  p1->>p1: 检查边界与环境
+  p1->>p2: 访问文件或启动进程
+  p2-->>p1: 返回字节与状态
+  p1->>p3: 大输出写入溢出文件
+  p1-->>p0: 返回结果与溢出引用

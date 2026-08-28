@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 14 课：Profile、Bundle、CLI 与 Headless Host</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 14 课：Profile、Bundle、CLI 与 Headless Host</h1>
   <p class="lead">同一套 Runtime 不应为 CLI、测试和未来 Web Server 各装配一次。本课建立稳定 composition root：Profile 决定部署数据，Bundle 决定插件图，Host 提供用例 API，CLI 只翻译进程协议。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">headless 的 cordis.patch.yml 叠加 base，runner 建立持久 Agent，flush 后输出结果并退出。</td><td data-framework="deepagents">HarnessProfile 调整提示词、工具可见性和中间件；ProviderProfile 处理模型构造参数。</td><td data-framework="openhands">Agent/LLM/Conversation 可程序化构建，LLM 配置支持环境或 JSON；需要远程访问时再引入 Agent Server。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">原版 headless 不挂载 Host/HTTP/Web；不要把实验室 HeadlessHost 类名套回原实现。</td><td data-framework="deepagents">这类 Profile 是模型相关配置叠加，不等同于完整进程的插件装配清单。</td><td data-framework="openhands">脚本运行入口与服务进程分别配置和部署。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/bundle/headless/README.zh.md">原仓库依据 1</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/profiles">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/sdk">官方文档 1</a> · <a href="https://docs.openhands.dev/sdk/arch/llm">官方文档 2</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>应对比“配置了什么对象”，而不是按 Profile、Host、Bundle 等名字建立一一对应关系。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>运行前的装配入口，决定模型、工具、策略和宿主组合。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 14 课</figcaption><a href="../assets/diagrams/0014-position.svg"><img src="../assets/diagrams/0014-position.svg" alt="配置、组合与无界面入口在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0014-position.svg">打开大图</a> · <a href="../assets/diagrams/0014-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>命令行任务、Profile、Bundle 与环境配置。</td></tr>
+    <tr><th>下游与输出</th><td>可运行的服务图和任务入口，交给循环或远程宿主。</td></tr>
+    <tr><th>不归本章负责</th><td>无界面运行不等于启动 HTTP 服务；名字都叫 Profile 也不一定配置同一层。</td></tr>
+    <tr><th>放进具体场景</th><td>同一套核心能力可由命令行跑一次任务，也可被长期服务托管，但端口、资源释放和退出码各有所有者。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 无界面宿主</figcaption>
+    <a href="../assets/diagrams/0014-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0014-modules.svg" alt="无界面宿主的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0014-modules.svg">打开大图</a> · <a href="../assets/diagrams/0014-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 无界面宿主</figcaption>
+    <a href="../assets/diagrams/0014-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0014-sequence.svg" alt="无界面宿主的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0014-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0014-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 无界面宿主</figcaption>
+    <a href="../assets/diagrams/0014-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0014-branches.svg" alt="无界面宿主的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0014-branches.svg">打开大图</a> · <a href="../assets/diagrams/0014-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,15 +57,16 @@
     <tr><th>解决的问题</th><td>避免 CLI、测试和服务端各自复制一套初始化逻辑，确保不同产品入口共享相同运行和恢复语义。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力域</th><th>完整能力</th><th>边界</th></tr></thead><tbody>
-    <tr><td>配置合并</td><td>默认值、配置文件、环境变量和命令行覆盖按固定优先级合并。</td><td>未知字段、无效枚举和缺少必填配置立即失败。</td></tr>
-    <tr><td>配置模型</td><td>模型提供方、模型、持久化根目录、工作目录、密钥环境名、基础地址、系统提示和沙箱策略。</td><td>脚本模型必须提供脚本响应。</td></tr>
-    <tr><td>插件包</td><td>按顺序应用插件组成运行时，持有统一释放边界。</td><td>某插件失败时逆序回滚此前插件。</td></tr>
-    <tr><td>宿主装配</td><td>创建存储、模型运行时、插件上下文和交互中介器，并选择真实或覆盖提供方。</td><td>所有产品面复用同一装配根。</td></tr>
-    <tr><td>会话用例</td><td>创建新会话、恢复旧会话、发送消息、运行轮次、取消和关闭刷盘。</td><td>对外暴露用例对象，不泄露内部智能体。</td></tr>
-    <tr><td>命令行</td><td>支持单次任务、交互输入、JSONL 输出、创建或恢复会话、配置覆盖和中断信号。</td><td>参数错误与运行错误映射为明确退出码。</td></tr>
-    <tr><td>独立进程恢复</td><td>一个 CLI 进程创建会话，另一个进程从磁盘恢复并继续连续轮次。</td><td>证明恢复不依赖同进程内存。</td></tr>
+    <tr><td><a href="#concept-0014-1">配置合并</a></td><td>默认值、配置文件、环境变量和命令行覆盖按固定优先级合并。</td><td>未知字段、无效枚举和缺少必填配置立即失败。</td></tr>
+    <tr><td><a href="#concept-0014-2">配置模型</a></td><td>模型提供方、模型、持久化根目录、工作目录、密钥环境名、基础地址、系统提示和沙箱策略。</td><td>脚本模型必须提供脚本响应。</td></tr>
+    <tr><td><a href="#concept-0014-3">插件包</a></td><td>按顺序应用插件组成运行时，持有统一释放边界。</td><td>某插件失败时逆序回滚此前插件。</td></tr>
+    <tr><td><a href="#concept-0014-4">宿主装配</a></td><td>创建存储、模型运行时、插件上下文和交互中介器，并选择真实或覆盖提供方。</td><td>所有产品面复用同一装配根。</td></tr>
+    <tr><td><a href="#concept-0014-5">会话用例</a></td><td>创建新会话、恢复旧会话、发送消息、运行轮次、取消和关闭刷盘。</td><td>对外暴露用例对象，不泄露内部智能体。</td></tr>
+    <tr><td><a href="#concept-0014-6">命令行</a></td><td>支持单次任务、交互输入、JSONL 输出、创建或恢复会话、配置覆盖和中断信号。</td><td>参数错误与运行错误映射为明确退出码。</td></tr>
+    <tr><td><a href="#concept-0014-7">独立进程恢复</a></td><td>一个 CLI 进程创建会话，另一个进程从磁盘恢复并继续连续轮次。</td><td>证明恢复不依赖同进程内存。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：组合根与无界面宿主</h2>
@@ -50,6 +94,40 @@
     <tr><th>方案对比</th><td>框架式全局容器方便自动注入但隐藏装配顺序；显式组合根代码更直白，适合调试和证明资源所有权。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>启动产品入口
+├─ 默认配置 → 校验 → 新建会话
+├─ 文件+env+CLI → 固定优先级覆盖
+├─ 未知字段/坏枚举 → 装配前失败
+├─ Bundle 第 N 个插件失败 → 逆序回滚 1..N-1
+├─ --session → 创建并持久化
+├─ --resume → 冷恢复并继续
+├─ --interactive → 同一会话逐行运行
+├─ SIGINT → 取消当前轮次
+└─ close → 刷盘、卸载、退出码</code></pre>
+  <table><thead><tr><th>场景</th><th>输入来源</th><th>宿主行为</th></tr></thead><tbody>
+    <tr><td>本地开发</td><td>Profile 文件+环境密钥。</td><td>创建真实提供方和工作区会话。</td></tr>
+    <tr><td>离线测试</td><td>脚本提供方覆盖。</td><td>不访问网络，复用同一 Host 语义。</td></tr>
+    <tr><td>跨进程恢复</td><td>新进程仅提供 session id。</td><td>从持久化根重建，不依赖旧 Agent 对象。</td></tr>
+    <tr><td>配置冲突</td><td>文件、env、CLI 同时给模型。</td><td>CLI 胜出，并可通过 dump/config 证据解释。</td></tr>
+    <tr><td>关闭竞态</td><td>轮次仍运行时收到退出。</td><td>先取消运行，再刷盘并释放 Bundle。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>装配方式</th><th>透明度</th><th>一致性</th><th>代价</th></tr></thead><tbody>
+    <tr><td>每个入口手写初始化</td><td>局部直观。</td><td>低，容易漂移。</td><td>重复代码和恢复差异。</td></tr>
+    <tr><td>全局自动注入框架</td><td>低，依赖隐式。</td><td>高。</td><td>调试装配顺序困难。</td></tr>
+    <tr><td>显式 Headless 组合根</td><td>高。</td><td>高，入口只翻译协议。</td><td>构造参数和工厂代码较多。</td></tr>
+    <tr><td>外部依赖注入配置</td><td>取决于工具。</td><td>高且可替换。</td><td>引入额外 DSL 和运行时。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么 Profile 不直接创建对象？</dt><dd>Profile 应是可校验、可打印的部署数据；若混入对象工厂，就无法通过 JSON 配置、比较或安全输出。</dd>
+    <dt>为什么 CLI 不直接操作 HarnessAgent？</dt><dd>那会复制存储、恢复和释放逻辑；CLI 应只依赖稳定用例 API，使服务端和测试共享同一语义。</dd>
+    <dt>未知配置字段为什么要拒绝？</dt><dd>宽松忽略会把拼写错误变成静默使用默认值，尤其可能导致错误模型、目录或沙箱策略。</dd>
+  </dl>
+
   <h2>四层边界</h2>
   <pre><code>CLI argv/stdin/stdout/SIGINT
           │ 翻译
@@ -69,6 +147,39 @@ Profile: JSON file < environment < CLI overrides</code></pre>
     <tr><td>CLI</td><td>参数、JSONL/文本输出、stdin、退出码、SIGINT</td><td>直接构造 Agent 内部组件</td></tr>
   </tbody></table>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0014-3" data-concept="插件包">
+  <h3>插件包：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>一个插件包到底装配哪些东西？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">headless 的 cordis.patch.yml 叠加 base，加入 persona、工具模式、Code Mode worker 和 runner，并禁用 HMR；这是应用组合。 <a href="../deepseek-harness/packages/bundle/headless/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">Profile 可通过 Python entry points 发布，按内置、插件、直接注册顺序叠加；它是模型行为配置扩展，不等于 Cordis 服务生命周期容器。 <a href="https://docs.langchain.com/oss/python/deepagents/profiles">依据</a></td>
+    <td data-framework="openhands">Plugin 打包 skills、hooks、MCP、agents、commands；加载后把组件交给 Agent/Conversation 使用，不是本课 Bundle 的统一 mount/dispose 契约。 <a href="https://docs.openhands.dev/sdk/guides/plugins">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>分发包、配置注册和运行时资源装配都叫“插件”，但失败回滚与释放责任不能据名称互推。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0014-4" data-concept="宿主装配">
+  <h3>宿主装配：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>无界面运行必须经过一个 HTTP Host 吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">上游 headless 不挂载 Host、HTTP 或 Web，runner 直接使用 ctx.agents；本课 HeadlessHost 是教学组合根，不是上游同名实体。 <a href="../deepseek-harness/packages/bundle/headless/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">create_deep_agent 组合模型、工具、Backend 和中间件，得到可执行 Agent；服务部署是另一层选择。 <a href="https://docs.langchain.com/oss/python/deepagents/customization">依据</a></td>
+    <td data-framework="openhands">Conversation 根据 Workspace 选择本地或远程实现；本地执行不要求 Agent Server，远程实现才经服务 API。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>无界面是交互方式，不代表网络服务；图中应将应用组合根与远程服务层分开。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0014-6" data-concept="命令行">
+  <h3>命令行：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>一次性任务入口何时输出并退出？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">dsh --profile headless 接收一个任务，创建新持久 Agent，等待停稳并 flush 后输出最后非空 assistant 文本；完成退出 0，否则 1，没有交互式后续输入。 <a href="../deepseek-harness/packages/bundle/headless/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">Deep Agents Code 是独立命令行产品入口；库的 create_deep_agent 不是 argv 解析器，CLI 行为应按该产品文档核对。 <a href="https://docs.langchain.com/oss/deepagents/code/overview">依据</a></td>
+    <td data-framework="openhands">SDK 可由 Python脚本创建 Conversation、发送消息并 run；参数解析、终端格式和退出码属于使用 SDK 的入口程序，不能从 Conversation API 推导统一 CLI 约定。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>本课交互输入和 JSONL 输出是实验室入口能力，不应直接归给三套框架的所有命令行产品。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>配置规则</h2>
   <pre><code>profile.json
   provider/model/persistenceRoot/cwd/apiKeyEnv/...
@@ -80,6 +191,29 @@ DSH_LAB_MODEL / DSH_LAB_SANDBOX / ...
 immutable resolved profile</code></pre>
   <div class="callout"><strong>Profile 只保存环境变量名，不保存 secret 值。</strong>DeepSeek Provider 每次请求读取 <code>process.env[apiKeyEnv]</code>，支持轮换，也避免密钥进入 Session Event、Profile 快照或调试输出。</div>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0014-1" data-concept="配置合并">
+  <h3>配置合并：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>多个来源给出同一设置时，实际按什么规则合并？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">settings 按 schema 默认值、组合 base、用户分节解析；update 深合并用户层并先校验再持久化。不是本课默认值→文件→环境→CLI 的通用四层算法。 <a href="../deepseek-harness/packages/settings/settings/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">模型级 Profile 覆盖提供方级；具体字段分别采用标量覆盖、集合并集、字典逐键合并和中间件按名称合并，不是统一替换。 <a href="https://docs.langchain.com/oss/python/deepagents/profiles">依据</a></td>
+    <td data-framework="openhands">AgentSettings 使用 Pydantic 校验配置数据；旧持久化配置经 from_persisted 迁移。该接口不定义本课那套文件/env/CLI 优先级。 <a href="https://docs.openhands.dev/sdk/guides/agent-settings">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>合并与迁移是不同问题；覆盖顺序还不足以说明集合、嵌套对象和未知字段的行为。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0014-2" data-concept="配置模型">
+  <h3>配置模型：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>配置描述整个应用，还是只描述模型与 Agent？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">插件分别注册 settings namespace，持有 schema 与组合 base；配置按能力归属，不是单个 Profile 对象拥有全部运行时资源。 <a href="../deepseek-harness/packages/settings/settings/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">HarnessProfile 调整提示词、工具和中间件；ProviderProfile 负责模型构造参数。运行时实例与可序列化 HarnessProfileConfig 也分开。 <a href="https://docs.langchain.com/oss/python/deepagents/profiles">依据</a></td>
+    <td data-framework="openhands">OpenHandsAgentSettings 描述模型、工具和 condenser 等 Agent 配置，可序列化后重建；并不代表已创建 Workspace 或运行会话。 <a href="https://docs.openhands.dev/sdk/guides/agent-settings">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>先明确配置对象覆盖范围，再决定哪些字段可保存、哪些资源必须重新创建。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>Headless 恢复路径</h2>
   <pre><code>process A: --session stable task-1
   create → Agent turn 1 → flush/fsync → close/dispose
@@ -88,6 +222,29 @@ process B: --resume stable task-2
   checksum/repair → Session replay → Agent nextTurn=2
   → flush/fsync → close/dispose</code></pre>
   <p>独立进程测试验证了这条路径；它不是同一进程里复用内存对象的“伪恢复”。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0014-5" data-concept="会话用例">
+  <h3>会话用例：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>创建、发送与恢复由哪个公开对象承接？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ctx.agents 管理创建和恢复，Agent 接口提供消息与运行控制；Session 存事件，持久化是另一服务，不是让入口直接改事件数组。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">调用图时以 thread_id 关联检查点；新输入调用与 Command(resume=...) 恢复 interrupt 的语义不同。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">Conversation 承接 send_message/run 等操作并协调状态、事件与 Agent.step；Agent 本身不是会话存储容器。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>迁移入口时映射用例而不是类名：发新消息、继续暂停与重建进程内对象不能混成一个 resume。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0014-7" data-concept="独立进程恢复">
+  <h3>独立进程恢复：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>旧进程退出后，新进程究竟从哪里拿回状态？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">会话持久化服务负责从存储加载并修复冷会话；上游 headless runner 每次创建新 Agent，不代表它暴露了本课 CLI 的恢复参数。 <a href="../deepseek-harness/packages/session/session-persistence/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">持久 checkpointer 加同一 thread_id 是恢复基础；仅使用内存保存器不能跨进程。恢复重建的是图状态，不是旧进程对象。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">用同一 conversation id 和持久目录加载 base_state.json 与事件文件；须保留实际数据，只有 id 不足以恢复。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>验收必须启动第二个进程并读取持久数据；同进程继续调用只能证明对象还活着。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

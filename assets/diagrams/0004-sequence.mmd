@@ -1,0 +1,15 @@
+---
+title: 账本与投影 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 产生者
+  participant p1 as Session
+  participant p2 as 投影函数
+  participant p3 as 消费者
+  p0->>p1: append 事件
+  p1->>p1: 分配连续序号
+  p3-->>p1: 读取事件前缀
+  p1->>p2: 传入不可变事件
+  p2->>p2: 按顺序折叠
+  p2->>p3: 返回派生视图

@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 6 课：Inbox 驱动的 Agent Loop</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 6 课：Inbox 驱动的 Agent Loop</h1>
   <p class="lead">把用户输入、Session、LLM 串成一个不可重入的 turn/step 状态机，并让取消和错误也闭合日志。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">agent-loop 是唯一具体驱动器；通过 ctx.agents 创建或恢复，管理 inbox、turn、step，并调用 llm/tools 服务。</td><td data-framework="deepagents">create_deep_agent 基于 LangChain/LangGraph 运行时组合模型、工具和中间件，使用 invoke 或流式入口运行。</td><td data-framework="openhands">Agent.step 根据 Conversation 状态推进；产生 Action/Observation 或消息，Conversation 负责运行编排。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">扩展行为挂到 agent/* 等检查点，具体 ReactLoopAgent 不作为外部构造入口。</td><td data-framework="deepagents">应用通常配置已有图执行能力，而不是自己编写本课的 while 循环。</td><td data-framework="openhands">文档中的默认 Agent 以事件驱动步骤工作，不把会话生命周期全放进 Agent 对象。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">原仓库依据 1</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/overview">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/deepagents/customization">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/agent">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>三者都完成“模型→行动→反馈”，差异在控制权放在专用驱动器、图运行时还是 Conversation 与 step 的协作中。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>系统的执行控制中心，连接状态、模型、工具和终止条件。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 6 课</figcaption><a href="../assets/diagrams/0006-position.svg"><img src="../assets/diagrams/0006-position.svg" alt="智能体循环在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0006-position.svg">打开大图</a> · <a href="../assets/diagrams/0006-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>宿主提交的任务、已有会话、可用模型与工具。</td></tr>
+    <tr><th>下游与输出</th><td>连续步骤、工具结果、最终回答及运行状态。</td></tr>
+    <tr><th>不归本章负责</th><td>循环决定何时做，不应把文件系统、审批和压缩的所有实现都塞进来。</td></tr>
+    <tr><th>放进具体场景</th><td>用户要求查文件：循环问模型，收到读文件调用，执行并写回结果，再问模型直到结束。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 智能体循环</figcaption>
+    <a href="../assets/diagrams/0006-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0006-modules.svg" alt="智能体循环的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0006-modules.svg">打开大图</a> · <a href="../assets/diagrams/0006-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 智能体循环</figcaption>
+    <a href="../assets/diagrams/0006-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0006-sequence.svg" alt="智能体循环的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0006-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0006-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 智能体循环</figcaption>
+    <a href="../assets/diagrams/0006-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0006-branches.svg" alt="智能体循环的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0006-branches.svg">打开大图</a> · <a href="../assets/diagrams/0006-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,14 +57,15 @@
     <tr><th>解决的问题</th><td>防止同一智能体重复运行和事件交叉，并保证成功、错误、取消都留下可恢复的闭合日志。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>行为</th><th>不变量</th></tr></thead><tbody>
-    <tr><td>消息入箱</td><td>接收用户消息并写入会话，等待下一轮原子认领。</td><td>运行中到达的新消息留给下一轮。</td></tr>
-    <tr><td>单轮运行</td><td>从空闲进入运行，生成轮次与步骤标识，调用模型并闭合事件。</td><td>同一智能体不可重入。</td></tr>
-    <tr><td>步骤推进</td><td>一个轮次内可按模型结果推进多个步骤。</td><td>步骤编号连续且属于当前轮次。</td></tr>
-    <tr><td>停止原因</td><td>区分完成、工具阻塞、最大步骤、取消和错误。</td><td>所有出口都写入轮次结束事件。</td></tr>
-    <tr><td>取消传播</td><td>中止当前模型或工具工作并等待协作式收尾。</td><td>生命周期投影仍然闭合。</td></tr>
-    <tr><td>空运行</td><td>没有待处理输入时直接返回。</td><td>不产生任何副作用或伪事件。</td></tr>
+    <tr><td><a href="#concept-0006-1">消息入箱</a></td><td>接收用户消息并写入会话，等待下一轮原子认领。</td><td>运行中到达的新消息留给下一轮。</td></tr>
+    <tr><td><a href="#concept-0006-2">单轮运行</a></td><td>从空闲进入运行，生成轮次与步骤标识，调用模型并闭合事件。</td><td>同一智能体不可重入。</td></tr>
+    <tr><td><a href="#concept-0006-3">步骤推进</a></td><td>一个轮次内可按模型结果推进多个步骤。</td><td>步骤编号连续且属于当前轮次。</td></tr>
+    <tr><td><a href="#concept-0006-4">停止原因</a></td><td>区分完成、工具阻塞、最大步骤、取消和错误。</td><td>所有出口都写入轮次结束事件。</td></tr>
+    <tr><td><a href="#concept-0006-5">取消传播</a></td><td>中止当前模型或工具工作并等待协作式收尾。</td><td>生命周期投影仍然闭合。</td></tr>
+    <tr><td><a href="#concept-0006-6">空运行</a></td><td>没有待处理输入时直接返回。</td><td>不产生任何副作用或伪事件。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：Agent Loop 状态机</h2>
@@ -44,6 +88,37 @@
     <tr><th>权衡</th><td>每个 Agent 串行运行限制单会话吞吐，却避免事件交错和上下文竞态；跨任务并行交给后续子智能体层。</td></tr>
     <tr><th>方案对比</th><td>递归函数写法简短但难统一取消和步数限制；显式状态机代码稍多，却能穷尽正常、错误、阻塞和取消路径。</td></tr>
   </tbody></table>
+
+  <h2>场景穷举</h2>
+  <pre><code>run()
+├─ Inbox 为空 → 无副作用返回
+├─ 模型直接回答 → finish → turn/end completed
+├─ 模型请求工具 → 执行 → 下一 step
+├─ 工具仍未接入 → turn/end blocked
+├─ 达到 maxSteps → turn/end max-steps
+├─ 模型/工具异常 → turn/end error
+└─ cancel → 协作收尾 → turn/end cancelled</code></pre>
+  <table><thead><tr><th>场景</th><th>状态变化</th><th>日志要求</th></tr></thead><tbody>
+    <tr><td>正常回答</td><td>idle→running→idle。</td><td>轮次和步骤成对闭合，助手消息已提交。</td></tr>
+    <tr><td>新消息竞态</td><td>运行中消息只入箱，不并入当前轮次。</td><td>下一次 run 再认领，避免上下文漂移。</td></tr>
+    <tr><td>并发 run</td><td>第二个调用立即被拒绝。</td><td>不产生第二组轮次事件。</td></tr>
+    <tr><td>取消</td><td>信号传给当前子操作，最终回到 idle。</td><td>错误或工具取消先落账，再闭合步骤和轮次。</td></tr>
+    <tr><td>进程恢复</td><td>从最大历史轮次编号加一。</td><td>不依赖内存计数器连续性。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>控制流</th><th>竞态可见性</th><th>适合</th></tr></thead><tbody>
+    <tr><td>递归调用模型</td><td>代码短，工具后递归。</td><td>取消、步数和错误出口分散。</td><td>简单原型。</td></tr>
+    <tr><td>显式 while 状态机</td><td>出口集中、步骤清晰。</td><td>高，断点可观察每次转换。</td><td>需要恢复和审计的 Harness。</td></tr>
+    <tr><td>Actor 邮箱</td><td>消息驱动、天然串行。</td><td>高，扩展并发模型强。</td><td>大规模多 Agent 系统，但实现更重。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么运行中消息不能立刻加入当前轮次？</dt><dd>模型请求可能已基于旧上下文发出；中途改变输入会使“请求看到了什么”和日志记录不一致。</dd>
+    <dt>取消为什么不能直接把状态改回 idle？</dt><dd>底层模型或工具可能仍在写事件或产生副作用；必须传播信号并等待收尾后才能释放运行权。</dd>
+    <dt>为什么 maxSteps 是正确性边界而非性能配置？</dt><dd>模型可能无限重复工具调用；没有硬上限，单轮永远不闭合，资源和费用也无上界。</dd>
+  </dl>
 
   <h2>状态与事件顺序</h2>
   <pre><code>send() ──&gt; Inbox
@@ -69,6 +144,69 @@ idle ──&gt; running
     <tr><td>aborted</td><td>aborted/user</td><td>取消仍闭合 step/turn</td></tr>
     <tr><td>tool-calls</td><td>blocked</td><td>等待下一课接入工具执行</td></tr>
   </tbody></table>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0006-1" data-concept="消息入箱">
+  <h3>消息入箱：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>运行中来的消息是下一轮输入，还是下一步引导？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">send 按 target/wakeup 区分；followup 进 next-turn，steer 进 next-step 并唤醒，inject 不唤醒。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">图调用的 messages 是状态输入；LangGraph interrupt/Command 用于暂停后提供新输入，不能直接等同双 inbox。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">send_message 可在运行中追加事件，后续 Agent.step 会看到新增消息；公开示例不使用 DeepSeek 的 next-turn/next-step 分类。 <a href="https://docs.openhands.dev/sdk/guides/convo-send-message-while-running">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>同样能中途发消息，但何时领取、是否唤醒、是否开启新轮次要分别比较。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0006-2" data-concept="单轮运行">
+  <h3>单轮运行：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>谁拥有 run 的控制权？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">私有循环驱动器打开 turn，领取输入，调度多个 step，再记录终态；调用方通过 Agent 接口控制。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">invoke/stream 驱动已组合图执行，控制流属于 LangGraph 运行时。 <a href="https://docs.langchain.com/oss/python/deepagents/overview">依据</a></td>
+    <td data-framework="openhands">Conversation.run 编排 Agent.step，生命周期不完全封装在 Agent 自身。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>本课一轮的边界不一定等同图 run 或 Conversation.run，测试时先定义比较单位。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0006-3" data-concept="步骤推进">
+  <h3>步骤推进：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>一次模型回复后如何进入下一步？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">循环调用 llm、执行 tools、记录结果后继续，压缩和策略通过检查点插件接入。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">模型与工具通过图和中间件组合执行；扩展通常接入调用钩子，而不是修改私有 while 循环。 <a href="https://docs.langchain.com/oss/python/langchain/middleware/overview">依据</a></td>
+    <td data-framework="openhands">step 查询模型并产生 Action/Observation；若产生 Condensation，先追加事件并返回，下一步使用新视图。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>“一步”可能只是压缩或等待处理，不保证每一步都发生一次模型调用。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0006-4" data-concept="停止原因">
+  <h3>停止原因：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>等待、失败、取消与正常完成如何区分？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">turn/end 记录结束原因；插件失败关闭当前轮次，不使长期驱动器永久死亡。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">interrupt 保存图状态并等外部输入；它是可恢复暂停，不应作为普通异常吞掉。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">待审批动作使状态进入 WAITING_FOR_CONFIRMATION；pause 后可 run 继续，不能统一显示“任务成功”。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>状态展示必须保留停止原因，否则暂停可能被误报完成，失败可能被误报空回答。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0006-5" data-concept="取消传播">
+  <h3>取消传播：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>取消返回是否已经没有后台工作？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">AbortSignal 协作取消；已启动工作仍需停稳，dispose 等待忽略信号的工作完成后才脱离注册表。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">interrupt 是可恢复控制流，不是终止底层外部进程；工具副作用和取消仍需由执行层处理。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">pause 请求暂停，示例等待运行线程退出后再继续；不能把暂停请求已发出等同于强杀进程树。 <a href="https://docs.openhands.dev/sdk/guides/convo-pause-and-resume">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>取消信号、运行停止和资源回收是三个时刻；不能用按钮回执替代停稳证据。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0006-6" data-concept="空运行">
+  <h3>空运行：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>没有待处理内容时会不会额外调用模型？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">轮次可以没有进入 step：拒绝或空输入仍能关闭 turn；inject 不唤醒，等后续唤醒消息。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">从没有 next 节点的最终 checkpoint replay 是 no-op；普通新 invoke 与这一情形不能混为一谈。 <a href="https://docs.langchain.com/oss/python/langgraph/use-time-travel">依据</a></td>
+    <td data-framework="openhands">Conversation.run 根据当前执行状态推进，Agent.step 也可能先处理待审批或压缩；不能推断每次 run 都必有新模型调用。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>验证空运行应观察模型调用次数和状态边界，不能只看返回文本是否为空。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

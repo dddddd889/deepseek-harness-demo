@@ -1,0 +1,15 @@
+---
+title: 观测与加固 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 测试或宿主
+  participant p1 as 遥测捕获器
+  participant p2 as TelemetrySink
+  participant p3 as 成本投影
+  p0->>p1: 绑定会话监听
+  p0->>p1: 追加待观测事件
+  p1->>p1: 策略筛选与脱敏
+  p1->>p2: emit 风格化记录
+  p0->>p3: 事件与版本价格表
+  p3-->>p0: 金额及未定价项

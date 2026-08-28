@@ -1,0 +1,9 @@
+---
+title: 可调试基线 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"类型错误"| result0["阻止进入下一课"]
+  decision -->|"断言失败"| result1["定位行为偏差"]
+  decision -->|"断点不命中"| result2["核对目标与源码映射"]
+  decision -->|"全部通过"| result3["建立可重复基线"]

@@ -1,0 +1,9 @@
+---
+title: 智能体服务 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"缺少有效令牌"| result0["受保护接口拒绝"]
+  decision -->|"同标识不同命令"| result1["返回冲突"]
+  decision -->|"请求体过大"| result2["返回 413"]
+  decision -->|"SSE 单帧超预算"| result3["断开连接、允许按序号恢复"]

@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 9 课：Permission、Approval 与 Sandbox</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 9 课：Permission、Approval 与 Sandbox</h1>
   <p class="lead">策略决定默认权限，审批允许单次严格升级，内核沙箱负责真正执行限制，Session 事件负责审计与恢复。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">approval、sandboxPolicy、sandbox 分别承接审批、策略和进程沙箱；工具 guard 提供不可放宽的拒绝。</td><td data-framework="deepagents">interrupt_on 借助 LangGraph 中断与 checkpointer 暂停敏感工具；隔离执行可接 sandbox backend。</td><td data-framework="openhands">SecurityAnalyzer 给动作评估风险，ConfirmationPolicy 决定是否等待确认；执行环境由 Workspace 承载。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">作用域工具可见性不是安全边界，实际限制必须落到策略与执行环境。</td><td data-framework="deepagents">审批状态需要同一 thread 恢复；backend 的文件规则不能被当作任意命令的完整沙箱。</td><td data-framework="openhands">风险标签和确认策略不是操作系统隔离机制。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/docs/capability-seams.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/core/tools/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/human-in-the-loop">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/deepagents/backends">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/security">官方文档 1</a> · <a href="https://docs.openhands.dev/sdk/arch/workspace">官方文档 2</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>至少分三问：工具是否可见、动作是否获准、进程能触碰什么。三者都不能只用一个“安全模式”概括。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>围绕工具及执行环境的安全约束层。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 9 课</figcaption><a href="../assets/diagrams/0009-position.svg"><img src="../assets/diagrams/0009-position.svg" alt="权限与沙箱在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0009-position.svg">打开大图</a> · <a href="../assets/diagrams/0009-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>待执行动作、策略、路径与网络范围、人工审批决定。</td></tr>
+    <tr><th>下游与输出</th><td>允许、拒绝或待审批状态，以及执行时的实际隔离约束。</td></tr>
+    <tr><th>不归本章负责</th><td>人工同意不等于进程隔离；只隐藏工具也不能阻止任意 shell 命令绕过能力列表。</td></tr>
+    <tr><th>放进具体场景</th><td>读文件可以自动通过，写敏感目录需要拒绝；即使批准跑测试，也应限制进程的文件与网络范围。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 权限与沙箱</figcaption>
+    <a href="../assets/diagrams/0009-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0009-modules.svg" alt="权限与沙箱的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0009-modules.svg">打开大图</a> · <a href="../assets/diagrams/0009-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 权限与沙箱</figcaption>
+    <a href="../assets/diagrams/0009-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0009-sequence.svg" alt="权限与沙箱的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0009-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0009-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 权限与沙箱</figcaption>
+    <a href="../assets/diagrams/0009-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0009-branches.svg" alt="权限与沙箱的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0009-branches.svg">打开大图</a> · <a href="../assets/diagrams/0009-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,15 +57,16 @@
     <tr><th>解决的问题</th><td>避免模型自行扩大权限，让每次高风险操作都有最小授权、可执行限制和可恢复审计记录。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>具体覆盖</th><th>安全不变量</th></tr></thead><tbody>
-    <tr><td>沙箱模式</td><td>只读、工作区写入和完全访问三级权限，支持严格单向升级。</td><td>请求权限不得低于工具实际效果。</td></tr>
-    <tr><td>审批策略</td><td>支持询问与从不询问；审批结果包含单次允许、拒绝、取消和不可用。</td><td>单次允许不污染后续调用。</td></tr>
-    <tr><td>审批交互</td><td>携带工具、参数、理由、当前模式和请求模式，响应器可异步回答。</td><td>没有响应器时确定性拒绝。</td></tr>
-    <tr><td>取消竞态</td><td>审批等待可取消，迟到回答被丢弃。</td><td>一次询问最多产生一个决定。</td></tr>
-    <tr><td>审计事件</td><td>询问、决定、模式和策略写入 Session，并可投影待处理审批。</td><td>拒绝没有对应询问的孤立决定。</td></tr>
-    <tr><td>状态恢复</td><td>从最后的权限模式和审批策略事件恢复服务状态。</td><td>进程重启不重置会话权限语义。</td></tr>
-    <tr><td>内核沙箱</td><td>macOS 上以平台沙箱执行真实进程，工作区写入仅开放指定目录。</td><td>策略判断和操作系统强制限制必须同时成立。</td></tr>
+    <tr><td><a href="#concept-0009-1">沙箱模式</a></td><td>只读、工作区写入和完全访问三级权限，支持严格单向升级。</td><td>请求权限不得低于工具实际效果。</td></tr>
+    <tr><td><a href="#concept-0009-2">审批策略</a></td><td>支持询问与从不询问；审批结果包含单次允许、拒绝、取消和不可用。</td><td>单次允许不污染后续调用。</td></tr>
+    <tr><td><a href="#concept-0009-3">审批交互</a></td><td>携带工具、参数、理由、当前模式和请求模式，响应器可异步回答。</td><td>没有响应器时确定性拒绝。</td></tr>
+    <tr><td><a href="#concept-0009-4">取消竞态</a></td><td>审批等待可取消，迟到回答被丢弃。</td><td>一次询问最多产生一个决定。</td></tr>
+    <tr><td><a href="#concept-0009-5">审计事件</a></td><td>询问、决定、模式和策略写入 Session，并可投影待处理审批。</td><td>拒绝没有对应询问的孤立决定。</td></tr>
+    <tr><td><a href="#concept-0009-6">状态恢复</a></td><td>从最后的权限模式和审批策略事件恢复服务状态。</td><td>进程重启不重置会话权限语义。</td></tr>
+    <tr><td><a href="#concept-0009-7">内核沙箱</a></td><td>macOS 上以平台沙箱执行真实进程，工作区写入仅开放指定目录。</td><td>策略判断和操作系统强制限制必须同时成立。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：授权决策与强制执行</h2>
@@ -48,6 +92,37 @@ LocalSandbox ─► Process / FS（下游执行）
     <tr><th>权衡</th><td>细粒度审批提升安全与可审计性，但增加交互摩擦；单次授权避免永久放宽，又可能要求重复确认。</td></tr>
     <tr><th>方案对比</th><td>仅提示用户属于软约束，工具可绕过；仅沙箱缺少业务意图与审计；两者叠加才能同时回答“应不应该”和“能不能”。</td></tr>
   </tbody></table>
+
+  <h2>场景穷举</h2>
+  <pre><code>工具请求
+├─ 最低权限 ≤ 当前模式 → 直接执行
+├─ 严格升级 + ask → 记录询问 → 单次允许/拒绝/取消
+├─ 严格升级 + never → 不询问，直接拒绝
+├─ 缺少回答器 → APPROVAL_UNAVAILABLE
+├─ 非严格或参数不成对 → 提问前拒绝
+└─ 已允许 → OS 沙箱仍限制真实访问</code></pre>
+  <table><thead><tr><th>场景</th><th>策略结果</th><th>执行结果</th></tr></thead><tbody>
+    <tr><td>只读工具</td><td>当前只读模式足够。</td><td>直接运行，但仍受文件边界限制。</td></tr>
+    <tr><td>工作区写入</td><td>用户单次允许升级。</td><td>仅本次在 workspace-write 沙箱运行。</td></tr>
+    <tr><td>越界写入</td><td>即使业务层错误批准。</td><td>强沙箱仍拒绝工作区外写入。</td></tr>
+    <tr><td>审批取消竞态</td><td>等待者先取消。</td><td>迟到允许无效，只写 cancelled 决定。</td></tr>
+    <tr><td>冷恢复</td><td>读取最后模式和策略事件。</td><td>恢复后继续相同授权语义，不恢复一次性许可。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>用户意图</th><th>强制力</th><th>缺陷</th></tr></thead><tbody>
+    <tr><td>仅提示词约束</td><td>模型可理解。</td><td>无。</td><td>模型或工具可忽略。</td></tr>
+    <tr><td>仅审批弹窗</td><td>明确。</td><td>弱，批准后无路径限制。</td><td>无法阻止工具越界。</td></tr>
+    <tr><td>仅 OS 沙箱</td><td>不知道操作理由。</td><td>强。</td><td>缺少业务策略和审计。</td></tr>
+    <tr><td>策略+审批+沙箱</td><td>明确且可恢复。</td><td>强。</td><td>实现复杂、存在交互摩擦。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>模型传入 requestedMode 是否等于获得权限？</dt><dd>不等于。它只是请求材料，权限服务必须结合工具最低效果、当前模式、策略和用户决定独立判定。</dd>
+    <dt>为什么单次允许不写成新的会话模式？</dt><dd>一次性许可只针对当前工具参数；提升会话模式会让之后所有调用意外继承更高权限。</dd>
+    <dt>平台没有强沙箱时怎么办？</dt><dd>必须在能力探测中明确标记，仅进程隔离不能冒充强沙箱；高风险场景应拒绝而非静默降级。</dd>
+  </dl>
 
   <h2>四层职责</h2>
   <pre><code>Session policy events
@@ -76,6 +151,29 @@ PermissionService.authorize
     <tr><td>实际约束</td><td>每次进程/文件操作</td><td>WorkspaceFs fence / Seatbelt runner</td></tr>
   </tbody></table>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0009-1" data-concept="沙箱模式">
+  <h3>沙箱模式：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>选择只读后，究竟限制了什么操作？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">bash-sandbox 将 read-only、workspace-write 映射为文件影响约束；danger-full-access 直接绕过 runner。网络和进程可见性不在这些模式的承诺内。 <a href="../deepseek-harness/packages/shell/bash-sandbox/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">permissions 按路径和读写操作约束内置文件工具，不覆盖自定义/MCP 工具或任意 execute；不能把一条只读规则当作整个进程只读。 <a href="https://docs.langchain.com/oss/python/deepagents/permissions">依据</a></td>
+    <td data-framework="openhands">Workspace 选择本地、Docker 或远程执行环境；文件和进程隔离取决于该环境的部署，不能由一个动作确认开关代替。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>先问约束对象是文件工具、shell 文件影响还是整个执行环境，再比较“只读”。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0009-7" data-concept="内核沙箱">
+  <h3>内核沙箱：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>业务层错误放行后，哪一层还能阻止越界？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Linux 选择 bwrap 或 Landlock，macOS 用 Seatbelt，Windows 用受限令牌；runner 不可用则失败关闭。Windows 与旧 Landlock ABI 可能仅部分强制执行。 <a href="../deepseek-harness/packages/sandbox/sandbox-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LocalShellBackend 在宿主执行，路径虚拟化不能约束 shell；需要强隔离时应选择 sandbox backend，而不是只配置 root_dir。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">DockerWorkspace 以容器提供执行环境；LocalWorkspace 直接使用宿主进程。RemoteAPIWorkspace 只是连接远程服务，仍需核对服务实际隔离配置。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>审批回答“是否允许”，隔离回答“最多能做什么”；操作系统限制的覆盖面和降级情况必须单独列明。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>严格升级规则</h2>
   <pre><code>read-only → workspace-write → danger-full-access
 
@@ -86,6 +184,39 @@ approval/policy=never 时不调用任何 answerer；
 没有 answerer 时 fail closed。</code></pre>
 
   <div class="callout"><strong>策略检查不是沙箱。</strong>如果只在 TypeScript 里判断后直接启动 bash，恶意或误判命令仍可能越界。本课在 macOS 下实际用 <code>sandbox-exec</code>/Seatbelt 包装 argv；没有可用受限 runner 的平台必须返回 <code>SANDBOX_UNAVAILABLE</code>，不能静默裸跑。</div>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0009-2" data-concept="审批策略">
+  <h3>审批策略：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>关闭审批提示，是自动拒绝还是直接执行？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ask 尝试应答者，缺失或失败则拒绝；never 在交互分发前拒绝需要审批的请求。allowed-once 只授权所请求操作。 <a href="../deepseek-harness/packages/interaction/user-approval/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">文件权限规则按首条匹配决定 allow、deny 或 interrupt，未匹配则允许；规则顺序会改变结果。 <a href="https://docs.langchain.com/oss/python/deepagents/permissions">依据</a></td>
+    <td data-framework="openhands">AlwaysConfirm 要求确认，NeverConfirm 不要求确认，ConfirmRisky 按风险阈值决定是否询问。 <a href="https://docs.openhands.dev/sdk/arch/security">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>DeepSeek 的 never 与 OpenHands 的 NeverConfirm 含义相反：前者不许询问并拒绝需审批操作，后者跳过确认。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0009-3" data-concept="审批交互">
+  <h3>审批交互：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>用户看到什么，批准后如何继续？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">approval/request waterfall 找应答者，结果为允许一次、拒绝、取消或不可用；原 seam 带工具名、理由和可选调用 id，不携带工具参数，区别于本课教学请求结构。 <a href="../deepseek-harness/packages/interaction/user-approval/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">interrupt 暴露可序列化载荷；应用用原 thread_id 和 Command(resume=...) 回传决定并继续图执行。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">Conversation 在待确认动作上暂停，由用户批准或拒绝后继续；安全分析器负责评估，确认策略决定是否需要交互。 <a href="https://docs.openhands.dev/sdk/guides/security">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>对比审批界面前，先核对请求载荷和恢复入口；教学示例里能展示参数，不代表上游审批 seam 自带参数。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0009-4" data-concept="取消竞态">
+  <h3>取消竞态：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>等待批准时取消，还能接受迟到的允许吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">请求绑定尚未结束的轮次；中止解析为 cancelled，决定必须先提交审计才能返回，不能产生未记录的授权。 <a href="../deepseek-harness/packages/interaction/user-approval/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">interrupt 是可持久暂停，不是进程取消；恢复需要匹配 thread/interrupt，节点从头重跑。应用若允许撤销审批，应另外校验请求仍有效，而非把迟到回复直接用于新运行。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">确认机制针对待执行动作；不能据此推导运行中工具已终止。审批取消与执行终止应分别验证，本次引用未给出与 DeepSeek 一次性请求相同的竞态保证。 <a href="https://docs.openhands.dev/sdk/arch/security">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>比较三个时刻：批准前取消、批准后未执行、工具已开始。暂停等待与杀掉进程不是同一个保证。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab
@@ -100,6 +231,29 @@ VS Code F5 → 08 · 权限与沙箱
 
   <h2>恢复规则</h2>
   <p>恢复不读取 OTel Logs，也不保存内存里的“已批准”布尔值。长期策略由 Session Event 最后写入获胜；一次性批准只证明历史上的那个 call 为什么执行，不能在恢复后复用。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0009-5" data-concept="审计事件">
+  <h3>审计事件：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>审批记录会直接成为模型上下文吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">approval/asked 与 approval/decided 成对写 Session，但只写日志；模型看发起方最终工具结果，不重复消费人类审批界面。 <a href="../deepseek-harness/packages/interaction/user-approval/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">interrupt 载荷随暂停暴露并由检查点保留执行位置；业务需要独立审计记录时，应显式设计状态/存储，不能假设有 asked/decided 同名事件。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">Conversation 的事件记录与状态持久化分开；确认状态不能简单映射成 DeepSeek 的审计对，模型可见事件也应按事件转换规则判断。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>“能恢复审批”等于保存了控制状态，不自动等于完整业务审计，更不等于要把审计内容全部发给模型。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0009-6" data-concept="状态恢复">
+  <h3>状态恢复：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>重启后沿用旧权限，还是采用新的默认配置？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">permission-presets 为新会话固定预设、模式和策略；恢复 seed 保留有效权限，只补缺失事实，不采用最新用户默认值。一次性允许不是永久授权。 <a href="../deepseek-harness/packages/interaction/permission-presets/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">恢复 interrupt 依赖持久 checkpointer 和相同 thread_id；这保存图状态，但应用重新装配的权限规则是否变化仍须自行控制。 <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">依据</a></td>
+    <td data-framework="openhands">同一 conversation id 与持久化目录用于恢复状态和事件；这不意味着容器/主机的当前权限也被回滚，执行环境仍是独立边界。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>分别验证会话策略、未决审批和执行环境；不要用“会话恢复成功”替代权限一致性检查。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>本阶段验收</h2>
   <pre><code>TypeScript strict check: passed

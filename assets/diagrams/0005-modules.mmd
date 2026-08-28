@@ -1,0 +1,13 @@
+---
+title: 流式模型 · 模块关系
+---
+flowchart TD
+  n0["模型步骤"]
+  n1["LlmRuntime"]
+  n2["模型提供方"]
+  n3["BlockAssembler"]
+  n4["Session 事件"]
+  n0 -->|"发起生成"| n1
+  n1 -->|"路由与取消"| n2
+  n1 -->|"组装流块"| n3
+  n1 -->|"逐块与最终消息落账"| n4

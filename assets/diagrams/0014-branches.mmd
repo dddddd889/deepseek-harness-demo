@@ -1,0 +1,9 @@
+---
+title: 无界面宿主 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"未知配置字段"| result0["装配前拒绝"]
+  decision -->|"插件包启动失败"| result1["逆序回滚"]
+  decision -->|"会话标识已存在"| result2["拒绝覆盖"]
+  decision -->|"输入中断或退出"| result3["取消并释放资源"]
