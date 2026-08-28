@@ -1,0 +1,9 @@
+---
+title: 本地能力 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"路径逃逸"| result0["拒绝文件操作"]
+  decision -->|"超时或取消"| result1["终止进程组并等待"]
+  decision -->|"输出过大"| result2["保留前缀并溢出"]
+  decision -->|"非零退出"| result3["返回退出码而非丢弃输出"]

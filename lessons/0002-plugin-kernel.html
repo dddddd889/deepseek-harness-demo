@@ -7,8 +7,51 @@
   <link rel="stylesheet" href="../assets/course.css">
 </head>
 <body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 2 课：最小可逆插件内核</h1>
   <p class="lead">这一阶段只解决一个问题：能力怎样动态加入 Harness，又怎样在热重载、失败或退出时完整撤销。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">Cordis 通过 Context、服务注入和插件作用域组合能力，并将注册资源与插件生命周期绑定。</td><td data-framework="deepagents">create_deep_agent 的 middleware 扩展模型与工具调用行为，backend 提供可替换执行能力。</td><td data-framework="openhands">Plugin 将 skills、hooks、MCP 配置、agent 定义和命令打包分发。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">这是一套运行时依赖与释放机制，不只是分发一组提示词文件。</td><td data-framework="deepagents">中间件组合不应直接等同于 Cordis 服务注入和热卸载语义。</td><td data-framework="openhands">这里的 Plugin 是能力包；不能仅凭同名推断具备 Cordis 的依赖图与资源作用域。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/docs/cordis-tutorial/02-lifecycle-and-effects.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/docs/cordis-tutorial/03-services.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/customization">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/guides/plugins">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>比较“插件”时先问它管理的是代码生命周期、调用拦截，还是能力分发；三者可以共存，但替换成本不同。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>横切运行时的装配与生命周期底座，决定哪些服务可用、由谁释放。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 2 课</figcaption><a href="../assets/diagrams/0002-position.svg"><img src="../assets/diagrams/0002-position.svg" alt="插件内核在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0002-position.svg">打开大图</a> · <a href="../assets/diagrams/0002-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>第 14 课的组合配置、插件声明及依赖。</td></tr>
+    <tr><th>下游与输出</th><td>向循环、工具、存储等模块提供已就绪服务；卸载时回收注册和资源。</td></tr>
+    <tr><th>不归本章负责</th><td>生命周期管理不是操作系统隔离；可信插件依然可以执行进程内代码。</td></tr>
+    <tr><th>放进具体场景</th><td>替换模型适配器时，先撤销旧注册再启用新服务；不能让被卸载插件的监听器继续响应。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 插件生命周期</figcaption>
+    <a href="../assets/diagrams/0002-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0002-modules.svg" alt="插件生命周期的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0002-modules.svg">打开大图</a> · <a href="../assets/diagrams/0002-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 插件生命周期</figcaption>
+    <a href="../assets/diagrams/0002-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0002-sequence.svg" alt="插件生命周期的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0002-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0002-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 插件生命周期</figcaption>
+    <a href="../assets/diagrams/0002-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0002-branches.svg" alt="插件生命周期的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0002-branches.svg">打开大图</a> · <a href="../assets/diagrams/0002-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -18,13 +61,14 @@
     <tr><th>解决的问题</th><td>防止热重载和启动失败后遗留服务、监听器或进程，为后续能力提供统一生命周期。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>具体覆盖</th><th>边界</th></tr></thead><tbody>
-    <tr><td>服务容器</td><td>发布、查找和撤销具名服务；拒绝重复服务键。</td><td>冲突失败时保留原服务。</td></tr>
-    <tr><td>插件装载</td><td>插件按顺序启动，并持有独立的子上下文和清理资源。</td><td>启动失败回滚本插件的部分注册。</td></tr>
-    <tr><td>事件系统</td><td>注册、触发并自动撤销随插件生命周期绑定的监听器。</td><td>卸载后监听器不再接收事件。</td></tr>
-    <tr><td>副作用清理</td><td>函数可返回同步或异步清理器，按后进先出顺序释放。</td><td>一个清理动作不能跳过其余动作。</td></tr>
-    <tr><td>容器释放</td><td>逆序卸载全部插件和服务，形成可重复的退出边界。</td><td>释放后容器回到干净状态。</td></tr>
+    <tr><td><a href="#concept-0002-1">服务容器</a></td><td>发布、查找和撤销具名服务；拒绝重复服务键。</td><td>冲突失败时保留原服务。</td></tr>
+    <tr><td><a href="#concept-0002-2">插件装载</a></td><td>插件按顺序启动，并持有独立的子上下文和清理资源。</td><td>启动失败回滚本插件的部分注册。</td></tr>
+    <tr><td><a href="#concept-0002-3">事件系统</a></td><td>注册、触发并自动撤销随插件生命周期绑定的监听器。</td><td>卸载后监听器不再接收事件。</td></tr>
+    <tr><td><a href="#concept-0002-4">副作用清理</a></td><td>函数可返回同步或异步清理器，按后进先出顺序释放。</td><td>一个清理动作不能跳过其余动作。</td></tr>
+    <tr><td><a href="#concept-0002-5">容器释放</a></td><td>逆序卸载全部插件和服务，形成可重复的退出边界。</td><td>释放后容器回到干净状态。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：可逆插件生命周期</h2>
@@ -48,6 +92,35 @@ HarnessContext ─► PluginContext ─► Service / Event / Effect
     <tr><th>方案对比</th><td>全局单例使用简单，却难以隔离和撤销；依赖注入容器可解析服务，但若没有 Effect 清理语义仍会泄漏外部资源。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>插件装载
+├─ apply 成功 → 发布服务/监听器 → dispose 逆序撤销
+├─ apply 中途抛错 → 立即回滚已登记副作用
+├─ 服务键冲突 → 拒绝新插件，原服务保留
+├─ 清理器抛错 → 记录错误，继续释放剩余资源
+└─ 热替换 → 候选成功后切换，再释放旧插件</code></pre>
+  <table><thead><tr><th>场景</th><th>风险</th><th>期望行为</th></tr></thead><tbody>
+    <tr><td>正常装卸</td><td>服务或监听器残留。</td><td>卸载后服务表和监听器数量回到装载前。</td></tr>
+    <tr><td>部分启动失败</td><td>前半段注册成功，后半段抛错。</td><td>子上下文逆序回滚所有已登记副作用。</td></tr>
+    <tr><td>重复服务</td><td>后插件静默覆盖前插件。</td><td>冲突在发布点失败，旧服务身份保持不变。</td></tr>
+    <tr><td>异步资源</td><td>进程、连接尚未关闭容器就退出。</td><td>释放流程等待异步清理器完成。</td></tr>
+    <tr><td>误用全局资源</td><td>插件直接改全局变量，内核不知道如何撤销。</td><td>要求插件把每个外部副作用配成 Effect 清理器。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>生命周期</th><th>隔离性</th><th>适用场景</th></tr></thead><tbody>
+    <tr><td>全局单例</td><td>通常随进程结束。</td><td>低，测试和热重载互相污染。</td><td>一次性短程序。</td></tr>
+    <tr><td>普通依赖注入容器</td><td>擅长创建和查找对象。</td><td>中，外部资源清理需另行约定。</td><td>请求级无状态服务。</td></tr>
+    <tr><td>插件子上下文+Effect</td><td>创建与逆操作强配对。</td><td>高，可回滚、可卸载。</td><td>长运行 Harness 与热重载。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么清理要后进先出？</dt><dd>后创建的资源往往依赖先创建资源；逆序释放才能先关消费者，再关它依赖的服务。</dd>
+    <dt>为什么不能让新服务覆盖旧服务？</dt><dd>静默覆盖会让旧插件仍持有资源却失去可发现身份，形成泄漏和不确定路由。</dd>
+    <dt>插件启动失败后能否继续使用容器？</dt><dd>只有回滚证明容器恢复到装载前状态才可以；否则应把整个容器视为受污染并销毁。</dd>
+  </dl>
+
   <h2>四个最小抽象</h2>
   <table>
     <thead><tr><th>抽象</th><th>职责</th><th>本课实现</th></tr></thead>
@@ -68,6 +141,59 @@ HarnessContext ─► PluginContext ─► Service / Event / Effect
   └── C → B → A（后进先出）</code></pre>
 
   <div class="callout"><strong>关键不变量：</strong>插件启动到一半失败，也必须执行已经登记的 disposer。否则一次 HMR 或配置错误就会留下幽灵 Service、重复 listener 或未关闭资源。</div>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0002-1" data-concept="服务容器">
+  <h3>服务容器：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>Context / Service 在三者里是否同义？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Cordis Context 按服务 key 访问注入能力，服务依赖影响插件何时能工作。 <a href="../deepseek-harness/docs/cordis-tutorial/03-services.zh.md">依据</a></td>
+    <td data-framework="deepagents">middleware 在模型/工具调用周围运行；运行上下文并不等价于 Cordis 的可热卸载服务依赖容器。 <a href="https://docs.langchain.com/oss/python/langchain/middleware/overview">依据</a></td>
+    <td data-framework="openhands">AgentContext 持有 skills 与提示词；Conversation 管状态。名字叫 Context 不表示它是服务容器。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>Context 在这里分别接近服务作用域、运行上下文、提示词上下文，不能按名字映射。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0002-2" data-concept="插件装载">
+  <h3>插件装载：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>加载插件时装入的是运行代码还是能力包？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ctx.plugin 挂载插件 fiber；依赖消失、配置变化或显式释放都可能导致卸载。 <a href="../deepseek-harness/docs/cordis-tutorial/02-lifecycle-and-effects.zh.md">依据</a></td>
+    <td data-framework="deepagents">create_deep_agent 接收中间件、模型与 backend 组合；这不是一套 Cordis fiber 热装卸协议。 <a href="https://docs.langchain.com/oss/python/deepagents/customization">依据</a></td>
+    <td data-framework="openhands">Plugin 包装 skills/hooks/MCP/agents/commands；它是可分发的扩展内容集合。 <a href="https://docs.openhands.dev/sdk/guides/plugins">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>代码生命周期、构造时组合和能力分发是三种不同的“插件”含义。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0002-3" data-concept="事件系统">
+  <h3>事件系统：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>监听事件能否改写即将发生的行为？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Cordis 事件机制支持不同分发模式，工具流水线也区分策略拦截与最终只读 result 通知。 <a href="../deepseek-harness/packages/core/tools/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">中间件钩子用于介入调用，事件流用于向外输出运行信息；消费流不等于修改运行图。 <a href="https://docs.langchain.com/oss/python/langchain/middleware/overview">依据</a></td>
+    <td data-framework="openhands">不可变 Event 进入追加日志；服务可观察事件，动作的安全决策另走 SecurityAnalyzer。 <a href="https://docs.openhands.dev/sdk/arch/events">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>必须区分控制钩子与事实通知；不能让一个审计监听器被误认为权限守卫。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0002-4" data-concept="副作用清理">
+  <h3>副作用清理：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>谁关闭 watcher、连接和定时器？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Cordis API 注册自动归属插件 effect；自行创建资源要用 ctx.effect 返回 disposer。 <a href="../deepseek-harness/docs/cordis-tutorial/02-lifecycle-and-effects.zh.md">依据</a></td>
+    <td data-framework="deepagents">backend 是执行环境接缝；应用或具体 backend 仍需管理自己创建的连接，不能假定中间件具备 Cordis disposer 栈。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">ToolExecutor 可提供 close，Workspace 使用上下文管理协议处理资源；分别归属工具和环境。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>可逆注册不等于所有资源自动回收；每个外部资源都要找到确切所有者。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0002-5" data-concept="容器释放">
+  <h3>容器释放：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>结束应用是否等同于结束一个会话？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">插件 fiber 释放撤销 effect；AgentHandle 与 AgentLoop 提供方共同约束 agent 的停稳与拆卸。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">一个图调用结束与 backend/应用进程退出是不同生命周期；例如磁盘 backend 文件不会随一次回答结束而消失。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">Conversation 管理运行暂停和关闭；Workspace 可独立管理远程环境，关闭客户端不应被理解为删除工作目录。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>应用容器、会话、执行环境要分别关闭，不能以一个 dispose 名字掩盖不同资源边界。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与断点</h2>
   <pre><code>cd harness-lab

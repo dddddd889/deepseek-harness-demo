@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 11 课：Token、Surface、Compaction 与 Spill</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 11 课：Token、Surface、Compaction 与 Spill</h1>
   <p class="lead">长会话治理的核心不是删日志，而是保留事实、缩小模型可见 surface，并把大字节移到受控文件中。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">compaction 与工具结果修剪通过插件介入；spillStore 与 spill-policy 分别管理外置存储和策略。</td><td data-framework="deepagents">内置上下文机制把大工具内容外置到 backend，并在历史过长时生成摘要。</td><td data-framework="openhands">Condenser 生成 Condensation，后续 View 过滤被遗忘事件并插入摘要；可组合 PipelineCondenser。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">表层改写与原始会话事实不同；不能将摘要当作完整审计记录。</td><td data-framework="deepagents">外置内容能否跨重启保留取决于 backend 与状态持久化配置。</td><td data-framework="openhands">这里描述的是事件视图压缩，不能直接等同于 DeepAgents 的文件外置。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/docs/capability-seams.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">原仓库依据 2</a> · <a href="../deepseek-harness/packages/spill/spill-policy/README.zh.md">原仓库依据 3</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/condenser">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>要分别检查“模型少看了什么”和“原文还在哪里”；只比较摘要算法会漏掉耐久性与可追溯性。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>位于会话历史与模型请求之间，同时把过大内容转移到可检索存储。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 11 课</figcaption><a href="../assets/diagrams/0011-position.svg"><img src="../assets/diagrams/0011-position.svg" alt="上下文压缩与外置在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0011-position.svg">打开大图</a> · <a href="../assets/diagrams/0011-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>增长的历史、工具大结果、模型窗口压力。</td></tr>
+    <tr><th>下游与输出</th><td>更小的模型可见视图、摘要和可再读取的内容引用。</td></tr>
+    <tr><th>不归本章负责</th><td>减小模型上下文不等于删除权威历史；外置引用必须有明确的保存与访问周期。</td></tr>
+    <tr><th>放进具体场景</th><td>测试输出上万行，模型先看摘要与文件引用，需要某条错误时再读原文，而不是每步重发全部输出。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 上下文治理</figcaption>
+    <a href="../assets/diagrams/0011-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0011-modules.svg" alt="上下文治理的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0011-modules.svg">打开大图</a> · <a href="../assets/diagrams/0011-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 上下文治理</figcaption>
+    <a href="../assets/diagrams/0011-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0011-sequence.svg" alt="上下文治理的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0011-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0011-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 上下文治理</figcaption>
+    <a href="../assets/diagrams/0011-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0011-branches.svg" alt="上下文治理的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0011-branches.svg">打开大图</a> · <a href="../assets/diagrams/0011-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,16 +57,17 @@
     <tr><th>解决的问题</th><td>防止长会话超过模型窗口或耗尽内存，同时保留审计、恢复和成本重算所需的原始事实。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>具体覆盖</th><th>不变量</th></tr></thead><tbody>
-    <tr><td>词元估算</td><td>估算文本、消息及各种内容块大小，单独统计模型可见面。</td><td>估算值不冒充提供方实际计费。</td></tr>
-    <tr><td>实际用量</td><td>累计提供方上报的输入、输出和缓存桶，作为历史用量事实。</td><td>压缩不能修改历史用量。</td></tr>
-    <tr><td>上下文压力</td><td>用最近实际提示词用量作为锚点，再叠加可见面变化预测下一请求。</td><td>压力值用于窗口决策，不作为新增账单。</td></tr>
-    <tr><td>压缩区间选择</td><td>选择已闭合的旧内容，避开仍活跃区域和不可拆分边界。</td><td>工具调用与对应结果必须作为原子组。</td></tr>
-    <tr><td>摘要事务</td><td>先写压缩开始，生成摘要，验证确实变小，再写可见面替换和结束。</td><td>失败只留闭合审计，不改变模型可见面。</td></tr>
-    <tr><td>连续再压缩</td><td>新摘要可替换旧摘要，形成能从事实日志重放的压缩链。</td><td>原始事件永远保留。</td></tr>
-    <tr><td>工具结果裁剪</td><td>模型侧仅保留必要前缀和溢出引用，完整内容交给受控存储。</td><td>展示截断与数据丢失明确区分。</td></tr>
-    <tr><td>溢出存储</td><td>大文本写入随机私有文件，引用保存长度与摘要，读取时校验完整性。</td><td>引用不能允许路径注入或内容替换。</td></tr>
+    <tr><td><a href="#concept-0011-1">词元估算</a></td><td>估算文本、消息及各种内容块大小，单独统计模型可见面。</td><td>估算值不冒充提供方实际计费。</td></tr>
+    <tr><td><a href="#concept-0011-2">实际用量</a></td><td>累计提供方上报的输入、输出和缓存桶，作为历史用量事实。</td><td>压缩不能修改历史用量。</td></tr>
+    <tr><td><a href="#concept-0011-3">上下文压力</a></td><td>用最近实际提示词用量作为锚点，再叠加可见面变化预测下一请求。</td><td>压力值用于窗口决策，不作为新增账单。</td></tr>
+    <tr><td><a href="#concept-0011-4">压缩区间选择</a></td><td>选择已闭合的旧内容，避开仍活跃区域和不可拆分边界。</td><td>工具调用与对应结果必须作为原子组。</td></tr>
+    <tr><td><a href="#concept-0011-5">摘要事务</a></td><td>先写压缩开始，生成摘要，验证确实变小，再写可见面替换和结束。</td><td>失败只留闭合审计，不改变模型可见面。</td></tr>
+    <tr><td><a href="#concept-0011-6">连续再压缩</a></td><td>新摘要可替换旧摘要，形成能从事实日志重放的压缩链。</td><td>原始事件永远保留。</td></tr>
+    <tr><td><a href="#concept-0011-7">工具结果裁剪</a></td><td>模型侧仅保留必要前缀和溢出引用，完整内容交给受控存储。</td><td>展示截断与数据丢失明确区分。</td></tr>
+    <tr><td><a href="#concept-0011-8">溢出存储</a></td><td>大文本写入随机私有文件，引用保存长度与摘要，读取时校验完整性。</td><td>引用不能允许路径注入或内容替换。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：事实保留与模型视图压缩</h2>
@@ -47,6 +91,40 @@ Range Selector ─► Summarizer ─► Surface replace（输出）
     <tr><th>权衡</th><td>摘要降低窗口压力但会损失细节且消耗一次模型调用；保留事实使系统可回溯，却增加本地存储。</td></tr>
     <tr><th>方案对比</th><td>滑动窗口简单但会切断工具因果链；全量摘要容易漂移；事务式区间摘要更复杂，却能保留边界并允许失败回滚。</td></tr>
   </tbody></table>
+
+  <h2>场景穷举</h2>
+  <pre><code>上下文压力评估
+├─ 预算充足 → 保持原 Surface
+├─ 轻度超压 → 裁剪超大工具结果
+├─ 历史可闭合 → 摘要旧区间并 replace
+├─ tool call/result 横跨边界 → 扩展或放弃区间
+├─ 摘要失败/不够小 → 审计闭合，不替换
+├─ 已有旧摘要 → 允许再压缩
+└─ 大原文 → SpillStore，Surface 只留引用</code></pre>
+  <table><thead><tr><th>场景</th><th>策略</th><th>保留内容</th></tr></thead><tbody>
+    <tr><td>短会话</td><td>不压缩。</td><td>完整事实和完整 Surface。</td></tr>
+    <tr><td>单个巨大工具结果</td><td>优先 spill/裁剪。</td><td>前缀、长度、摘要和完整文件。</td></tr>
+    <tr><td>多轮旧历史</td><td>选择闭合区间摘要。</td><td>事实事件+摘要替换事件。</td></tr>
+    <tr><td>摘要器异常</td><td>记录失败结束。</td><td>原 Surface 原样继续。</td></tr>
+    <tr><td>摘要失真</td><td>框架只能验证大小和边界，语义质量需评估。</td><td>保留原事实以便回看或重做。</td></tr>
+    <tr><td>窗口仍超限</td><td>继续压缩、选择更大模型或拒绝请求。</td><td>不能静默切掉未闭合因果链。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>策略</th><th>细节保真</th><th>成本</th><th>主要风险</th></tr></thead><tbody>
+    <tr><td>滑动窗口</td><td>近期高、早期为零。</td><td>最低。</td><td>切断长期约束和工具因果。</td></tr>
+    <tr><td>全量摘要</td><td>取决于摘要质量。</td><td>每次较高。</td><td>反复摘要漂移。</td></tr>
+    <tr><td>区间事务摘要</td><td>近期原文+旧区间摘要。</td><td>中。</td><td>区间选择和边界实现复杂。</td></tr>
+    <tr><td>检索式记忆</td><td>按查询召回。</td><td>索引和检索成本。</td><td>召回遗漏；不能替代审计日志。</td></tr>
+    <tr><td>更大上下文模型</td><td>最高。</td><td>价格和延迟更高。</td><td>窗口最终仍有限。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么 projectedTokens 不能用于计费？</dt><dd>它是本地估算和锚点差值，不是提供方实际处理量；账单只能从 provider usage 派生。</dd>
+    <dt>为什么摘要事件也必须写入日志？</dt><dd>否则无法解释某次模型请求看到了什么，也无法冷重放连续压缩链。</dd>
+    <dt>Spill 是压缩吗？</dt><dd>不是。Spill 只移动字节存放位置；如果引用仍代表全部内容，语义未压缩。工具裁剪才改变模型可见信息量。</dd>
+  </dl>
 
   <h2>先拆开四个量</h2>
   <table><thead><tr><th>量</th><th>来源</th><th>用途</th><th>是否可计费</th></tr></thead><tbody>
@@ -73,6 +151,39 @@ projectedTokens 接近或超过 contextWindow
 费用只根据实际 TokenUsage 计算，不能根据预测值计算。</code></pre>
   <div class="callout"><strong>Cost 存哪里？</strong>本实验与 DeepSeek Harness 都把原始 usage 放在 Session Event，投影可重建累计桶。货币 cost 应由 <code>provider/model + usage + 生效时间/价格表版本</code> 派生；OTel 可复制指标做观测，但不是恢复或账单事实源。</div>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0011-1" data-concept="词元估算">
+  <h3>词元估算：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>本地估算如何影响上下文，而不是账单？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">tokenMeter 用固定启发式规则测量表层与请求开销，并可结合匹配的 provider usage 锚点修正压力；不是精确 tokenizer。 <a href="../deepseek-harness/packages/llm/token-meter/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">SummarizationMiddleware 根据上下文大小与模型窗口触发治理；本地窗口判断不是 provider 实际计费量。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">RollingCondenser 可按事件视图大小触发，LLMSummarizingCondenser 的 max_size 是事件数阈值；并非本课 projectedTokens 的同义字段。 <a href="https://docs.openhands.dev/sdk/arch/condenser">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>先确认度量单位：估算 token、模型窗口比例、事件数量不能直接比较数值。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0011-2" data-concept="实际用量">
+  <h3>实际用量：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>谁提供计费用量，哪些桶不能重复相加？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">读取提供方用量的互斥 input/cache-read/cache-write/output 桶，不再次叠加 reasoning；成功 assistant 锚点参与重放计量。 <a href="../deepseek-harness/packages/llm/token-meter/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangChain AIMessage 的 usage_metadata 表达输入、输出和细分用量，具体可用信息取决于模型集成；不同于上下文估算。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">LLM Metrics 与 ConversationStats 保存 token/cost，并可按 usage_id 汇总不同模型用途。 <a href="https://docs.openhands.dev/sdk/guides/metrics">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>账单依据模型回报及其归一化语义，不能拿压缩后视图大小替代历史实际消耗。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0011-3" data-concept="上下文压力">
+  <h3>上下文压力：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>什么时候启动治理，用哪份容量？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">compaction-basic 向精确 provider/model 路由解析容量，并用 tokenMeter 当前 revision 的压力与策略阈值比较。 <a href="../deepseek-harness/packages/compaction/compaction-basic/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">内置压缩在逼近模型窗口时优先处理可外置内容，必要时摘要；阈值与模型能力配置有关。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">Condenser 可主动按阈值处理；Agent 在模型上下文超限时也会生成 CondensationRequest。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>比较的不只是阈值，还要区分主动治理与提供方拒绝请求后的补救路径。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>事实日志与模型 Surface</h2>
   <pre><code>append user(seq=0) ─┐
 append assistant(1) ├─ 原始 Session Event 永久保留
@@ -87,6 +198,19 @@ compaction/end(6)
 原始 log:      [0, 1, 2, 3, 4, 5, 6]</code></pre>
   <p>恢复时重放 <code>surfaceOp</code> 即可得到相同模型输入；二次压缩还能替换 seq=5 与后续节点。摘要失败只闭合 start/end 审计 bracket，不产生 replacement。</p>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0011-4" data-concept="压缩区间选择">
+  <h3>压缩区间选择：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>摘要哪些历史，如何避免割裂工具调用？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">选择最旧完整表层单元，保留近期尾部，切点调整到工具调用/结果配对平衡处；未闭合不可分尾部拒绝压缩。 <a href="../deepseek-harness/packages/compaction/compaction-basic/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">SummarizationMiddleware 压缩旧消息并保留近期上下文；不要把这一策略直接视为 DeepSeek 的 surface 节点区间协议。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">LLMSummarizingCondenser 保留开头与近期事件，对中间事件生成摘要，Condensation 标记 forgotten_event_ids。 <a href="https://docs.openhands.dev/sdk/arch/condenser">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>DeepSeek 的表层单元、DeepAgents 的消息历史、OpenHands 的事件视图，各自决定合法切分边界。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>压缩事务的不变量</h2>
   <ol>
     <li>在异步摘要前冻结选区及 token 价格。</li>
@@ -96,6 +220,29 @@ compaction/end(6)
     <li>先记录 shadow price，再同步提交 replacement。</li>
     <li>任何失败都不改变当前 surface。</li>
   </ol>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0011-5" data-concept="摘要事务">
+  <h3>摘要事务：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>摘要失败后是否已经破坏原历史？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">压缩后端返回 summary、模型信息及 usage 等，事务记录 compaction/summary；摘要必须缩小源内容，不能把失败输出直接当替换结果。 <a href="../deepseek-harness/packages/compaction/compaction-basic/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">摘要中间件把旧消息压缩成可供后续运行使用的内容；状态耐久性仍依赖 LangGraph checkpointer，并不是本课的显式多事件事务。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">Agent 追加 Condensation 后返回，下一步 View.from_events 才过滤被遗忘事件并插入摘要；原事件日志与模型视图分离。 <a href="https://docs.openhands.dev/sdk/arch/condenser">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>“生成摘要”与“让摘要成为下一次请求的事实”是两个边界，三者提交方式并不相同。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0011-6" data-concept="连续再压缩">
+  <h3>连续再压缩：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>已经有摘要，后续又满了怎么办？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">重新测量改写后的表层，限制 compactionRetries，拒绝不缩小内容的摘要；仍不能回到预算则失败。 <a href="../deepseek-harness/packages/compaction/compaction-basic/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">内置摘要用于持续增长的消息历史；它降低上下文压力，不承诺可以无损保留每次早期细节。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">RollingCondenser 对当前 View 再次检查阈值；后续视图包含此前摘要，而不是永远重新发送所有原始事件。 <a href="https://docs.openhands.dev/sdk/arch/condenser">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>重复摘要可能累积信息损失；“还能运行”不是“原始细节仍完整进入模型”。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>超大工具输出与用户附件有什么区别</h2>
   <div class="callout"><strong>Spill 就是“超大内容落盘”。</strong>当命令输出、测试日志或工具返回文本太大时，系统不会把完整内容一直放在内存、会话日志或模型上下文中，而是把它写入本地受保护文件。模型只看到内容摘要、总字节数、文件引用和分段读取方法，需要时再按范围读取。</div>
@@ -108,6 +255,29 @@ compaction/end(6)
     <tr><td>用户附件（Attachment）</td><td>用户上传的图片、PDF 等不可变文件</td><td>附件标识、文件类型、大小等信息</td></tr>
   </tbody></table>
   <p>本地超大内容落盘使用会话哈希目录和随机文件名，避免不同会话互相读取或猜测文件路径。目录权限 <code>0700</code> 表示只有当前用户可以访问；文件权限 <code>0600</code> 表示只有当前用户可以读写。实验版还会记录 SHA-256，并在读取时检查文件是否损坏或被修改。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0011-7" data-concept="工具结果裁剪">
+  <h3>工具结果裁剪：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>删减模型可见内容，与搬走字节有什么区别？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">可选 toolResultPruner 在选摘要范围前改写超大工具结果；重测已安全时可跳过模型摘要。 <a href="../deepseek-harness/packages/compaction/compaction-basic/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">大工具结果外置到 backend，消息改成预览与文件引用，模型可用文件工具再读需要的部分。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">TerminalObservation.to_llm_content 通过 maybe_truncate 裁剪模型可见输出，并可传 full_output_save_dir 保存完整输出；这发生在工具结果展示层，不是 Condenser 的跨事件摘要。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/terminal/definition.py">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>无模型裁剪、外置后按需读取、跨事件摘要是不同机制，不应统一称作“截断”。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0011-8" data-concept="溢出存储">
+  <h3>溢出存储：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>原文放在哪里，恢复后引用是否还有效？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">spill-policy 经 spillStore 保存完整纯文本，再提供有界预览和取回指引；省略 maxInlineBytes 时策略不启用。 <a href="../deepseek-harness/packages/spill/spill-policy/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">外置落到所配 backend；StateBackend 文件随线程状态，FilesystemBackend 在磁盘，StoreBackend 可跨线程，生命周期不同。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">终端结果的 maybe_truncate 接收 full_output_save_dir，将超长输出保存后提供裁剪内容；其文件生命周期需按终端和工作区配置核对，不能直接套用 DeepSeek spillStore 的存储契约。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/terminal/definition.py">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>内容引用不是耐久保证；要同时检查存储后端、读取权限和清理时机。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

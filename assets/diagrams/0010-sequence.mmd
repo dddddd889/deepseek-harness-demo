@@ -1,0 +1,16 @@
+---
+title: 持久化与恢复 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 宿主
+  participant p1 as 存储
+  participant p2 as 磁盘
+  participant p3 as 修复器
+  p0->>p1: resume 会话标识
+  p1->>p2: 读取原始字节
+  p2-->>p1: 返回日志
+  p1->>p1: 检查校验和与序号
+  p1->>p3: 计算悬空结束事件
+  p1->>p2: 持久化修复
+  p1-->>p0: 返回恢复的 Session

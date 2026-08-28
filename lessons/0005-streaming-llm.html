@@ -7,8 +7,51 @@
   <link rel="stylesheet" href="../assets/course.css">
 </head>
 <body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 5 课：可控流式 LLM 与 DeepSeek Adapter</h1>
   <p class="lead">核心只依赖 StreamChunk 协议。Fake Provider 与真实 DeepSeek Provider 共享同一 Runtime、Assembler 和 Session 落账路径。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">ctx.llm 注册适配器，prepareCall 固定本次适配器与配置；流协议含 usage、finish 等事件。</td><td data-framework="deepagents">接受支持工具调用的 LangChain chat model；provider:model 字符串由模型集成解析，也可传已配置模型对象。</td><td data-framework="openhands">LLM 封装 LiteLLM，提供 completion/responses、流式调用、重试和用量统计。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">具体提供方约定留在适配器，循环不应直接依赖 DeepSeek HTTP 数据形状。</td><td data-framework="deepagents">模型集成兼容性与具体参数取决于提供方，不由 DeepAgents 统一抹平。</td><td data-framework="openhands">提供方适配属于 LLM 层，Action 的执行仍属于工具层。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/llm/llm/src/types.ts">原仓库依据 1</a> · <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/models">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/llm">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>都隔离模型供应商，但适配扩展点不同：服务注册、LangChain 模型对象、LiteLLM 封装。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>智能体循环与外部模型服务之间的适配边界。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 5 课</figcaption><a href="../assets/diagrams/0005-position.svg"><img src="../assets/diagrams/0005-position.svg" alt="流式模型接口在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0005-position.svg">打开大图</a> · <a href="../assets/diagrams/0005-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>第 6 课组装的消息、工具描述、模型参数和取消信号。</td></tr>
+    <tr><th>下游与输出</th><td>文本与工具调用分片、用量以及完成或错误，返回循环并写入会话。</td></tr>
+    <tr><th>不归本章负责</th><td>模型可以提出工具调用，但真正执行属于第 7 课；网络分片也不是完整消息。</td></tr>
+    <tr><th>放进具体场景</th><td>一条工具参数 JSON 被拆成多个分片，适配层须完成组装后才能交给工具执行。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 流式模型</figcaption>
+    <a href="../assets/diagrams/0005-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0005-modules.svg" alt="流式模型的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0005-modules.svg">打开大图</a> · <a href="../assets/diagrams/0005-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 流式模型</figcaption>
+    <a href="../assets/diagrams/0005-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0005-sequence.svg" alt="流式模型的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0005-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0005-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 流式模型</figcaption>
+    <a href="../assets/diagrams/0005-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0005-branches.svg" alt="流式模型的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0005-branches.svg">打开大图</a> · <a href="../assets/diagrams/0005-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -18,14 +61,15 @@
     <tr><th>解决的问题</th><td>隔离不同模型接口和网络协议差异，让流式输出、错误与用量拥有一致且可测试的行为。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>正常路径</th><th>异常路径</th></tr></thead><tbody>
-    <tr><td>提供方注册与路由</td><td>按提供方标识选择模型实现，并支持运行时撤销。</td><td>未知提供方转成稳定错误终止帧。</td></tr>
-    <tr><td>可控假模型</td><td>脚本化输出文本、工具调用、用量和结束原因，可插入延迟。</td><td>用于稳定复现取消与竞态。</td></tr>
-    <tr><td>内容组装</td><td>按首次索引顺序组装交错文本、推理和工具参数。</td><td>保留工具参数原始 JSON。</td></tr>
-    <tr><td>模型步骤落账</td><td>逐块写入流事件，结束时写最终消息和用量。</td><td>失败流保留数据块但不伪造助手消息。</td></tr>
-    <tr><td>DeepSeek 请求适配</td><td>映射消息、工具、系统提示和模型参数，按次解析密钥。</td><td>缺少密钥时在网络请求前失败。</td></tr>
-    <tr><td>DeepSeek SSE 翻译</td><td>处理跨网络块边界的数据帧、结束标记、工具增量和互斥缓存用量桶。</td><td>裸异常与取消统一收敛为唯一终止帧。</td></tr>
+    <tr><td><a href="#concept-0005-1">提供方注册与路由</a></td><td>按提供方标识选择模型实现，并支持运行时撤销。</td><td>未知提供方转成稳定错误终止帧。</td></tr>
+    <tr><td><a href="#concept-0005-2">可控假模型</a></td><td>脚本化输出文本、工具调用、用量和结束原因，可插入延迟。</td><td>用于稳定复现取消与竞态。</td></tr>
+    <tr><td><a href="#concept-0005-3">内容组装</a></td><td>按首次索引顺序组装交错文本、推理和工具参数。</td><td>保留工具参数原始 JSON。</td></tr>
+    <tr><td><a href="#concept-0005-4">模型步骤落账</a></td><td>逐块写入流事件，结束时写最终消息和用量。</td><td>失败流保留数据块但不伪造助手消息。</td></tr>
+    <tr><td><a href="#concept-0005-5">DeepSeek 请求适配</a></td><td>映射消息、工具、系统提示和模型参数，按次解析密钥。</td><td>缺少密钥时在网络请求前失败。</td></tr>
+    <tr><td><a href="#concept-0005-6">DeepSeek SSE 翻译</a></td><td>处理跨网络块边界的数据帧、结束标记、工具增量和互斥缓存用量桶。</td><td>裸异常与取消统一收敛为唯一终止帧。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：模型流式适配层</h2>
@@ -52,6 +96,37 @@ BlockAssembler ─► Message + Usage + Finish（输出）
     <tr><th>方案对比</th><td>一次性等待完整响应实现简单但首字延迟高且难取消；直接透传厂商 SSE 灵活，却把不稳定协议扩散到所有下游。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>一次模型流
+├─ 文本/推理交错 → 按块索引组装
+├─ 工具参数分片 → 保留并拼接原始 JSON
+├─ usage 在末尾 → 先写用量，再写终止
+├─ 网络异常/未知提供方 → 唯一 error finish
+├─ 用户取消 → 唯一 cancelled finish
+└─ [DONE] 无内容 → 正常闭合，不伪造消息</code></pre>
+  <table><thead><tr><th>场景</th><th>线协议现象</th><th>框架语义</th></tr></thead><tbody>
+    <tr><td>正常文本</td><td>多个 SSE data 帧携带文本增量。</td><td>开始、增量、结束、用量、终止顺序落账。</td></tr>
+    <tr><td>交错工具</td><td>多个 tool call 的名称和参数按索引穿插。</td><td>组装器为每个索引维护独立状态。</td></tr>
+    <tr><td>任意网络切片</td><td>一个 SSE 行跨多个 Uint8Array，或一块含多帧。</td><td>增量解析器按空行恢复完整事件。</td></tr>
+    <tr><td>提供方故障</td><td>HTTP 非成功、JSON 错误或流中断。</td><td>保留已收到块，只产生一个错误终止帧。</td></tr>
+    <tr><td>取消竞态</td><td>取消与最后一帧同时到达。</td><td>终止状态第一次写入获胜，不重复结束。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>首字延迟</th><th>统一性</th><th>代价</th></tr></thead><tbody>
+    <tr><td>完整响应后返回</td><td>高。</td><td>高，处理简单。</td><td>无法实时展示，取消收益低。</td></tr>
+    <tr><td>透传厂商 SSE</td><td>低。</td><td>低，下游绑定厂商字段。</td><td>切换模型和测试困难。</td></tr>
+    <tr><td>稳定 StreamChunk</td><td>低。</td><td>高，核心只认统一协议。</td><td>厂商独有能力需显式扩展协议。</td></tr>
+    <tr><td>Reactive Observable</td><td>低。</td><td>可组合性强。</td><td>依赖和学习成本高于异步生成器。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么必须只有一个终止帧？</dt><dd>Agent 和 Session 以终止帧决定步骤出口；重复或缺失都会导致双重结算或悬空生命周期。</dd>
+    <dt>为什么 usage 要放在 finish 之前？</dt><dd>消费者看到 finish 后通常停止读取；若用量在后面，它可能永远无法落账。</dd>
+    <dt>适配器应不应该重试？</dt><dd>只有在请求尚未产生可见输出且具备幂等条件时才可能安全；流已部分输出后自动重试会造成重复文本和重复副作用决策。</dd>
+  </dl>
+
   <h2>调用链</h2>
   <pre><code>GenerateOptions
       │
@@ -76,6 +151,69 @@ LlmRuntime ── provider route ──&gt; Fake Provider / DeepSeek HTTP SSE
   </table>
 
   <div class="callout"><strong>密钥不是领域数据。</strong><code>DEEPSEEK_API_KEY</code> 只在发起 HTTP 请求时解析，不能出现在 RequestHeader、Session Event、日志或 OTel 属性里。</div>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0005-1" data-concept="提供方注册与路由">
+  <h3>提供方注册与路由：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>provider/model 在什么地方绑定？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ctx.llm 管适配器，prepareCall 捕获精确注册，避免配置解析与分派之间发生热替换混用。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">provider:model 经 init_chat_model 解析，也可传入已配置模型实例；模型集成决定具体参数。 <a href="https://docs.langchain.com/oss/python/deepagents/models">依据</a></td>
+    <td data-framework="openhands">LLM 用 LiteLLM 统一模型路由，provider/model 遵循其配置格式。 <a href="https://docs.openhands.dev/sdk/arch/llm">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>运行时注册表、模型对象和统一供应商库是不同替换边界。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0005-2" data-concept="可控假模型">
+  <h3>可控假模型：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>如何在不调用真实模型时复现相同流？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">llm-replay 从 Session JSONL 分片重建流；override 可注入裸异常、hang 等日志不足以表达的情况。 <a href="../deepseek-harness/packages/test-support/llm-replay/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">入口接受模型对象，因此可在模型边界替换测试实现；这不等于自带 DeepSeek JSONL fixture 解码器。 <a href="https://docs.langchain.com/oss/python/deepagents/models">依据</a></td>
+    <td data-framework="openhands">LLM 是模型调用边界；测试可围绕该边界固定响应，不能直接消费 DeepSeek 的回放格式。这里是测试接缝对比，不宣称同名回放插件。 <a href="https://docs.openhands.dev/sdk/arch/llm">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>固定内容还不够；取消、首块前异常、挂起需要固定时序或注入点。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0005-3" data-concept="内容组装">
+  <h3>内容组装：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>交错增量怎样成为完整模型消息？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">适配器把提供方 SSE 转换为 StreamChunk，块身份、增量与完成事件交给统一协议消费方。 <a href="../deepseek-harness/packages/llm/llm-deepseek/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">AIMessageChunk 支持累加，工具调用增量与消息内容在 LangChain 消息模型内组装。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">LLM 层处理提供方调用及流，Agent 解析结果形成 ActionEvent/MessageEvent；不是直接把网络帧当完整事件。 <a href="https://docs.openhands.dev/sdk/arch/agent">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>组装需要保留内容块与调用身份，不能只拼 text 字段。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0005-4" data-concept="模型步骤落账">
+  <h3>模型步骤落账：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>流结束与写入完整消息是什么关系？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">成功调用恰好追加一个 assistant/message 锚点，包含 sourceEventSeqs 和可用 usage；空内容也有完成锚点。 <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">消息状态与检查点由图运行时保存，流订阅仅观察运行输出，不等于每个网络 chunk 已单独持久化。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">消息和行动作为 EventLog 事件保存，配置/统计另在 ConversationState；不要套用 DeepSeek 的 sourceEventSeqs。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>“前端看到字”不代表“完整模型步骤已持久化”，各框架的提交单位不同。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0005-5" data-concept="DeepSeek 请求适配">
+  <h3>DeepSeek 请求适配：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>接同一个模型 API 时谁做协议转换？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">deepseek-official 路由直接 fetch chat-completions；凭据按请求解析，另有 pi-ai 路径，二者可并存。 <a href="../deepseek-harness/packages/llm/llm-deepseek/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">使用支持工具调用的 LangChain 模型集成；模型参数和凭据应配置在该模型对象或 provider profile。 <a href="https://docs.langchain.com/oss/python/deepagents/models">依据</a></td>
+    <td data-framework="openhands">通过 LLM/LiteLLM 的提供方适配调用；本课直接 fetch 的请求构造不是 SDK 的唯一入口。 <a href="https://docs.openhands.dev/sdk/arch/llm">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>同一个供应商不代表同一套 harness 请求协议，配置应落在实际适配层。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0005-6" data-concept="DeepSeek SSE 翻译">
+  <h3>DeepSeek SSE 翻译：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>模型 SSE 和浏览器事件流是不是同一条通道？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">模型适配器用 eventsource-parser 分帧并翻译为 StreamChunk；这与浏览器侧双 WebSocket 下行是不同链路。 <a href="../deepseek-harness/packages/llm/llm-deepseek/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">模型集成处理提供方流，应用消费 LangChain 消息流/事件流；不必暴露提供方原始 SSE。 <a href="https://docs.langchain.com/oss/python/langchain/messages">依据</a></td>
+    <td data-framework="openhands">LLM 流式调用与 Agent Server 的 HTTP/WebSocket 会话 API 分层；提供方格式不直接成为客户端协议。 <a href="https://docs.openhands.dev/sdk/arch/llm">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>应分别画模型→运行时和运行时→界面两段传输，不能因为都有流就认为协议相同。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

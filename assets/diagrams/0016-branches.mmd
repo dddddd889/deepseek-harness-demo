@@ -1,0 +1,9 @@
+---
+title: 网页客户端 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"重复事件"| result0["幂等忽略"]
+  decision -->|"序号缺口"| result1["明确失败、调用方重新同步"]
+  decision -->|"连接终止"| result2["调用方决定重新追尾"]
+  decision -->|"审批已被处理"| result3["保留首个有效决定"]

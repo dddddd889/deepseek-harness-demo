@@ -1,0 +1,9 @@
+---
+title: 流式模型 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"未知提供方"| result0["错误终止帧"]
+  decision -->|"请求或流异常"| result1["保留已收到数据块"]
+  decision -->|"取消信号"| result2["取消终止帧"]
+  decision -->|"正常结束"| result3["提交完整助手消息"]

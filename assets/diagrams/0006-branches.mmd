@@ -1,0 +1,9 @@
+---
+title: 智能体循环 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"收件箱为空"| result0["无副作用返回"]
+  decision -->|"已有轮次运行"| result1["拒绝重入"]
+  decision -->|"模型请求工具"| result2["执行或报告未接入阻塞"]
+  decision -->|"取消或步骤耗尽"| result3["记录对应停止原因"]

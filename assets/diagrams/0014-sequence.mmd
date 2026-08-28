@@ -1,0 +1,15 @@
+---
+title: 无界面宿主 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as CLI
+  participant p1 as 配置解析器
+  participant p2 as HeadlessHost
+  participant p3 as 会话存储
+  p0->>p1: 文件、环境与参数
+  p1-->>p0: 返回校验配置
+  p0->>p2: open 宿主
+  p2->>p3: 创建或恢复会话
+  p0->>p2: 运行对话
+  p2->>p3: 关闭并刷盘

@@ -1,0 +1,13 @@
+---
+title: 智能体服务 · 模块关系
+---
+flowchart TD
+  n0["HTTP 客户端"]
+  n1["AgentServer"]
+  n2["鉴权与 RPC 路由"]
+  n3["HeadlessHost"]
+  n4["SSE 事件连接"]
+  n0 -->|"发送请求"| n1
+  n1 -->|"校验与幂等处理"| n2
+  n1 -->|"定位会话并执行"| n3
+  n1 -->|"从序号重放和追尾"| n4

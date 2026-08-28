@@ -7,8 +7,51 @@
   <link rel="stylesheet" href="../assets/course.css">
 </head>
 <body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 1 课：先证明环境可调试</h1>
   <p class="lead">本课只建立“代码能运行、测试能失败、断点能停住”三个事实。暂时不接入 LLM，也不引入 Cordis。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">原仓库使用 pnpm 工作区，区分 Host/Client 构建，脚本包含 TypeScript 构建与 Vitest 测试。</td><td data-framework="deepagents">通过 create_deep_agent 组合已有模型、工具和上下文能力，属于可嵌入应用的库入口。</td><td data-framework="openhands">Software Agent SDK 提供可组合的 Agent、Conversation、LLM 等构件；服务端和工具另有包。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">本课 Bun 最小实验是教学基线，不是原仓库的完整构建链。</td><td data-framework="deepagents">最小调用成功只证明库接通；应用自己的测试、部署和持久化配置仍需建立。</td><td data-framework="openhands">SDK 的最小会话不等于完整 OpenHands 产品部署。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/package.json">原仓库依据 1</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/overview">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/sdk">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>三者首先要对齐比较层级：原仓库工程、可嵌入库、产品部署不能用同一个“启动成功”标准验收。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>全系统的构建与验证底座，不是一次模型请求中的运行阶段。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 1 课</figcaption><a href="../assets/diagrams/0001-position.svg"><img src="../assets/diagrams/0001-position.svg" alt="工程基线在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0001-position.svg">打开大图</a> · <a href="../assets/diagrams/0001-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>开发者修改源码、依赖和配置。</td></tr>
+    <tr><th>下游与输出</th><td>可启动、可测试、可复现的运行产物，供第 2 课插件内核和后续所有模块使用。</td></tr>
+    <tr><th>不归本章负责</th><td>不负责模型推理、工具执行或会话恢复。</td></tr>
+    <tr><th>放进具体场景</th><td>刚拉下仓库先跑一个不依赖真实模型的检查，确认失败来自代码还是环境；再进入插件与协议开发。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 可调试基线</figcaption>
+    <a href="../assets/diagrams/0001-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0001-modules.svg" alt="可调试基线的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0001-modules.svg">打开大图</a> · <a href="../assets/diagrams/0001-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 可调试基线</figcaption>
+    <a href="../assets/diagrams/0001-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0001-sequence.svg" alt="可调试基线的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0001-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0001-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 可调试基线</figcaption>
+    <a href="../assets/diagrams/0001-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0001-branches.svg" alt="可调试基线的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0001-branches.svg">打开大图</a> · <a href="../assets/diagrams/0001-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -18,12 +61,13 @@
     <tr><th>解决的问题</th><td>排除环境和工具链噪声，避免后续把安装、编译或调试问题误判成 Harness 设计问题。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>具体覆盖</th><th>完成标志</th></tr></thead><tbody>
-    <tr><td>运行基线</td><td>Bun 运行 TypeScript 源码，入口能够稳定退出并返回正确退出码。</td><td>示例输出可重复。</td></tr>
-    <tr><td>类型基线</td><td>严格类型检查覆盖源码与测试，类型错误在运行前暴露。</td><td><code>tsc</code> 无错误。</td></tr>
-    <tr><td>测试基线</td><td>测试可通过，也能通过故意修改断言证明失败路径有效。</td><td><code>bun:test</code> 能红能绿。</td></tr>
-    <tr><td>调试基线</td><td>VS Code 可启动目标、命中源码断点并检查局部变量与调用栈。</td><td>按 F5 能停在断点。</td></tr>
+    <tr><td><a href="#concept-0001-1">运行基线</a></td><td>Bun 运行 TypeScript 源码，入口能够稳定退出并返回正确退出码。</td><td>示例输出可重复。</td></tr>
+    <tr><td><a href="#concept-0001-2">类型基线</a></td><td>严格类型检查覆盖源码与测试，类型错误在运行前暴露。</td><td><code>tsc</code> 无错误。</td></tr>
+    <tr><td><a href="#concept-0001-3">测试基线</a></td><td>测试可通过，也能通过故意修改断言证明失败路径有效。</td><td><code>bun:test</code> 能红能绿。</td></tr>
+    <tr><td><a href="#concept-0001-4">调试基线</a></td><td>VS Code 可启动目标、命中源码断点并检查局部变量与调用栈。</td><td>按 F5 能停在断点。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：可调试基线</h2>
@@ -44,6 +88,35 @@
     <tr><th>方案对比</th><td>直接运行完整应用反馈丰富但变量太多；最小垂直基线信息少，却能最快区分工具链故障与业务故障。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>开始验证
+├─ 运行成功、测试通过、断点命中 → 基线成立
+├─ 运行失败、类型检查失败 → 先修工具链或源码
+├─ 测试永远通过 → 反向制造失败，排查假测试
+├─ 断点不命中 → 检查启动目标与源码映射
+└─ 本地通过、CI 失败 → 对齐版本、环境和工作目录</code></pre>
+  <table><thead><tr><th>场景</th><th>观察</th><th>处理</th></tr></thead><tbody>
+    <tr><td>正常</td><td>入口、类型检查、测试和断点四条链路全部成功。</td><td>冻结版本与命令，作为后续课程共同入口。</td></tr>
+    <tr><td>边界</td><td>空输入、最小文件或无依赖时仍能启动和退出。</td><td>保留最小夹具，避免把业务数据当作工具链前提。</td></tr>
+    <tr><td>失败</td><td>编译错误、断言错误或非零退出能被明确报告。</td><td>确认失败发生在哪一层，不用后续模块掩盖根因。</td></tr>
+    <tr><td>恢复</td><td>重装依赖或换机器后结果漂移。</td><td>按锁文件、运行时版本、配置、工作目录顺序恢复。</td></tr>
+    <tr><td>误用</td><td>只运行一次 Hello 就宣称环境可靠。</td><td>必须反向证明测试能失败、断点能观察真实源码。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>优势</th><th>代价</th><th>何时选择</th></tr></thead><tbody>
+    <tr><td>只跑完整应用</td><td>最接近最终体验。</td><td>依赖和变量过多，失败定位困难。</td><td>基线已稳定后的端到端验收。</td></tr>
+    <tr><td>只做静态检查</td><td>快、确定、适合 CI。</td><td>不能证明运行时、I/O 和调试器有效。</td><td>提交前快速门禁。</td></tr>
+    <tr><td>运行+类型+测试+断点</td><td>证据互补，能定位层次。</td><td>初始配置稍多。</td><td>新仓库和教学实验的推荐基线。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么“测试通过”还不够？</dt><dd>测试可能根本没有运行目标代码，或断言永远为真；必须故意制造失败证明测试链路有辨别力。</dd>
+    <dt>为什么第一课就需要断点？</dt><dd>后续大量问题涉及事件顺序和竞态，只看最终输出无法判断中间状态；调试能力必须先于复杂状态机。</dd>
+    <dt>能否直接用系统全局 Bun？</dt><dd>可以，但必须固定并打印版本；否则机器或 CI 升级后出现的行为变化无法和代码变化区分。</dd>
+  </dl>
+
   <h2>当前基线</h2>
   <table>
     <tbody>
@@ -53,6 +126,49 @@
       <tr><th>构建产物</th><td>Bun 运行源码；发布时生成 JS、声明文件与 source map</td></tr>
     </tbody>
   </table>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0001-1" data-concept="运行基线">
+  <h3>运行基线：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>同样启动一个 agent，运行环境如何不同？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">原工程是 Node/TypeScript 与 pnpm 工作区；本课 Bun 启动器只是实验室入口。 <a href="../deepseek-harness/package.json">依据</a></td>
+    <td data-framework="deepagents">这里比较 Python DeepAgents 包，依赖和构建信息由 pyproject.toml 声明；不是 Bun 工程。 <a href="https://github.com/langchain-ai/deepagents/blob/main/libs/deepagents/pyproject.toml">依据</a></td>
+    <td data-framework="openhands">SDK 工程使用 uv 工作区组织 sdk/tools/workspace/agent-server 等 Python 包。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/pyproject.toml">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>复现基线应锁定各自环境，不能把实验室 Bun 版本当作三套框架的共同运行要求。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0001-2" data-concept="类型基线">
+  <h3>类型基线：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>错误在哪个类型检查边界被发现？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">原工程 build:lib 分 Host/Client 编译，typecheck 使用 TypeScript 项目构建。 <a href="../deepseek-harness/package.json">依据</a></td>
+    <td data-framework="deepagents">Python 包带 py.typed，开发依赖含 ty；类型检查不是 TypeScript 的 tsc。 <a href="https://github.com/langchain-ai/deepagents/blob/main/libs/deepagents/pyproject.toml">依据</a></td>
+    <td data-framework="openhands">工程配置 Pyright 的 include/extraPaths，事件等运行数据还使用 Pydantic 校验。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/pyproject.toml">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>静态检查与运行时验证分开验收；一个类型检查器通过不代表网络输入可信。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0001-3" data-concept="测试基线">
+  <h3>测试基线：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>最小测试究竟由哪个执行器运行？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">原仓库 test 脚本运行 Vitest；实验室使用 bun:test，二者不是同一套命令。 <a href="../deepseek-harness/package.json">依据</a></td>
+    <td data-framework="deepagents">开发测试依赖包含 pytest、pytest-asyncio、pytest-socket 等，可区分异步测试和外部网络依赖。 <a href="https://github.com/langchain-ai/deepagents/blob/main/libs/deepagents/pyproject.toml">依据</a></td>
+    <td data-framework="openhands">使用 pytest/pytest-asyncio，并将 stress 测试默认排除；常规测试绿不代表已经运行压力测试。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/pyproject.toml">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>先证明目标测试确实被选中，再比较结果；尤其不要把被默认排除的测试算作通过。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0001-4" data-concept="调试基线">
+  <h3>调试基线：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>断点应跟随哪个进程和源码入口？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">本地原工程的 Host/Client 构建分离，定位服务端运行问题应跟 Host 入口；浏览器与宿主是两个执行环境。 <a href="../deepseek-harness/package.json">依据</a></td>
+    <td data-framework="deepagents">最小调用从 create_deep_agent 返回对象的 invoke/流入口开始；Python 调试器应附着承载该调用的应用进程。 <a href="https://docs.langchain.com/oss/python/deepagents/overview">依据</a></td>
+    <td data-framework="openhands">LocalConversation 在当前进程运行，RemoteConversation 经网络委托；远程工具断点应落在 Agent Server 所在进程。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>VS Code 是调试界面，不是共同运行时；附着错进程会出现“请求成功但断点不命中”。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>练习</h2>
   <ol>

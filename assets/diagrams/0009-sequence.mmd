@@ -1,0 +1,15 @@
+---
+title: 权限与沙箱 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 工具管线
+  participant p1 as 权限服务
+  participant p2 as 用户响应器
+  participant p3 as 执行层
+  p0->>p1: 效果与请求权限
+  p1->>p1: 判定当前模式
+  p1->>p2: 需要时询问升级
+  p2-->>p1: 单次决定
+  p1-->>p0: 返回授权上下文
+  p0->>p3: 按授权模式执行

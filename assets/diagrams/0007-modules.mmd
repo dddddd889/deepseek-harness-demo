@@ -1,0 +1,13 @@
+---
+title: 工具执行 · 模块关系
+---
+flowchart TD
+  n0["Agent"]
+  n1["工具执行管线"]
+  n2["ToolRegistry"]
+  n3["PermissionService"]
+  n4["工具函数"]
+  n0 -->|"提交调用批次"| n1
+  n1 -->|"解析与模式校验"| n2
+  n1 -->|"授权判定"| n3
+  n1 -->|"安全分组后执行"| n4

@@ -1,0 +1,105 @@
+flowchart TD
+  subgraph frontend["前端与客户端"]
+    frontend0["应用外壳与插件装配"]
+    frontend1["通信与连接生命周期"]
+    frontend2["会话与工作区状态"]
+    frontend3["UI 扩展与 React 渲染"]
+    frontend4["对话与任务界面"]
+    frontend5["工作台与偏好界面"]
+  end
+  subgraph server["后端：服务接入层（Agent Server 职责）"]
+    server0["Web 宿主与资源服务"]
+    server1["远程调用网关"]
+    server2["会话操作与历史入口"]
+    server3["实时事件下行"]
+    server4["访问与协议边界"]
+    server5["无界面与 SDK 入口"]
+  end
+  subgraph core["后端：智能体核心与编排"]
+    core0["智能体与运行生命周期"]
+    core1["循环与输入调度"]
+    core2["会话事实与读模型"]
+    core3["上下文工程"]
+    core4["子智能体与后台任务"]
+    core5["工作流与目标控制"]
+  end
+  subgraph execution["模型、工具与执行环境"]
+    execution0["模型适配与流式协议"]
+    execution1["工具注册与执行管线"]
+    execution2["审批、权限与隔离"]
+    execution3["本地与远程执行后端"]
+    execution4["外部工具与知识接入"]
+    execution5["结果与大内容处理"]
+  end
+  subgraph storage["数据库与持久化"]
+    storage0["会话持久化接口"]
+    storage1["权威存储后端"]
+    storage2["恢复、修复与分叉"]
+    storage3["派生查询与搜索"]
+    storage4["非会话数据与配置"]
+    storage5["附件与溢出产物"]
+  end
+  subgraph observability["OTel 与可观测性"]
+    observability0["事件与运维信号捕获"]
+    observability1["投影、脱敏与分享策略"]
+    observability2["OTel Logs 导出管线"]
+    observability3["接收与观测存储"]
+    observability4["用量、成本与统计读模型"]
+    observability5["运行时诊断与不变量"]
+  end
+  subgraph foundation["工程、装配与交付底座"]
+    foundation0["插件依赖与资源生命周期"]
+    foundation1["产品装配与配置覆盖"]
+    foundation2["构建与协议生成"]
+    foundation3["自动测试与回归"]
+    foundation4["本地开发与断点调试"]
+    foundation5["发布与运维检查"]
+  end
+  frontend0 -.->|"R01 装配插槽"| frontend3
+  frontend1 -->|"R02 同步事件"| frontend2
+  frontend2 -->|"R03 提供状态"| frontend3
+  frontend3 -->|"R04 渲染对话"| frontend4
+  frontend3 -->|"R05 渲染工作台"| frontend5
+  server0 -.->|"R06 承载接口"| server1
+  server4 -.->|"R07 约束访问"| server1
+  server1 -->|"R08 分发操作"| server2
+  server2 -->|"R09 会话订阅"| server3
+  core0 -->|"R10 驱动循环"| core1
+  core1 -->|"R11 准备请求"| core3
+  core3 -->|"R12 提供上下文"| core1
+  core1 -->|"R13 追加事实"| core2
+  core4 -->|"R14 创建或继续"| core0
+  core5 -->|"R15 任务编排"| core4
+  execution1 -->|"R16 执行检查"| execution2
+  execution2 -->|"R17 允许后执行"| execution3
+  execution1 -->|"R18 接入能力"| execution4
+  execution3 -->|"R19 处理结果"| execution5
+  storage0 -->|"R20 追加提交"| storage1
+  storage1 -->|"R21 读取历史"| storage2
+  storage1 -->|"R22 派生索引"| storage3
+  observability0 -.->|"R23 投影脱敏"| observability1
+  observability1 -.->|"R24 交接记录"| observability2
+  observability2 -.->|"R25 OTLP 导出"| observability3
+  foundation1 -.->|"R26 装配插件"| foundation0
+  foundation2 -.->|"R27 提供产物"| foundation1
+  foundation3 -.->|"R28 回归检查"| foundation5
+  foundation5 -.->|"R29 检查配置"| foundation1
+  foundation3 -.->|"R30 校验构建"| foundation2
+  frontend1 -->|"R31 HTTP 请求"| server1
+  server3 -->|"R32 双 WS 推送"| frontend1
+  server2 -->|"R33 会话操作"| core0
+  server5 -->|"R34 无界面调用"| core0
+  core2 -->|"R35 事件与投影"| server3
+  core1 -->|"R36 模型请求"| execution0
+  execution0 -->|"R37 记录响应"| core2
+  core1 -->|"R38 调度工具"| execution1
+  execution5 -->|"R39 记录结果"| core2
+  core2 -->|"R40 写入事实"| storage0
+  storage2 -->|"R41 恢复会话"| core0
+  execution5 -->|"R42 保存产物"| storage5
+  core2 -.->|"R43 捕获副本"| observability0
+  core2 -->|"R44 派生统计"| observability4
+  foundation1 -.->|"R45 配置路由"| storage4
+  foundation0 -.->|"R46 服务与生命周期"| core0
+  foundation4 -.->|"R47 断点调试"| core1
+  observability5 -.->|"R48 检查不变量"| core1

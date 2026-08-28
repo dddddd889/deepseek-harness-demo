@@ -1,0 +1,9 @@
+---
+title: 持久化与恢复 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"无换行尾部"| result0["截断未提交尾部"]
+  decision -->|"完整行校验失败"| result1["拒绝恢复"]
+  decision -->|"悬空工具调用"| result2["记录结果未知、禁止自动重试"]
+  decision -->|"完整闭合日志"| result3["直接重建会话"]

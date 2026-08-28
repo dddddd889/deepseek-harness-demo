@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 13 课：Jobs、子 Agent 与 Workflow</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 13 课：Jobs、子 Agent 与 Workflow</h1>
   <p class="lead">并发不是 <code>Promise.all</code> 本身，而是身份、所有权、取消、资源收敛和可观察生命周期共同组成的控制面。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">subagents 提供创建与继续的接口，jobs 负责后台任务登记，workflowEngine 提供脚本编排；进程内子 agent 通过 ctx.agents 创建。</td><td data-framework="deepagents">task 把工作委派到具有独立上下文的子智能体；stream.subagents 可观察每次委派的状态和输出。</td><td data-framework="openhands">TaskToolSet 创建或恢复子 Conversation，同步等待结果；可用 task ID 继续已有任务。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">这些是分开的扩展服务，不能把一个异步工具 Promise 当作完整工作流。</td><td data-framework="deepagents">同步 task 与另行配置的异步子智能体能力应分开讨论，不能推出通用后台 Job 持久调度。</td><td data-framework="openhands">这条接口明确是阻塞式委派，不能用它证明后台 Jobs 或通用 Workflow 调度能力。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/docs/capability-seams.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/subagents">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/deepagents/event-streaming">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/guides/task-tool-set">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>“支持多 agent”远不够：还要对齐等待方式、上下文隔离、取消归属、结果持久化和继续执行语义。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>位于单智能体循环之上的工作协调层，可创建或等待多个执行单元。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 13 课</figcaption><a href="../assets/diagrams/0013-position.svg"><img src="../assets/diagrams/0013-position.svg" alt="任务与子智能体编排在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0013-position.svg">打开大图</a> · <a href="../assets/diagrams/0013-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>父任务的委派请求、子任务说明、取消和等待条件。</td></tr>
+    <tr><th>下游与输出</th><td>子任务身份、进度、结果与失败，返回父任务。</td></tr>
+    <tr><th>不归本章负责</th><td>工具并行、后台 Job、子智能体和持久 Workflow 不是同一能力；必须分别核对。</td></tr>
+    <tr><th>放进具体场景</th><td>父任务把检索交给子智能体，继续或等待由编排策略决定；取消父任务时还要明确子任务是否随之停止。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 并发编排</figcaption>
+    <a href="../assets/diagrams/0013-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0013-modules.svg" alt="并发编排的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0013-modules.svg">打开大图</a> · <a href="../assets/diagrams/0013-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 并发编排</figcaption>
+    <a href="../assets/diagrams/0013-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0013-sequence.svg" alt="并发编排的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0013-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0013-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 并发编排</figcaption>
+    <a href="../assets/diagrams/0013-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0013-branches.svg" alt="并发编排的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0013-branches.svg">打开大图</a> · <a href="../assets/diagrams/0013-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,16 +57,17 @@
     <tr><th>解决的问题</th><td>控制并发任务的身份、权限、资源和生命周期，避免任务泄漏、结果串线或父任务结束后子任务仍失控运行。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力域</th><th>完整能力</th><th>收敛规则</th></tr></thead><tbody>
-    <tr><td>后台任务创建</td><td>分配稳定标识，绑定可选所有者、生产方终止钩子和完成承诺。</td><td>启动失败不消耗任务标识。</td></tr>
-    <tr><td>任务输出</td><td>追加流式文本、单消费游标读取、快照查询和幂等最终输出。</td><td>监听器异常与任务状态隔离。</td></tr>
-    <tr><td>任务状态机</td><td>运行、停止中、完成、已终止和失败；终态由第一次提交决定。</td><td>终止先通知生产方，再提交停止中。</td></tr>
-    <tr><td>所有权</td><td>私有任务只能由所有者查看或操作，无所有者任务可共享。</td><td>释放所有者时取消、等待并移除全部私有任务。</td></tr>
-    <tr><td>任务等待</td><td>支持完成等待、超时和等待者取消。</td><td>等待超时或取消不等于取消后台任务。</td></tr>
-    <tr><td>子智能体选择</td><td>显式或唯一提供方选择，检查可用性、深度、输出模式、工具过滤和角色能力。</td><td>能力校验在启动发布前完成。</td></tr>
-    <tr><td>子智能体生命周期</td><td>开始握手成功后发布开始事件，结束原因规范化并与运行标识唯一配对。</td><td>启动失败不伪造开始事件，父取消向下传播。</td></tr>
-    <tr><td>工作流</td><td>工作线程脚本动态发起子智能体，支持阶段、并发上限、总数上限、扇出扇入和显式结果。</td><td>超限或脚本失控时取消子任务并在宽限期后强制收敛。</td></tr>
+    <tr><td><a href="#concept-0013-1">后台任务创建</a></td><td>分配稳定标识，绑定可选所有者、生产方终止钩子和完成承诺。</td><td>启动失败不消耗任务标识。</td></tr>
+    <tr><td><a href="#concept-0013-2">任务输出</a></td><td>追加流式文本、单消费游标读取、快照查询和幂等最终输出。</td><td>监听器异常与任务状态隔离。</td></tr>
+    <tr><td><a href="#concept-0013-3">任务状态机</a></td><td>运行、停止中、完成、已终止和失败；终态由第一次提交决定。</td><td>终止先通知生产方，再提交停止中。</td></tr>
+    <tr><td><a href="#concept-0013-4">所有权</a></td><td>私有任务只能由所有者查看或操作，无所有者任务可共享。</td><td>释放所有者时取消、等待并移除全部私有任务。</td></tr>
+    <tr><td><a href="#concept-0013-5">任务等待</a></td><td>支持完成等待、超时和等待者取消。</td><td>等待超时或取消不等于取消后台任务。</td></tr>
+    <tr><td><a href="#concept-0013-6">子智能体选择</a></td><td>显式或唯一提供方选择，检查可用性、深度、输出模式、工具过滤和角色能力。</td><td>能力校验在启动发布前完成。</td></tr>
+    <tr><td><a href="#concept-0013-7">子智能体生命周期</a></td><td>开始握手成功后发布开始事件，结束原因规范化并与运行标识唯一配对。</td><td>启动失败不伪造开始事件，父取消向下传播。</td></tr>
+    <tr><td><a href="#concept-0013-8">工作流</a></td><td>工作线程脚本动态发起子智能体，支持阶段、并发上限、总数上限、扇出扇入和显式结果。</td><td>超限或脚本失控时取消子任务并在宽限期后强制收敛。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：受控并发编排</h2>
@@ -54,6 +98,41 @@
     <tr><th>方案对比</th><td>裸 Promise 适合短小同进程工作；作业队列适合持久分布式任务；本实现位于两者之间，专注单宿主可取消 Agent 编排。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>并发工作
+├─ 前台等待 Job → 流式读取 → completed
+├─ 等待超时 → 只停止等待，Job 继续
+├─ kill → producer.stop → stopping → 首个终态
+├─ owner 释放 → kill + wait + remove 私有 Jobs
+├─ Subagent 启动失败 → 不发布 start
+├─ 父取消 → 向全部子运行传播
+├─ Workflow 超并发 → 排队
+├─ Workflow 超总数 → 拒绝并取消已启动子任务
+└─ worker 忙循环 → 宽限后强制终止</code></pre>
+  <table><thead><tr><th>场景</th><th>控制面行为</th><th>不变量</th></tr></thead><tbody>
+    <tr><td>后台长任务</td><td>Job 独立运行，调用方分段读取输出。</td><td>只有一个消费游标，最终结果幂等。</td></tr>
+    <tr><td>多个所有者</td><td>各自只能查看私有任务，共享任务所有人可见。</td><td>任务标识不能泄露所有者信息。</td></tr>
+    <tr><td>子能力不匹配</td><td>在 provider.start 前拒绝。</td><td>没有伪造生命周期和外部资源。</td></tr>
+    <tr><td>扇出扇入</td><td>并发限制内启动，等待所有需要的子结果。</td><td>结果映射按脚本标识稳定关联。</td></tr>
+    <tr><td>部分失败</td><td>脚本决定继续、降级或取消其余子任务。</td><td>每个子运行仍独立闭合。</td></tr>
+    <tr><td>父级退出</td><td>沿所有权树取消并等待。</td><td>不能留下私有孤儿任务。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>持久性</th><th>控制能力</th><th>适用场景</th></tr></thead><tbody>
+    <tr><td>Promise.all</td><td>仅进程内。</td><td>基本等待，取消和所有权弱。</td><td>短小同生命周期任务。</td></tr>
+    <tr><td>本地 Job/Subagent Runtime</td><td>状态在进程内，结果可接会话日志。</td><td>所有权、流输出、取消、预算完整。</td><td>单宿主 Agent 并发。</td></tr>
+    <tr><td>持久作业队列</td><td>跨进程重启。</td><td>重试、租约和分布式调度。</td><td>长任务和多节点。</td></tr>
+    <tr><td>工作流平台</td><td>强持久。</td><td>补偿、定时、人工节点。</td><td>业务级长期流程，运维成本最高。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>等待超时为什么不取消 Job？</dt><dd>超时描述等待者的耐心，不代表生产任务应停止；把两者绑定会让旁观者意外终止共享工作。</dd>
+    <dt>为什么 start 事件必须在 provider 握手后发布？</dt><dd>发布即承诺存在一个可管理运行；握手失败前发布会留下无法取消、无法查询的幽灵子任务。</dd>
+    <dt>并发上限和总数上限有何不同？</dt><dd>并发上限控制瞬时资源，可排队；总数上限控制整个工作流爆炸，即使串行创建也必须拒绝。</dd>
+  </dl>
+
   <h2>三层职责</h2>
   <pre><code>Workflow Engine（动态脚本、phase、fan-out/fan-in、预算）
       │ agent()
@@ -69,6 +148,19 @@ Job Registry（id、owner 鉴权、output cursor、wait/kill、清理）</code><
     <tr><td>Workflow Engine</td><td>worker、脚本预算、child 汇合</td><td>child Agent 的内部 loop</td></tr>
   </tbody></table>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0013-1" data-concept="后台任务创建">
+  <h3>后台任务创建：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>启动返回 id 时，工作已经处于什么状态？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">jobs.start 先校验控制器、存活 owner 和容量，再调用生产方一次；预检或启动失败不生成 id。本地实现不排队，running/stopping 都占容量。 <a href="../deepseek-harness/packages/jobs/jobs-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">start_async_task 创建服务端 thread/run，返回任务 id；可用 ASGI 同部署或 HTTP 远程传输，不一定跨进程。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">TaskToolSet 创建或恢复子会话并等待结果；它的 task_id 不是“已提交后台作业”的等价凭据。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>立即返回的作业句柄与同步工具最终结果是不同接口，不能仅按 task 命名对齐。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>Job 状态机</h2>
   <pre><code>start preflight ── run() throws ──► 无记录、id 不消耗
        │
@@ -83,6 +175,49 @@ wait timeout / wait Abort：只离开等待，不取消 Job
 owner dispose：cancel → await done → 删除 private record</code></pre>
   <p>Job ID 是可预测的 <code>&lt;kind&gt;-N</code>，所以安全边界必须是 owner session 鉴权。unknown 与 foreign 返回相同错误，避免枚举侧信道。</p>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0013-2" data-concept="任务输出">
+  <h3>任务输出：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>重复读取输出，是增量消费还是重读最终结果？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">jobs.read 对流任务消费唯一游标，对最终输出任务幂等读取；get/list 只给非消费快照，多读者不能假设各有独立游标。 <a href="../deepseek-harness/packages/jobs/jobs/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">check_async_task 查询状态，成功后从子 thread 状态提取最终输出；任务元数据另存 async_tasks，不依赖消息历史保留 id。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">TaskObservation 返回 task_id、subagent、最终 status 和 text，不是通用 stdout 流游标。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>界面展示进度、模型读取增量和收集最终答案需要分别选择接口。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0013-3" data-concept="任务状态机">
+  <h3>任务状态机：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>取消请求成功，是否等于工作已结束？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">kill 先调用生产方取消，成功才转 stopping；等待 done 结算后释放名额。取消抛错仍保持运行，首次终止结果只提交一次。 <a href="../deepseek-harness/packages/jobs/jobs/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">取消经 runs.cancel，任务标为 cancelled；update 则在同一 thread 上中断旧 run 并创建新 run，任务 id 保持不变。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">TaskObservation 的 completed/error 是同步收集的最终结果，不提供与 running→stopping 相同的中间状态表。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>状态必须标明描述的是控制请求、某次 run，还是底层生产者完全停稳。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0013-4" data-concept="所有权">
+  <h3>所有权：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>谁能控制任务，谁销毁时负责清理？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">可预测 job id 不是授权；访问按 owner SessionId 隔离。生命周期清理绑定确切 Agent 对象，owner dispose 取消并等待，生产工具重载不结束任务。 <a href="../deepseek-harness/packages/jobs/jobs-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">supervisor 的 async_tasks 记录其跟踪的子 thread；远程操作通过 Agent Protocol 服务鉴权，元数据归属不应被当作服务端访问控制。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">TaskManager 管理子会话并按 task_id 恢复上下文；公开工具指南没有建立 DeepSeek 确切 Agent scope 清理的等价契约。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>展示归属、访问权限和资源清理责任是三件事；知道 id 不能自动取得控制权。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0013-5" data-concept="任务等待">
+  <h3>任务等待：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>等待者超时或取消，会不会停止生产任务？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">wait 超时返回存活快照，中止只停止等待；要停止任务必须 kill。已提交给等待方的终态优先于随后中止。 <a href="../deepseek-harness/packages/jobs/jobs/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">异步委派让 supervisor 继续工作，通过 check/list 观察，cancel 是独立控制操作；不要把一次状态查询当成等待至终态。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">task 调用阻塞收集子会话结果；并行工具配置可改变多个调用的并发方式，但不把单次 task 变成轮询式后台接口。 <a href="https://docs.openhands.dev/sdk/guides/parallel-tool-execution">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>等待超时表达观察者的耐心；取消任务表达对生产者的控制，不应混用。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>子 Agent 发布边界</h2>
   <ol>
     <li>检查 provider 是否存在、可用。</li>
@@ -93,6 +228,29 @@ owner dispose：cancel → await done → 删除 private record</code></pre>
     <li><code>dispose()</code> 取消剩余工作并等待资源静止。</li>
   </ol>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0013-6" data-concept="子智能体选择">
+  <h3>子智能体选择：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>名称选择的是角色、执行提供方，还是部署图？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">具名 provider 决定执行实现，capabilities 在启动前校验结构化输出、深度、工具过滤和 persona 请求；角色与工具组合不等于 provider 路由。 <a href="../deepseek-harness/packages/subagent/subagent/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">AsyncSubAgent 用 name/description 供 supervisor 选择，graph_id 指定服务端图，url 决定 ASGI 或 HTTP 传输。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">subagent_type 选择 register_agent 注册的工厂；工厂装配模型、工具和上下文，默认类型为 default。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>同一个“研究员”名称可能是角色标签、工厂名或部署路由，不能把可替换层级画成一样。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0013-7" data-concept="子智能体生命周期">
+  <h3>子智能体生命周期：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>子任务完成后，能否继续给同一个子智能体发消息？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">一次性 start 发布 SubagentRun，由持有方收集并释放；startContinuable 在 inbox 接受后返回 childId/messageId，后续可冷恢复投递，不经普通 Job 结果 promise。 <a href="../deepseek-harness/packages/subagent/subagent/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">异步子智能体保留自己的 thread，update 在同一 thread 发起新 run；这不同于每次调用都重新开始的同步委派。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">task 的 resume 参数重载已保存子会话继续处理，保留对话上下文；恢复调用仍同步收集结果。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>必须分别比较身份持续性与本次运行的收集方式；可恢复不等于始终后台驻留。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>Workflow worker</h2>
   <pre><code>worker: phase()/log()/agent() ── message ──► Host
                                            │ semaphore
@@ -102,6 +260,19 @@ owner dispose：cancel → await done → 删除 private record</code></pre>
                                            │ result/null
 worker Promise 恢复 ◄──────── agent-result ┘</code></pre>
   <p>脚本运行在独立 Worker Thread，因此死循环不会卡住 Host event loop。Worker 不是安全沙箱；脚本必须来自可信来源。取消先传播给所有 child，并等待 dispose；只有超过 <code>cancelGraceMs</code> 才强制终止。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0013-8" data-concept="工作流">
+  <h3>工作流：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>多步编排是否自动获得跨重启恢复？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">WorkflowEngine 接收动态脚本，持有方负责 dispose；限制并发、条目和子 agent 数，但不保存脚本进度与中间值，进程重启不能续跑。 <a href="../deepseek-harness/packages/workflow/workflow/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangGraph 用节点、边和状态表达顺序、并行及路由；配合持久 checkpointer 才形成恢复基础，不是动态脚本自动持久化。 <a href="https://docs.langchain.com/oss/python/langgraph/workflows-agents">依据</a></td>
+    <td data-framework="openhands">TaskToolSet 支持委派与子会话恢复；若应用要多阶段流程、重试与补偿，仍需另行编排，不能把子会话保存当成整个流程检查点。 <a href="https://docs.openhands.dev/sdk/guides/task-tool-set">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>保存子任务历史、保存编排进度、回滚外部副作用是三个不同等级的能力。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

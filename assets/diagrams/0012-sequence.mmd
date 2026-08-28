@@ -1,0 +1,15 @@
+---
+title: 外部能力 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 调用方
+  participant p1 as MCP 桥
+  participant p2 as MCP 服务
+  participant p3 as 工具注册表
+  p0->>p1: 刷新能力
+  p1->>p2: 请求工具分页
+  p2-->>p1: 返回工具与游标
+  p1->>p1: 遍历并校验全部页
+  p1->>p3: 原子换代工具
+  p0->>p3: 使用限定名称调用

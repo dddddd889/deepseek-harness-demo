@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 15 课：Agent Server</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 15 课：Agent Server</h1>
   <p class="lead">Agent Server 位于 Client 与 Agent Runtime 之间：它不是 Agent Loop 的别名，而是网络信任边界、多 Session 路由器、命令控制面和事件数据面。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">Host/API Proxy 与 Typert Gateway 暴露服务；浏览器以 HTTP POST 调用，events.mux/events.host 两条 WebSocket 下行。</td><td data-framework="deepagents">库内的图可以放入服务应用；LangSmith Deployment 的 Agent Server 是额外运行和部署层。</td><td data-framework="openhands">openhands-agent-server 是独立服务包，以 HTTP 和 WebSocket 暴露 Conversation 与工作区能力；RemoteWorkspace 连接它。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">原连接层明确没有认证层；Host 信任栅栏不是认证。实验室 RPC/SSE 是教学实现。</td><td data-framework="deepagents">不要把 DeepAgents Python 库直接视为独立服务端产品；托管服务与自建应用另有部署约束。</td><td data-framework="openhands">服务端认证必须配置；不能因为使用 SDK 就假设接口已安全暴露。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/docs/api-gateway.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/client/connection/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/langsmith/deployment">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/agent-server">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>三者都有可对应的服务化边界，但原版 DeepSeek 的 Host、DeepAgents 的部署层与 OpenHands Agent Server 不是同一个包级抽象。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>客户端与服务端运行时之间的远程边界，负责调用、连接和事件传输。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 15 课</figcaption><a href="../assets/diagrams/0015-position.svg"><img src="../assets/diagrams/0015-position.svg" alt="智能体服务层在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0015-position.svg">打开大图</a> · <a href="../assets/diagrams/0015-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>创建会话、发送消息、取消、查询历史与订阅等客户端请求。</td></tr>
+    <tr><th>下游与输出</th><td>宿主操作结果、会话事件和连接状态。</td></tr>
+    <tr><th>不归本章负责</th><td>远程 API 不替代循环；可达性限制不等于用户认证，部署前要单独检查信任边界。</td></tr>
+    <tr><th>放进具体场景</th><td>网页发消息后断线，服务端会话不应依赖页面组件存活；重连需恢复订阅与历史视图。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 智能体服务</figcaption>
+    <a href="../assets/diagrams/0015-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0015-modules.svg" alt="智能体服务的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0015-modules.svg">打开大图</a> · <a href="../assets/diagrams/0015-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 智能体服务</figcaption>
+    <a href="../assets/diagrams/0015-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0015-sequence.svg" alt="智能体服务的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0015-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0015-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 智能体服务</figcaption>
+    <a href="../assets/diagrams/0015-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0015-branches.svg" alt="智能体服务的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0015-branches.svg">打开大图</a> · <a href="../assets/diagrams/0015-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,16 +57,17 @@
     <tr><th>解决的问题</th><td>让远程客户端安全、幂等地控制多个智能体会话，并在断线、慢消费者和服务重启时保持事件连续。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>完整行为</th><th>网络边界</th></tr></thead><tbody>
-    <tr><td>持有者鉴权</td><td>在任何 RPC 分派、事件读取或附件访问前验证 Bearer 令牌。</td><td>未授权请求不能探测会话是否存在。</td></tr>
-    <tr><td>RPC 控制面</td><td>创建、恢复、发送、运行、取消、快照和关闭会话，返回稳定结果或错误。</td><td>严格校验请求结构和方法参数。</td></tr>
-    <tr><td>请求幂等</td><td>按请求标识缓存同一命令结果，支持客户端安全重试。</td><td>同一标识绑定不同命令时报冲突。</td></tr>
-    <tr><td>多会话路由</td><td>以会话标识定位独立宿主和运行状态，并隔离并发命令。</td><td>同一会话运行中再次发送被忙碌错误拒绝。</td></tr>
-    <tr><td>SSE 数据面</td><td>从指定序号重放历史后追尾实时事件，SSE 事件标识等于 Session 序号。</td><td>客户端可凭最后序号无缝续传。</td></tr>
-    <tr><td>资源预算</td><td>限制 RPC 请求体和 SSE 单帧大小，并处理慢消费者。</td><td>请求超限返回 413，帧超预算主动断开。</td></tr>
-    <tr><td>恢复与停机</td><td>服务关闭时取消运行、关闭连接、刷盘并释放宿主；新服务可冷恢复。</td><td>网络层不是恢复事实源。</td></tr>
-    <tr><td>同源网页与附件</td><td>可挂载静态网页、附件上传和鉴权读取入口。</td><td>静态路径防逃逸，API 始终保留鉴权。</td></tr>
+    <tr><td><a href="#concept-0015-1">持有者鉴权</a></td><td>在任何 RPC 分派、事件读取或附件访问前验证 Bearer 令牌。</td><td>未授权请求不能探测会话是否存在。</td></tr>
+    <tr><td><a href="#concept-0015-2">RPC 控制面</a></td><td>创建、恢复、发送、运行、取消、快照和关闭会话，返回稳定结果或错误。</td><td>严格校验请求结构和方法参数。</td></tr>
+    <tr><td><a href="#concept-0015-3">请求幂等</a></td><td>按请求标识缓存同一命令结果，支持客户端安全重试。</td><td>同一标识绑定不同命令时报冲突。</td></tr>
+    <tr><td><a href="#concept-0015-4">多会话路由</a></td><td>以会话标识定位独立宿主和运行状态，并隔离并发命令。</td><td>同一会话运行中再次发送被忙碌错误拒绝。</td></tr>
+    <tr><td><a href="#concept-0015-5">SSE 数据面</a></td><td>从指定序号重放历史后追尾实时事件，SSE 事件标识等于 Session 序号。</td><td>客户端可凭最后序号无缝续传。</td></tr>
+    <tr><td><a href="#concept-0015-6">资源预算</a></td><td>限制 RPC 请求体和 SSE 单帧大小，并处理慢消费者。</td><td>请求超限返回 413，帧超预算主动断开。</td></tr>
+    <tr><td><a href="#concept-0015-7">恢复与停机</a></td><td>服务关闭时取消运行、关闭连接、刷盘并释放宿主；新服务可冷恢复。</td><td>网络层不是恢复事实源。</td></tr>
+    <tr><td><a href="#concept-0015-8">同源网页与附件</a></td><td>可挂载静态网页、附件上传和鉴权读取入口。</td><td>静态路径防逃逸，API 始终保留鉴权。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：Agent 网络服务层</h2>
@@ -48,6 +92,41 @@ Client ◄──── SSE 重放 + 追尾（输出） ◄── Session Log
     <tr><th>方案对比</th><td>REST 轮询简单但延迟和流量高；WebSocket 全双工灵活但恢复协议更自定义；RPC+SSE 利用 HTTP 语义并以 Session seq 天然续传。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>网络请求
+├─ 无/坏 Bearer → 分派前 401
+├─ 新 requestId → 执行并缓存结果
+├─ 同 id 同命令重试 → 返回相同结果
+├─ 同 id 不同命令 → 冲突
+├─ session busy → 拒绝并发命令
+├─ SSE after=N → 重放 N+1..末尾 → 实时追尾
+├─ 慢消费者/大帧 → 断开保护服务
+├─ 请求体超限 → 413
+└─ shutdown → 停接入、断流、取消、flush、dispose</code></pre>
+  <table><thead><tr><th>场景</th><th>控制面</th><th>数据面</th></tr></thead><tbody>
+    <tr><td>首次发送</td><td>RPC 返回接受或轮次结果。</td><td>SSE 按 Session seq 推送事实事件。</td></tr>
+    <tr><td>响应丢失重试</td><td>相同 requestId 返回缓存结果。</td><td>不会产生第二组事件。</td></tr>
+    <tr><td>SSE 断线</td><td>无命令状态变化。</td><td>客户端以 lastSeq 重新连接并补齐。</td></tr>
+    <tr><td>多会话</td><td>路由到独立 HeadlessHost。</td><td>订阅只接收目标 Session。</td></tr>
+    <tr><td>冷重启</td><td>新宿主按 id 恢复。</td><td>历史从持久日志重放，不从旧连接恢复。</td></tr>
+    <tr><td>恶意输入</td><td>鉴权、结构和体积检查先于领域调用。</td><td>帧预算防止单事件拖垮缓冲区。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>协议</th><th>命令</th><th>事件流</th><th>恢复复杂度</th></tr></thead><tbody>
+    <tr><td>REST+轮询</td><td>标准。</td><td>延迟高、重复传输。</td><td>低。</td></tr>
+    <tr><td>WebSocket</td><td>双向同连接。</td><td>实时。</td><td>需自定义关联、重放和背压。</td></tr>
+    <tr><td>JSON-RPC+SSE</td><td>requestId 天然关联。</td><td>单向事件流适合 seq 续传。</td><td>中，两个通道但职责清楚。</td></tr>
+    <tr><td>消息队列</td><td>异步、可持久。</td><td>订阅能力强。</td><td>运维和客户端接入更重。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么鉴权必须早于“会话不存在”判断？</dt><dd>否则未授权调用者能通过响应差异枚举有效会话标识。</dd>
+    <dt>为什么 requestId 还要绑定命令摘要？</dt><dd>只按 id 缓存会让客户端错误复用 id 时拿到无关旧结果，掩盖严重调用方缺陷。</dd>
+    <dt>SSE 慢消费者为什么可以被断开？</dt><dd>事件已有持久日志，客户端可按序号重连；无限为单连接缓存反而会拖垮所有会话。</dd>
+  </dl>
+
   <h2>完整分层</h2>
   <pre><code>CLI / Web / SDK Client
         │ Bearer + JSON-RPC / SSE
@@ -64,11 +143,67 @@ Client ◄──── SSE 重放 + 追尾（输出） ◄── Session Log
                     │
        JSONL/SQLite + Attachment/Spill stores</code></pre>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0015-1" data-concept="持有者鉴权">
+  <h3>持有者鉴权：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>能连接服务端，就等于拥有某个会话吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Connection 的 Host/Origin/Fetch-Metadata 检查是浏览器信任栅栏，不是身份认证；特权方法只限回环。不要把本课 Bearer 持有者鉴权归给上游 Web 载体。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">采用 Agent Server 部署时，认证识别调用者，授权处理资源访问；DeepAgents 库本身不因 thread_id 自动获得多租户鉴权。 <a href="https://docs.langchain.com/langsmith/auth">依据</a></td>
+    <td data-framework="openhands">Agent Server 默认不启用 API 认证；配置 session API keys 后要求 X-Session-API-Key。共享服务密钥也不自动等于逐会话用户归属授权。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>可达性、服务认证和资源授权要分别验证，不能用 CORS 或一个会话 id 替代。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0015-4" data-concept="多会话路由">
+  <h3>多会话路由：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>一个服务怎样找到正确的会话运行对象？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">TypertLookupMap 将 agentId 等 wire identity 解析成 Host 对象；RemoteScope 先定位作用域 Context，再取得该范围的服务。 <a href="../deepseek-harness/docs/api-gateway.zh.md">依据</a></td>
+    <td data-framework="deepagents">thread 承载会话状态，run 是一次执行，assistant 指定图及配置；三种 id 分工不同，不宜统称 Agent id。 <a href="https://docs.langchain.com/langsmith/agent-server">依据</a></td>
+    <td data-framework="openhands">远程 Workspace 连接 Agent Server，Conversation API 访问其会话；本地与远程会话由 Workspace 类型选择。 <a href="https://docs.openhands.dev/sdk/arch/conversation">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>路由身份、运行身份与配置身份应分开，尤其不能让旧客户端对象指向另一个新运行。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0015-8" data-concept="同源网页与附件">
+  <h3>同源网页与附件：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>浏览器能上传文件，就能安全访问所有本地文件吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Connection 在 /api 桥接和 WebSocket upgrade 前检查 Host 与 Origin，并限制请求体；这些检查不赋予附件任意路径权限，也不提供用户身份认证。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">Agent Server 的认证/授权层负责保护资源；前端和附件存储如何接入属于应用部署设计，不能把 DeepAgents 文件 Backend 当作浏览器上传安全策略。 <a href="https://docs.langchain.com/langsmith/auth">依据</a></td>
+    <td data-framework="openhands">Workspace 文件上传下载走专门接口，服务暴露时另配置 API key、TLS、网络与 CORS；跨域许可不是文件归属验证。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>上传通道、附件身份、文件访问边界与浏览器来源校验必须独立审查。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>控制面与数据面分开</h2>
   <table><thead><tr><th>接口</th><th>用途</th><th>关键语义</th></tr></thead><tbody>
     <tr><td><code>POST /rpc</code></td><td>create/resume/send/cancel/snapshot/close</td><td>JSON-RPC 2.0、request id 幂等、结构化错误</td></tr>
     <tr><td><code>GET /events</code></td><td>Session Event replay + tail</td><td>SSE id=Session seq、Last-Event-ID、队列预算</td></tr>
   </tbody></table>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0015-2" data-concept="RPC 控制面">
+  <h3>RPC 控制面：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>客户端方法怎样映射到服务端能力？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Typert 用 @Remote/@RemoteScope 声明公开方法，生成具体客户端函数；Gateway 解析身份并校验请求/返回。事件流不属于一元 Remote 描述符。 <a href="../deepseek-harness/docs/api-gateway.zh.md">依据</a></td>
+    <td data-framework="deepagents">Agent Server 按 assistants、threads、runs 等资源提供 API；DeepAgents 图作为部署对象运行，不是把任意 Python 方法自动变成远程调用。 <a href="https://docs.langchain.com/langsmith/agent-server">依据</a></td>
+    <td data-framework="openhands">独立 openhands-agent-server 用 HTTP/WebSocket 暴露会话和工作区操作，远程 SDK 代理这些 API；它不是 Cordis Remote 注册表。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>比较控制面要看公开能力白名单、身份解析和协议校验，而不只看是否用了 HTTP。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0015-5" data-concept="SSE 数据面">
+  <h3>SSE 数据面：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>浏览器持续接收事件的实际协议是什么？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">上游使用 events.mux 与 events.host 两条只下行 WebSocket；网络 GET 返回 426，没有 SSE 回退。Fetch SSE 编解码只供进程内载体，本课 SSE 是教学方案。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">部署 Streaming API 提供状态、更新、消息等流模式，thread stream 可用最后事件 id 重连；其流不是 DeepSeek Session 原始日志格式。 <a href="https://docs.langchain.com/langsmith/streaming">依据</a></td>
+    <td data-framework="openhands">Agent Server 提供 HTTP 与 WebSocket 会话事件 API，不能因为本课标题为 SSE 就把其传输也描述为 SSE。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>区分传输协议、事件数据格式和重连游标；都能“流式显示”不代表客户端可互换。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>一次远程 Turn</h2>
   <pre><code>Client ─ session.send(id=42) ─► Server
@@ -81,8 +216,34 @@ Server ─ RPC result ─► Client
 重复 id=42 + 相同 params：复用同一 pending/final response
 重复 id=42 + 不同 params：IDEMPOTENCY_CONFLICT</code></pre>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0015-3" data-concept="请求幂等">
+  <h3>请求幂等：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>超时重发一次请求，会不会执行两次？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Gateway 的描述符和类型校验约定不等于持久去重承诺；本课 requestId 缓存是教学机制，不能从上游 Remote 方法生成推断同样保证。 <a href="../deepseek-harness/docs/api-gateway.zh.md">依据</a></td>
+    <td data-framework="deepagents">服务端对运行中再次提交可选择拒绝、入队、中断或回滚；这些 double-texting 策略处理重叠运行，不等于重复 HTTP 请求的幂等键。 <a href="https://docs.langchain.com/langsmith/double-texting">依据</a></td>
+    <td data-framework="openhands">服务概览列出了会话与命令 API，但没有声明通用 requestId 去重协议；客户端不得仅因调用远程 Conversation 就假设写请求可安全重试。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>需分别检查重复提交去重、并发运行策略和外部工具副作用；任一层成立都不能替代另两层。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>恢复在哪里发生</h2>
   <p><code>session.resume</code> 通过 HeadlessHost 调用 Session Store：checksum、torn-tail repair、interrupted closer、投影重放，再发布 active Conversation。Agent Server 的幂等缓存、SSE 连接和 live Agent 都是易失控制状态，不是恢复源。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0015-7" data-concept="恢复与停机">
+  <h3>恢复与停机：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>连接恢复与运行恢复分别发生在哪一层？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">任一事件 socket 结束都会使 generation 失效并重建双流；Host teardown 中止 source 并等待清理。会话冷恢复另由持久化/Agent 层完成，不由 socket 重连代替。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">流重连按最后事件 id 补收事件；执行恢复依赖检查点。重新连接已有 run 的流，不是再次提交同一个任务。 <a href="https://docs.langchain.com/langsmith/streaming">依据</a></td>
+    <td data-framework="openhands">会话从持久数据恢复，服务端敏感值需保持 OH_SECRET_KEY 才能解密；网络重新连通不证明旧运行或外部进程仍存活。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>停机需明确停止准入、运行收敛与存储完成；重连成功只能证明传输恢复。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>背压与停机</h2>
   <ul>
@@ -90,6 +251,19 @@ Server ─ RPC result ─► Client
     <li><code>res.write()</code> 返回 false 时等待 drain/close，不无限写入内存。</li>
     <li>Server close 先停止接收和关闭 SSE，再取消 running Agent，flush/close conversations，最后 dispose Host。</li>
   </ul>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0015-6" data-concept="资源预算">
+  <h3>资源预算：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>请求、运行和执行环境的上限由谁控制？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">Connection 整体缓冲请求体，maxRequestBodyBytes 限制单请求驻留内存；这是传输预算，不替代工具输出、任务并发等能力预算。 <a href="../deepseek-harness/packages/client/connection/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">异步子任务占服务 worker 槽，槽不足会排队；并发工作数属于部署容量，不是模型上下文窗口或 token 预算。 <a href="https://docs.langchain.com/oss/python/deepagents/async-subagents">依据</a></td>
+    <td data-framework="openhands">LocalWorkspace、DockerWorkspace 和远程工作区使用不同执行环境；CPU/内存隔离应查实际容器或服务配置，不能从 SDK 的工作区抽象推定已设限。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>至少分别验收入口内存、运行并发和执行资源；一个 max 值不能覆盖整条链路。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

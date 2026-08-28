@@ -1,0 +1,15 @@
+---
+title: 插件生命周期 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 宿主
+  participant p1 as 根上下文
+  participant p2 as 插件
+  participant p3 as 清理栈
+  p0->>p1: mount 插件
+  p1->>p2: apply 子上下文
+  p2->>p3: 登记资源逆操作
+  p2-->>p1: 启动完成
+  p0->>p1: 卸载插件
+  p1->>p3: 逆序等待清理

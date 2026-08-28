@@ -1,0 +1,16 @@
+---
+title: 智能体服务 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 客户端
+  participant p1 as AgentServer
+  participant p2 as 会话宿主
+  participant p3 as Session
+  p0->>p1: Bearer 与 session.send
+  p1->>p1: 鉴权和请求去重
+  p1->>p2: 路由会话命令
+  p2->>p3: 追加运行事件
+  p1-->>p0: 返回 RPC 结果
+  p3-->>p1: 通知新事件
+  p1-->>p0: SSE 推送事件

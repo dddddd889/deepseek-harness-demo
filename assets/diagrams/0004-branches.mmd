@@ -1,0 +1,9 @@
+---
+title: 账本与投影 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"序号不连续"| result0["拒绝不完整前缀"]
+  decision -->|"最终用量到达"| result1["覆盖同一步骤样本"]
+  decision -->|"可见面替换"| result2["事实保留、视图更新"]
+  decision -->|"生命周期不匹配"| result3["报告损坏序号"]

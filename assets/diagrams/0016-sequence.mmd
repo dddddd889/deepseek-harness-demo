@@ -1,0 +1,16 @@
+---
+title: 网页客户端 · 调用时序
+---
+sequenceDiagram
+  autonumber
+  participant p0 as 客户端
+  participant p1 as AgentServer
+  participant p2 as Session
+  participant p3 as 客户端投影
+  p0->>p1: 请求快照
+  p1->>p2: 读取事件前缀
+  p1-->>p0: 返回事件快照
+  p0->>p3: reset 快照
+  p0->>p1: 从最后序号订阅
+  p1-->>p0: SSE 增量事件
+  p0->>p3: apply 增量

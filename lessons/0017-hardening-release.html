@@ -2,8 +2,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 17 课：可观测、成本与发布加固</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 17 课：可观测、成本与发布加固</h1>
   <p class="lead">最后一层不是再加业务能力，而是证明系统在失败、重载、跨平台和冷启动时仍有清晰边界。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">session-telemetry-otel 把会话记录送入 OTel Logs；会话中的 assistant/message 完成锚点可携带用量。</td><td data-framework="deepagents">可接 LangSmith tracing 观察运行；线程状态由 checkpointer 保存，外置文件由所选 backend 承担。</td><td data-framework="openhands">当前 SDK 经 Laminar 插桩支持 OpenTelemetry Traces；ConversationStats 聚合各 usage_id 的 token 与 cost，持久化包含统计状态。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">遥测有 full/feedback-only/disabled 模式；本地日志才是恢复依据，金额不能仅从“启用 OTel”推断。</td><td data-framework="deepagents">跟踪后端与恢复后端是不同存储；不能假定 DeepAgents 自动维护一个本地累计金额账本。</td><td data-framework="openhands">不是“OpenHands 不用 OTel”；其 traces 与 DeepSeek 会话 logs 的信号形态不同。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">原仓库依据 2</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/backends">官方文档 1</a> · <a href="https://docs.langchain.com/oss/python/langgraph/persistence">官方文档 2</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/guides/observability">官方文档 1</a> · <a href="https://docs.openhands.dev/sdk/guides/metrics">官方文档 2</a> · <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">官方文档 3</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>把执行事实、恢复状态、统计投影和遥测副本四者分开，才能回答“记录在哪”“丢了能否重建”和“成本是否可信”。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>覆盖全系统的观测与验证层，消费运行证据而不接管执行事实。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 17 课</figcaption><a href="../assets/diagrams/0017-position.svg"><img src="../assets/diagrams/0017-position.svg" alt="观测、成本与发布加固在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0017-position.svg">打开大图</a> · <a href="../assets/diagrams/0017-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>会话事件、模型用量、运行错误、测试和故障注入结果。</td></tr>
+    <tr><th>下游与输出</th><td>诊断记录、成本视图、告警与发布验收证据。</td></tr>
+    <tr><th>不归本章负责</th><td>遥测可能丢失或被禁用，不能当作恢复数据库；token 统计与货币成本也不是同一字段。</td></tr>
+    <tr><th>放进具体场景</th><td>服务异常后用遥测定位步骤，用本地持久化恢复会话；账单核对还要确认模型价格和缺失用量如何处理。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 观测与加固</figcaption>
+    <a href="../assets/diagrams/0017-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0017-modules.svg" alt="观测与加固的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0017-modules.svg">打开大图</a> · <a href="../assets/diagrams/0017-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 观测与加固</figcaption>
+    <a href="../assets/diagrams/0017-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0017-sequence.svg" alt="观测与加固的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0017-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0017-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 观测与加固</figcaption>
+    <a href="../assets/diagrams/0017-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0017-branches.svg" alt="观测与加固的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0017-branches.svg">打开大图</a> · <a href="../assets/diagrams/0017-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -13,16 +56,17 @@
     <tr><th>解决的问题</th><td>让运行问题可观测、成本可复算、敏感信息可控，并把可靠性要求落实为可重复的发布门禁。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力域</th><th>完整能力</th><th>不能替代什么</th></tr></thead><tbody>
-    <tr><td>会话遥测</td><td>禁用、仅反馈和完整三种模式；选择事件、设置严重级别、脱敏并隔离导出失败。</td><td>不能替代 Session 事实日志。</td></tr>
-    <tr><td>OTel Logs</td><td>把选定会话事件转换为可检索、关联和告警的观测记录并送往 Collector。</td><td>不能用于会话恢复、分叉或权威计费。</td></tr>
-    <tr><td>反馈导出</td><td>仅反馈模式在用户提交反馈后导出对应记录，避免默认采集完整会话。</td><td>不能绕过脱敏与采集策略。</td></tr>
-    <tr><td>成本投影</td><td>按请求时刻匹配提供方、模型和生效价格，将互斥用量桶计算为高精度美元成本。</td><td>未知模型进入未定价列表，不能默认为零成本。</td></tr>
-    <tr><td>运行能力探测</td><td>探测平台、真实伪终端、强沙箱和进程隔离，并提供强制能力检查。</td><td>不支持的强能力不能静默降级。</td></tr>
-    <tr><td>热重载</td><td>先完整启动候选插件包，成功后原子切换，再释放旧包。</td><td>候选失败时旧能力继续服务，不发生闪断。</td></tr>
-    <tr><td>故障注入</td><td>在指定命中次数稳定触发异常或延迟，用于复现提供方和传输故障。</td><td>只影响明确配置的故障点和次数。</td></tr>
-    <tr><td>发布验收</td><td>类型检查、完整测试、构建、CLI 帮助、冒烟运行和资源收敛检查。</td><td>单个成功演示不能替代整套发布门禁。</td></tr>
+    <tr><td><a href="#concept-0017-1">会话遥测</a></td><td>禁用、仅反馈和完整三种模式；选择事件、设置严重级别、脱敏并隔离导出失败。</td><td>不能替代 Session 事实日志。</td></tr>
+    <tr><td><a href="#concept-0017-2">OTel Logs</a></td><td>把选定会话事件转换为可检索、关联和告警的观测记录并送往 Collector。</td><td>不能用于会话恢复、分叉或权威计费。</td></tr>
+    <tr><td><a href="#concept-0017-3">反馈导出</a></td><td>仅反馈模式在用户提交反馈后导出对应记录，避免默认采集完整会话。</td><td>不能绕过脱敏与采集策略。</td></tr>
+    <tr><td><a href="#concept-0017-4">成本投影</a></td><td>按请求时刻匹配提供方、模型和生效价格，将互斥用量桶计算为高精度美元成本。</td><td>未知模型进入未定价列表，不能默认为零成本。</td></tr>
+    <tr><td><a href="#concept-0017-5">运行能力探测</a></td><td>探测平台、真实伪终端、强沙箱和进程隔离，并提供强制能力检查。</td><td>不支持的强能力不能静默降级。</td></tr>
+    <tr><td><a href="#concept-0017-6">热重载</a></td><td>先完整启动候选插件包，成功后原子切换，再释放旧包。</td><td>候选失败时旧能力继续服务，不发生闪断。</td></tr>
+    <tr><td><a href="#concept-0017-7">故障注入</a></td><td>在指定命中次数稳定触发异常或延迟，用于复现提供方和传输故障。</td><td>只影响明确配置的故障点和次数。</td></tr>
+    <tr><td><a href="#concept-0017-8">发布验收</a></td><td>类型检查、完整测试、构建、CLI 帮助、冒烟运行和资源收敛检查。</td><td>单个成功演示不能替代整套发布门禁。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：生产可信度闭环</h2>
@@ -49,6 +93,44 @@
     <tr><th>方案对比</th><td>把日志、账单和恢复混成一库查询方便，却让采样或价格变化破坏事实；分层派生保持职责清晰并允许各自重建。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>生产证据链
+├─ telemetry disabled → 不导出
+├─ feedback-only → 用户反馈后导出关联记录
+├─ full → 选择事件、脱敏、导出
+├─ sink 失败 → 隔离，不阻塞 Session
+├─ 已知模型价格 → 按请求时刻精确投影
+├─ 未知价格 → unpriced，绝不记零
+├─ 候选热重载失败 → 旧 Bundle 继续
+├─ 平台缺强能力 → 明确拒绝/声明降级
+├─ 第 N 次故障 → 稳定 throw/delay
+└─ release gate 任一失败 → 不发布</code></pre>
+  <table><thead><tr><th>场景</th><th>系统行为</th><th>不能做的事</th></tr></thead><tbody>
+    <tr><td>遥测后端宕机</td><td>记录导出失败并继续追加会话事实。</td><td>不能让观测系统成为业务单点。</td></tr>
+    <tr><td>敏感会话</td><td>禁用或仅反馈采集，并应用字段脱敏。</td><td>不能默认把完整提示词发送到 Collector。</td></tr>
+    <tr><td>价格变更</td><td>按 request/header 时间选择生效价格。</td><td>不能用当前价重算过去请求而不标版本。</td></tr>
+    <tr><td>热重载候选坏</td><td>候选上下文回滚，旧包继续对外服务。</td><td>不能先卸旧再试新。</td></tr>
+    <tr><td>能力缺失</td><td>强制要求时立即失败，否则显式报告降级。</td><td>不能把进程隔离叫成强沙箱。</td></tr>
+    <tr><td>故障演练</td><td>指定命中次数稳定复现。</td><td>不能随机污染未指定路径。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>数据/机制</th><th>权威性</th><th>保留策略</th><th>主要用途</th></tr></thead><tbody>
+    <tr><td>Session JSONL</td><td>权威事实。</td><td>按会话耐久策略。</td><td>恢复、分叉、重放。</td></tr>
+    <tr><td>OTel Logs</td><td>可丢弃副本。</td><td>采样、脱敏、集中保留。</td><td>检索、关联、告警。</td></tr>
+    <tr><td>Cost Projection</td><td>可重算派生值。</td><td>保留价格表版本和用量。</td><td>费用分析和预算。</td></tr>
+    <tr><td>指标 Metrics</td><td>聚合观测。</td><td>降采样。</td><td>趋势和告警，不还原单会话。</td></tr>
+    <tr><td>分布式追踪 Traces</td><td>采样调用图。</td><td>短期或采样。</td><td>跨服务延迟和因果定位。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么 OTel Logs 不能用于恢复？</dt><dd>它可能采样、脱敏、延迟、乱序或导出失败；这些对观测可接受，对权威状态恢复不可接受。</dd>
+    <dt>为什么成本用整数而不是浮点数？</dt><dd>大量小额请求累加会放大二进制浮点误差；高精度整数单位让复算和对账确定。</dd>
+    <dt>为什么热重载要先启动候选？</dt><dd>旧包是当前可用服务；只有候选完整通过启动不变量后才能原子替换，否则一次配置错误就会造成停机。</dd>
+    <dt>测试全绿是否足以发布？</dt><dd>不够。还需证明构建产物可运行、CLI 协议正确、平台能力满足、故障可收敛且资源无泄漏。</dd>
+  </dl>
+
   <h2>三类数据不要混成一份</h2>
   <pre><code>Session JSONL（权威事实） ──► 恢复 / fork / replay
         │
@@ -63,9 +145,45 @@
     <tr><td>OTel Logs</td><td>SDK 队列与外部 Collector/backend</td><td>只影响观测，不影响 Session 恢复</td></tr>
   </tbody></table>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0017-1" data-concept="会话遥测">
+  <h3>会话遥测：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>观测数据丢失后，是否影响会话恢复？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">遥测后端将投影记录送入 OTel，关闭等待有截止时间，待发送记录可能丢失；权威会话日志与遥测出口分开，不能拿 Collector 当恢复存储。 <a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangSmith 跟踪 run 的模型使用量与成本；LangGraph 检查点负责执行状态。观测平台中的 trace 不是恢复图执行的检查点。 <a href="https://docs.langchain.com/langsmith/cost-tracking">依据</a></td>
+    <td data-framework="openhands">SDK 通过 OTel 插桩导出执行步骤、工具、模型调用等 trace；会话持久化仍由 Conversation 的状态与事件存储承担。 <a href="https://docs.openhands.dev/sdk/guides/observability">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>事实存储和观测出口应分别验收可靠性；“遥测收到”不能替代会话持久化完成。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>OTel Logs 在 DeepSeek Harness 中的准确角色</h2>
   <p>原生实现把 canonical Session Event 的投影映射为两个 logger scope：ledger 与 ops。首个 streaming chunk 表示流开始，完整内容最终由 assistant/message 承载；导出前可挂脱敏 waterfall。同步捕获和 exporter 异常都被隔离，不能反向打断 agent loop。批处理、重试、队列和丢失策略归 OTel SDK；handoff cursor 只代表“交给 SDK”，不代表远端已确认。</p>
   <p>因此这里采用的是 <strong>OTel Logs</strong>，而不是用 Trace/Metric 重建 Session。若部署需要 traces/metrics，可为 HTTP、LLM、tool latency 和队列深度另加运维信号，但它们仍不是恢复事实源。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0017-2" data-concept="OTel Logs">
+  <h3>OTel Logs：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>三框架观测的信号和记录单位相同吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">LoggerProvider→BatchLogRecordProcessor→OTLP/HTTP 日志导出器；ledger 与 ops 分属两个插桩作用域，记录映射为结构化日志 body/attributes。 <a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangSmith 以 trace/run 组织模型调用及其成本；这是追踪平台的数据模型，不能直接当作 DeepSeek ledger 日志协议。 <a href="https://docs.langchain.com/langsmith/cost-tracking">依据</a></td>
+    <td data-framework="openhands">内置 OTel Traces 通过 Laminar 插桩导出 spans，可发往配置的 OTLP 后端；不是“不用 OTel”，而是这里比较的信号为 Traces。 <a href="https://docs.openhands.dev/sdk/guides/observability">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>Logs 更适合逐条记录事实，Traces 表达调用层次与时间；共同使用 OTLP 不代表数据可以互相当恢复日志。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0017-3" data-concept="反馈导出">
+  <h3>反馈导出：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>点一次反馈会上传哪些历史内容？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">FEEDBACK_ONLY 仅认已写入 Session 的权威 feedback/record，触发截至该事件的日志后缀回放并执行当时脱敏规则；默认 DISABLED 不构造 SDK，反馈留在本地。 <a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">create_feedback 将评分/评论关联到已有 trace 或子 run；浏览器可用限定 run/key 的预签名反馈地址，不等于反馈时才上传整段本地历史。 <a href="https://docs.langchain.com/langsmith/attach-user-feedback">依据</a></td>
+    <td data-framework="openhands">SDK 观测指南描述配置驱动的持续 trace 导出，未定义 DeepSeek 式反馈授权回放；产品反馈及共享策略需要另行核对，不能从启用 tracing 推定。 <a href="https://docs.openhands.dev/sdk/guides/observability">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>评价某次运行与授权共享历史是不同动作；反馈按钮应明确披露的数据范围。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>Cost 为什么是投影</h2>
   <ul>
@@ -75,6 +193,19 @@
     <li>金额使用整数皮美元计算；未知模型进入 unpriced，不静默记为 0。</li>
   </ul>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0017-4" data-concept="成本投影">
+  <h3>成本投影：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>token 用量如何变成金额，金额存在哪里？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">token-meter 从用量事实和估算维护投影；本课 PriceBook/picoUSD 是教学示例，不能据此声称上游已有同样版本化价格表或金额存储。 <a href="../deepseek-harness/packages/llm/token-meter/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LangSmith 按模型用量和价格计算 trace 成本，也支持自定义价格或显式成本；金额在观测平台中汇总，不是图检查点的天然计费字段。 <a href="https://docs.langchain.com/langsmith/cost-tracking">依据</a></td>
+    <td data-framework="openhands">LLM Metrics 提供 accumulated_cost，ConversationStats 按 usage 聚合；应通过 get_combined_metrics 等接口读统计，而非从界面文本重新计算。 <a href="https://docs.openhands.dev/sdk/guides/metrics">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>用量事实、价格规则、金额聚合与持久化位置要分别对齐；没有价格时不要把缺失金额当零成本。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>加固边界</h2>
   <pre><code>Capability Probe ─► seatbelt / process-only / PTY availability
 HotBundle.reload ─► 影子挂载候选 ─成功→原子切换→释放旧代
@@ -82,6 +213,49 @@ HotBundle.reload ─► 影子挂载候选 ─成功→原子切换→释放旧�
 FaultInjector ─► 第 N 次 throw/delay，稳定复现传输与 provider 故障
 Build ─► TypeScript → dist JS + declarations + source maps + Web assets
 Smoke ─► 编译产物 CLI + 插件内核 + JSONL 冷恢复</code></pre>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0017-5" data-concept="运行能力探测">
+  <h3>运行能力探测：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>运行环境不支持某项能力时如何表达？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">sandbox-local 探测并缓存平台 runner；不可用返回 SANDBOX_UNAVAILABLE，不静默无约束运行；部分执行能力以 partial 明示。 <a href="../deepseek-harness/packages/sandbox/sandbox-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">Backend 决定文件与 execute 能力；LocalShellBackend 本身无隔离，不能用“命令能运行”推导沙箱可用。应核对选中的实际后端。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">Agent Server 提供 health、ready 与 server_info，分别用于存活、初始化就绪和版本/工具信息；不能用 health 成功替代全部工具能力验证。 <a href="https://docs.openhands.dev/sdk/arch/agent-server">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>服务活着、功能存在和约束有效是三个不同探测结果。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0017-6" data-concept="热重载">
+  <h3>热重载：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>代码更新后哪些状态保留，失败是否回滚？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">client-hmr 通过 /plugins/events SSE 接收重建通知，串行替换插件 fiber；被重载组件 React 状态丢失，数据层保留；失败标记 FAILED，不自动回滚。 <a href="../deepseek-harness/packages/client/hmr/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">langgraph dev 默认热重载，langgraph up 可选 watch；这是开发/部署服务器重载，不等于 Cordis 插件级 effect 替换契约。 <a href="https://docs.langchain.com/langsmith/local-dev-testing">依据</a></td>
+    <td data-framework="openhands">AgentSettings 支持序列化重建 Agent；配置重建不代表运行中的对象已安全热替换。该文档未给出与 Cordis 相同的插件卸载链。 <a href="https://docs.openhands.dev/sdk/guides/agent-settings">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>会话事件 WebSocket 与插件重建 SSE 是两条不同链路；重载粒度与状态保留必须具体到组件。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0017-7" data-concept="故障注入">
+  <h3>故障注入：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>如何稳定复现取消、挂起或模型异常？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">llm-replay 用会话 JSONL 重建模型分片，并可 override 注入裸异常和 hang；这能覆盖正常日志本身表达不了的时序。 <a href="../deepseek-harness/packages/test-support/llm-replay/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">模型入口接受已配置模型对象，测试可替换该边界；这提供注入接缝，但不等于自带 DeepSeek JSONL 回放与时序 fixture。 <a href="https://docs.langchain.com/oss/python/deepagents/models">依据</a></td>
+    <td data-framework="openhands">SDK 项目使用 pytest 及异步、超时等测试支持；具体异常仍需测试替身或受控执行环境注入，测试依赖本身不证明已覆盖某个故障。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/pyproject.toml">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>固定响应、固定时序与验证资源收敛分别设计；只让模型返回错误文本不是真实取消测试。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0017-8" data-concept="发布验收">
+  <h3>发布验收：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>怎样证明当前组合可以发布，而不是仅能启动？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">本地进程提供方明确记录平台和退出清理边界；发布验收应覆盖实际支持平台与终止路径，不能将教学用例通过当成上游全平台保证。 <a href="../deepseek-harness/packages/subprocess/subprocess-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">官方区分轻量 langgraph dev 与包含持久存储的 langgraph up，要求部署前验证真实组合；开发热重载成功不等于生产恢复通过。 <a href="https://docs.langchain.com/langsmith/local-dev-testing">依据</a></td>
+    <td data-framework="openhands">项目配置分别包含类型检查、lint 和测试工具；依赖存在不是流水线已通过的证据，应用仍需验证其模型、Workspace 与服务组合。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/pyproject.toml">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>验收证据必须对应待发布版本、部署组合和失败场景；不能用框架具备测试工具替代实际运行结果。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

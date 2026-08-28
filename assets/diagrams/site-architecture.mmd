@@ -1,0 +1,27 @@
+flowchart TD
+  web["网页 / AgentClient"]
+  server["AgentServer：RPC / SSE"]
+  host["HeadlessHost"]
+  cli["CLI"]
+  config["Profile / Bundle / Context"]
+  agent["HarnessAgent"]
+  session["Session 事件账本"]
+  llm["LlmRuntime / DeepSeek"]
+  store["JSONL 存储 / 冷恢复"]
+  projection["消息、用量、客户端投影"]
+  extensions["工具 / 本地 / 权限 / 外部能力"]
+  orchestration["子智能体 / Jobs / Workflow"]
+  observe["遥测 Sink / 成本 / 发布加固"]
+  web -->|"请求与事件"| server
+  server -->|"会话路由"| host
+  cli -->|"直接用例调用"| host
+  config -->|"装配"| host
+  host -->|"创建会话智能体"| agent
+  agent -->|"追加事件"| session
+  agent -->|"生成"| llm
+  session -->|"写入与恢复"| store
+  session -->|"重放"| projection
+  session -->|"独立示例直接消费事件"| observe
+  agent -.->|"可选注入，非默认"| extensions
+  extensions -.->|"独立教学扩展"| orchestration
+  server -->|"RPC 返回与 SSE 事件"| web

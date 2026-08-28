@@ -1,0 +1,9 @@
+---
+title: 领域协议 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"不可表达 JSON"| result0["拒绝写入"]
+  decision -->|"循环引用"| result1["报告非法值路径"]
+  decision -->|"合法数据"| result2["快照并冻结"]
+  decision -->|"新增协议变体"| result3["要求消费者穷尽处理"]

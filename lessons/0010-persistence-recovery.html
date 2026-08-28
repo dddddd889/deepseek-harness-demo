@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 10 课：JSONL 持久化、恢复与 Fork</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 10 课：JSONL 持久化、恢复与 Fork</h1>
   <p class="lead">恢复源是持久化 Session Log，不是 OTel、UI Store 或正在运行的 Agent 对象。本课把“提交了什么”和“什么允许修复”做成字节级协议。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">ctx.agents.resume 经 sessionPersistence 加载日志并重建；持久化 seam 有 JSONL 和 SQLite 实现。</td><td data-framework="deepagents">从 LangGraph checkpointer 按 thread_id 恢复图状态；Store 保存跨线程数据，二者职责不同。</td><td data-framework="openhands">同一 conversation_id 与 persistence_dir 加载 base_state.json 和 events/ 下的事件文件。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">本课演示 JSONL 不代表原实现只有 JSONL；Session 内存状态与 flush 屏障要分开。</td><td data-framework="deepagents">MemorySaver 只保存在内存，进程重启会丢；持久恢复要选持久 checkpointer。</td><td data-framework="openhands">这是当前 SDK 的状态加事件恢复，不应套用旧 V0 的轨迹文件说明；工作区副作用需另行考虑。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/packages/core/agent-loop/README.zh.md">原仓库依据 1</a> · <a href="../deepseek-harness/packages/session/session-persistence-jsonl/README.zh.md">原仓库依据 2</a> · <a href="../deepseek-harness/docs/capability-seams.zh.md">原仓库依据 3</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/langgraph/persistence">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/guides/convo-persistence">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>恢复源分别是持久会话日志、图检查点、会话状态加事件文件；三者都不从观测后端恢复执行。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>位于会话状态下方的耐久边界，在进程重启后反向供给新运行时。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 10 课</figcaption><a href="../assets/diagrams/0010-position.svg"><img src="../assets/diagrams/0010-position.svg" alt="持久化与恢复在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0010-position.svg">打开大图</a> · <a href="../assets/diagrams/0010-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>已接受的会话记录与显式持久化屏障；恢复时输入会话身份。</td></tr>
+    <tr><th>下游与输出</th><td>持久文件或数据库记录；重启后重建历史、状态和继续执行的起点。</td></tr>
+    <tr><th>不归本章负责</th><td>恢复会话不等于恢复外部进程；结果未知的副作用不能靠重新调用工具来猜。</td></tr>
+    <tr><th>放进具体场景</th><td>运行测试时崩溃，重启先加载会话并识别未闭合调用，再决定如何处理；不能把遥测平台的记录当作本地提交成功。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 持久化与恢复</figcaption>
+    <a href="../assets/diagrams/0010-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0010-modules.svg" alt="持久化与恢复的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0010-modules.svg">打开大图</a> · <a href="../assets/diagrams/0010-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 持久化与恢复</figcaption>
+    <a href="../assets/diagrams/0010-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0010-sequence.svg" alt="持久化与恢复的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0010-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0010-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 持久化与恢复</figcaption>
+    <a href="../assets/diagrams/0010-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0010-branches.svg" alt="持久化与恢复的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0010-branches.svg">打开大图</a> · <a href="../assets/diagrams/0010-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,16 +57,17 @@
     <tr><th>解决的问题</th><td>保证进程重启后不会丢失已提交事实，也不会猜测或重复执行结果未知的外部副作用。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>具体覆盖</th><th>恢复原则</th></tr></thead><tbody>
-    <tr><td>会话头</td><td>持久化会话标识、格式、版本、工作目录和可选父会话谱系。</td><td>身份或版本不匹配时拒绝恢复。</td></tr>
-    <tr><td>逐事件存储</td><td>每个事件独占一行，保存连续序号、时间、数据和校验和。</td><td>完整坏行视为已提交损坏，绝不猜测。</td></tr>
-    <tr><td>写后队列与刷盘</td><td>追加进入串行队列，<code>flush</code> 等待写入并调用文件同步。</td><td>刷盘是进程骤停前的持久化屏障。</td></tr>
-    <tr><td>崩溃尾部修复</td><td>仅截断最后一个换行之后未提交的半行，并持久化修复结果。</td><td>有换行的完整记录不能自动删除。</td></tr>
-    <tr><td>生命周期修复</td><td>为悬空工具调用补未知结果，再补步骤结束和中断轮次结束。</td><td>结果未知的外部副作用不得自动重试。</td></tr>
-    <tr><td>冷恢复</td><td>校验记录、修复边界、重建 Session 和全部投影，并从下一轮编号继续。</td><td>恢复源只有持久化事件日志。</td></tr>
-    <tr><td>会话分叉</td><td>按指定序号复制前缀，在中间边界补闭合事件，并写入父谱系。</td><td>分叉后两个日志独立增长。</td></tr>
-    <tr><td>路径防护</td><td>会话标识编码为根目录内单一文件名，检查重复标识。</td><td>危险标识不能逃逸目录或覆盖已有会话。</td></tr>
+    <tr><td><a href="#concept-0010-1">会话头</a></td><td>持久化会话标识、格式、版本、工作目录和可选父会话谱系。</td><td>身份或版本不匹配时拒绝恢复。</td></tr>
+    <tr><td><a href="#concept-0010-2">逐事件存储</a></td><td>每个事件独占一行，保存连续序号、时间、数据和校验和。</td><td>完整坏行视为已提交损坏，绝不猜测。</td></tr>
+    <tr><td><a href="#concept-0010-3">写后队列与刷盘</a></td><td>追加进入串行队列，<code>flush</code> 等待写入并调用文件同步。</td><td>刷盘是进程骤停前的持久化屏障。</td></tr>
+    <tr><td><a href="#concept-0010-4">崩溃尾部修复</a></td><td>仅截断最后一个换行之后未提交的半行，并持久化修复结果。</td><td>有换行的完整记录不能自动删除。</td></tr>
+    <tr><td><a href="#concept-0010-5">生命周期修复</a></td><td>为悬空工具调用补未知结果，再补步骤结束和中断轮次结束。</td><td>结果未知的外部副作用不得自动重试。</td></tr>
+    <tr><td><a href="#concept-0010-6">冷恢复</a></td><td>校验记录、修复边界、重建 Session 和全部投影，并从下一轮编号继续。</td><td>恢复源只有持久化事件日志。</td></tr>
+    <tr><td><a href="#concept-0010-7">会话分叉</a></td><td>按指定序号复制前缀，在中间边界补闭合事件，并写入父谱系。</td><td>分叉后两个日志独立增长。</td></tr>
+    <tr><td><a href="#concept-0010-8">路径防护</a></td><td>会话标识编码为根目录内单一文件名，检查重复标识。</td><td>危险标识不能逃逸目录或覆盖已有会话。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：可证明的崩溃恢复</h2>
@@ -48,6 +92,39 @@ Header + JSONL + checksum ── flush/fsync ─► 磁盘事实
     <tr><th>方案对比</th><td>数据库提供事务与索引但引入服务和迁移复杂度；JSONL 易检查、易教学、适合单会话顺序写，规模增长后可换后端而保留协议。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>冷恢复读取文件
+├─ 全部行完整且校验通过 → 直接重建
+├─ 最后一段无换行 → 截断到最后提交边界
+├─ 完整行 checksum 错 → 拒绝恢复
+├─ seq 缺口/重复 → 拒绝恢复
+├─ open tool call → UNKNOWN result + closers
+├─ open step/turn → interrupted closers
+└─ fork at seq → 补边界 + parent lineage + 独立日志</code></pre>
+  <table><thead><tr><th>崩溃位置</th><th>磁盘证据</th><th>恢复决定</th></tr></thead><tbody>
+    <tr><td>写入前</td><td>没有新字节。</td><td>事件未提交，不存在。</td></tr>
+    <tr><td>写到半行</td><td>末尾无换行。</td><td>安全截断半行。</td></tr>
+    <tr><td>完整行后、fsync 前</td><td>可能存在也可能随掉电丢失。</td><td>以实际可读完整行作为事实；flush 才承诺耐久。</td></tr>
+    <tr><td>工具副作用后、result 前</td><td>只有 tool/call。</td><td>写 UNKNOWN，要求检查外部状态。</td></tr>
+    <tr><td>修复事件写到一半</td><td>修复尾部也遵循换行边界。</td><td>下次恢复再次确定性生成相同 closers。</td></tr>
+    <tr><td>历史中间损坏</td><td>完整坏行或序号缺口。</td><td>停止，绝不自动跨过。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>事务能力</th><th>可检查性</th><th>适用规模</th></tr></thead><tbody>
+    <tr><td>覆盖写 JSON 快照</td><td>需临时文件+重命名。</td><td>当前状态直观，历史丢失。</td><td>小型无审计状态。</td></tr>
+    <tr><td>校验 JSONL</td><td>单记录提交，顺序追加。</td><td>文本可检查，修复边界明确。</td><td>单会话顺序写和教学实现。</td></tr>
+    <tr><td>SQLite</td><td>强事务、索引和并发读。</td><td>需查询工具。</td><td>大量会话和复杂检索。</td></tr>
+    <tr><td>远程事件库</td><td>分布式耐久与复制。</td><td>运维复杂。</td><td>多节点生产系统。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>为什么换行能当提交标志？</dt><dd>写入器承诺每条记录只有完整编码后才追加换行；因此无换行尾部一定不是已提交记录，而完整行必须接受校验。</dd>
+    <dt>为什么不能自动重跑悬空工具？</dt><dd>外部写操作可能已经成功，只是 result 未落盘；自动重跑可能重复付款、删除或覆盖。</dd>
+    <dt>flush 是否保证所有存储硬件场景绝不丢失？</dt><dd>它提供操作系统和文件系统暴露的耐久屏障，不等于对故障硬件作绝对保证；真正生产还需磁盘、复制和备份策略。</dd>
+  </dl>
+
   <h2>文件格式</h2>
   <pre><code>{ kind: "header", header: { id, format, version, cwd, parent? }, checksum }
 { kind: "event",  event:  { seq: 0, type, time, data },       checksum }
@@ -61,6 +138,39 @@ Header + JSONL + checksum ── flush/fsync ─► 磁盘事实
     <tr><td>open turn/step</td><td>追加 deterministic closer</td><td>提供可继续的协议闭包</td></tr>
     <tr><td>tool/call 无结果</td><td>TOOL_OUTCOME_UNKNOWN</td><td>外部副作用可能已经发生</td></tr>
   </tbody></table>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0010-1" data-concept="会话头">
+  <h3>会话头：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>恢复时，身份与配置依据什么校验？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">SessionHeader 单独记录 id、version、cwd、谱系、delegationDepth 和 agentPreset；原版不是示例中的 kind/header/checksum 外壳。恢复必须保留决定工具与提示词的 preset。 <a href="../deepseek-harness/packages/session/session-persistence-jsonl/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">用 thread_id、checkpoint_ns、checkpoint_id 定位检查点，快照携带状态、下一节点和元数据；不是每个会话一行 SessionHeader。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">配置、执行状态与统计放在 base_state.json，历史事件另存；恢复依据 conversation_id 与 persistence_dir。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>三者的恢复身份分别绑定日志头、图检查点坐标、会话目录与基础状态，不能共用一个 Header 解析器。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0010-2" data-concept="逐事件存储">
+  <h3>逐事件存储：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>磁盘到底存事件、消息还是状态快照？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">存逻辑 SessionEvent；默认物理格式为带校验的 Zstandard frames（.jsonl.zstd），可无损打包连续分片，也可选原始 JSONL。不是每个物理行都对应一个事件。 <a href="../deepseek-harness/packages/session/session-persistence-jsonl/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">checkpointer 保存图状态和中间 writes；可用 SQLite/PostgreSQL 等后端。检查点不是本课 JSONL 事件序列。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">events/event-*.json 每文件一个事件；base_state.json 独立更新，不需要重写全部事件历史。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>比较恢复格式时要同时看逻辑数据模型和物理编码，不能把“都能存历史”当作格式相同。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0010-8" data-concept="路径防护">
+  <h3>路径防护：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>会话标识如何安全映射到存储位置？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">会话 ID 单射转义为安全路径段；读取时验证 Header 的 id/cwd 与选中 transcript 路径一致，拒绝重复身份或错位路径。 <a href="../deepseek-harness/packages/session/session-persistence-jsonl/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">thread_id 是检查点索引，不必对应文件路径；数据库后端的键约束与本地文件 backend 的路径约束不能混用。 <a href="https://docs.langchain.com/oss/python/langgraph/persistence">依据</a></td>
+    <td data-framework="openhands">公开入口使用 conversation_id 和 persistence_dir 组织目录；路径遍历防护的精确行为不由“有一个 ID”自动保证，须看具体存储实现。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>DeepSeek 明确约束 ID→路径映射；另两者应核对实际后端，而不是继承实验室的文件名编码假设。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>恢复顺序</h2>
   <pre><code>read bytes
@@ -76,8 +186,54 @@ Header + JSONL + checksum ── flush/fsync ─► 磁盘事实
 
   <div class="callout"><strong>未知副作用不能自动重试。</strong>如果 <code>tool/call</code> 已持久化而 result 没有，恢复只能声明 <code>TOOL_OUTCOME_UNKNOWN</code>。读操作或幂等操作可评估后重试；写操作必须先检查外部状态。</div>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0010-4" data-concept="崩溃尾部修复">
+  <h3>崩溃尾部修复：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>截断的字节能否修，什么损坏必须拒绝？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">原始模式处理不完整行；压缩模式检查 frame，最后不完整 frame 可保留已解码完整记录后重编码。完整 frame 校验失败等损坏会被拒绝。 <a href="../deepseek-harness/packages/session/session-persistence-jsonl/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">恢复入口读取已保存检查点；SQLite/PostgreSQL 的物理损坏处理归所选后端。没有理由把 JSONL 的“最后换行”规则套到检查点上。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">公开格式是基础状态文件加独立事件文件，不是连续 JSONL；文档未建立“截断最后半行即可恢复”的规则，不能照搬本课修复器。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>尾部修复依赖存储格式。这里只有 DeepSeek JSONL 实现与本课有相近的物理尾部问题，且压缩模式仍有明显区别。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0010-5" data-concept="生命周期修复">
+  <h3>生命周期修复：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>工具请求留下了，但结果没有落盘，是否重跑？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">区分 TOOL_NOT_STARTED 与 TOOL_OUTCOME_UNKNOWN：未持久调用与已持久调用无结果不是同一情况；冷恢复补 tool/step/turn closer，未知副作用需验证。 <a href="../deepseek-harness/packages/session/session-persistence/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">从旧检查点 replay 会重新执行之后的节点，包含 LLM/API 请求；这与只读取旧事实不同，外部副作用必须考虑重复执行。 <a href="https://docs.langchain.com/oss/python/langgraph/use-time-travel">依据</a></td>
+    <td data-framework="openhands">持久化恢复载入已有会话状态和事件；这份公开合约没有证明采用 DeepSeek 的两类合成错误或相同 closer 协议，不能据此承诺外部操作只发生一次。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>“闭合旧轮次再继续”与“从检查点重执行后续节点”是不同恢复策略，尤其影响工具副作用。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0010-6" data-concept="冷恢复">
+  <h3>冷恢复：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>新进程从哪里重新建立可执行会话？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">prepare/load 校验持久日志并提交冷修复，重建未发布 Session 后再交给 Agent 创建与发布；活动会话的开放轮次不会被冒充崩溃修复。 <a href="../deepseek-harness/packages/session/session-persistence/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">相同 thread_id 关联已配置的 checkpointer；MemorySaver 在进程退出后不保留数据，跨进程必须用持久后端。 <a href="https://docs.langchain.com/oss/python/langgraph/persistence">依据</a></td>
+    <td data-framework="openhands">构造 Conversation 时提供原 conversation_id 与 persistence_dir，重新加载状态与事件后继续。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>三者都要重建运行时，但恢复源分别是日志、图检查点、状态加事件；遥测后端不在这条路径上。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>Flush 与骤停</h2>
   <p><code>Session.append()</code> 进入串行 write-behind 队列；<code>flush()</code> 等待队列并调用文件 <code>fsync</code>。测试用独立 Node 子进程 flush 后直接退出，再由父进程冷恢复，证明耐久边界不是同进程缓存假象。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0010-3" data-concept="写后队列与刷盘">
+  <h3>写后队列与刷盘：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>哪个边界之后才允许认为状态已持久化？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">协调器按会话批量排队；session/flush 取消合并等待并排空，JSONL 后端 append 后 fsync。内存 append 与持久屏障不同。 <a href="../deepseek-harness/packages/session/session-persistence/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">durability 可选 sync、async、exit：分别在下一步前完成保存、与下一步并行保存、退出时保存。选项影响进程崩溃时可恢复的位置。 <a href="https://docs.langchain.com/oss/python/langgraph/checkpointers">依据</a></td>
+    <td data-framework="openhands">ConversationState 字段变更自动保存基础状态，事件增量写文件；公开使用方式不是调用本课的 Session.flush。是否等价于特定硬件耐久屏障须另查底层实现。 <a href="https://docs.openhands.dev/sdk/guides/convo-persistence">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>DeepSeek 暴露 flush 屏障，LangGraph 暴露执行耐久策略，OpenHands 提供自动保存；自动保存不等于已经证明 fsync 语义。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>Fork</h2>
   <pre><code>source events[0..atSeq]
@@ -85,6 +241,19 @@ Header + JSONL + checksum ── flush/fsync ─► 磁盘事实
   → 新 header.parent = { sessionId, seq }
   → 写入独立 JSONL
   → 后续 append 互不影响</code></pre>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0010-7" data-concept="会话分叉">
+  <h3>会话分叉：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>复制什么、允许从哪里切、是否复制工作区？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">ctx.sessions.fork 复制选定事件前缀并记录谱系，要求前缀结束时没有开放轮次。与上方实验室“任意 atSeq 后补 closer”的规则不同。 <a href="../deepseek-harness/packages/core/session/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">在旧 checkpoint 上 update_state 创建分支，再 invoke 继续；不回滚原历史，后续节点重新执行。分支对象是图状态，不是文件系统副本。 <a href="https://docs.langchain.com/oss/python/langgraph/use-time-travel">依据</a></td>
+    <td data-framework="openhands">Conversation.fork 深拷贝事件与状态并生成新 ID；工作目录仍共享，默认重置 cost/token 指标。不能把会话隔离理解成工作区隔离。 <a href="https://docs.openhands.dev/sdk/guides/convo-fork">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>同名 Fork 分别操作事件前缀、图检查点、会话副本；切点限制、统计继承和工作区共享必须独立比较。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab

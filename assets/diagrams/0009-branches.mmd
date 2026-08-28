@@ -1,0 +1,9 @@
+---
+title: 权限与沙箱 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"当前模式足够"| result0["无需升级直接执行"]
+  decision -->|"禁止询问或无响应器"| result1["确定性拒绝"]
+  decision -->|"用户拒绝或取消"| result2["写入审批决定"]
+  decision -->|"严格升级获准"| result3["仅本次授权"]

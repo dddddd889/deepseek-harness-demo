@@ -1,0 +1,9 @@
+---
+title: 插件生命周期 · 异常与边界分支
+---
+flowchart TD
+  decision{"观察到哪种情况？"}
+  decision -->|"启动中途失败"| result0["回滚已登记资源"]
+  decision -->|"服务键冲突"| result1["拒绝新服务"]
+  decision -->|"清理器失败"| result2["继续清理并汇总错误"]
+  decision -->|"重复释放"| result3["幂等返回"]

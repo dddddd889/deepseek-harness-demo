@@ -3,8 +3,51 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>第 8 课：文件系统、子进程、Shell 与 PTY</title><link rel="stylesheet" href="../assets/course.css">
 </head><body><main>
+  <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 8 课：文件系统、子进程、Shell 与 PTY</h1>
   <p class="lead">本地能力不是一个万能 bash 函数，而是四层独立 seam：路径、进程、命令解释和交互终端。</p>
+
+  <!-- 章节定位与对比：开始 -->
+  <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
+  <section id="framework-comparison"><details><summary>章节概览（可选）：三框架职责摘要</summary>
+  <h2>本章对比：DeepSeek Harness / DeepAgents / OpenHands</h2>
+  <p>口径：DeepSeek 依据本地原仓库（99f6f02fecdb），不是 harness-lab；deepagent 按 LangChain DeepAgents 理解；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。在线资料核对于 2026-08-28，描述文档能力，不代表已在本实验室安装或测试。没有依据的同名能力不强行等同。</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>比较维度</th><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands Software Agent SDK</th></tr></thead><tbody>
+    <tr data-dimension="mechanism"><th scope="row">本章由谁负责、怎么实现</th><td data-framework="deepseek">fs、subprocess、shell、terminals 是独立服务，存在 local、sandbox 或 E2B 等实现组合。</td><td data-framework="deepagents">FilesystemBackend 操作本机文件，LocalShellBackend 还支持 execute；CompositeBackend 可按路径路由。</td><td data-framework="openhands">Workspace 抽象本地与远程执行环境，工具在选定环境中执行；RemoteWorkspace 连接 Agent Server。</td></tr>
+    <tr data-dimension="boundary"><th scope="row">与另外两者的边界差异</th><td data-framework="deepseek">工具入口与能力提供方分开，不必为每种执行环境重写模型侧工具。</td><td data-framework="deepagents">本机 shell 没有隔离；文件 backend 的路径配置也不能替代系统沙箱。</td><td data-framework="openhands">切换到远程工作区改变的是执行位置，不只是前端显示的目录。</td></tr>
+    <tr data-dimension="sources"><th scope="row">核对实现的一手依据</th><td data-framework="deepseek"><a href="../deepseek-harness/docs/capability-seams.zh.md">原仓库依据 1</a></td><td data-framework="deepagents"><a href="https://docs.langchain.com/oss/python/deepagents/backends">官方文档 1</a></td><td data-framework="openhands"><a href="https://docs.openhands.dev/sdk/arch/workspace">官方文档 1</a></td></tr>
+  </tbody></table></div>
+  <p class="callout"><strong>三者的关键区别：</strong>可移植性取决于环境接口是否足够清晰；不要让工具定义直接绑定开发机路径和进程实现。（基于上述依据的归纳）</p>
+  </details></section>
+  <section id="system-position">
+  <h2>本章在全系统中的位置</h2>
+  <p>工具层下方，直接接触文件、子进程和终端的执行层。</p>
+  <p>下面是本课程的概念地图，不是某框架的逐包调用图，也不表示实验室已默认装配全部能力。三套框架的实际对应关系见上方横向对比表。</p>
+  <figure class="course-diagram"><figcaption>全系统定位 · 橙色高亮第 8 课</figcaption><a href="../assets/diagrams/0008-position.svg"><img src="../assets/diagrams/0008-position.svg" alt="本地能力在全系统中的位置，橙色为本课职责" loading="lazy"></a><p><a href="../assets/diagrams/0008-position.svg">打开大图</a> · <a href="../assets/diagrams/0008-position.mmd">Mermaid 图源</a></p></figure>
+  <table><tbody>
+    <tr><th>上游与输入</th><td>第 7 课已准入的文件与命令操作。</td></tr>
+    <tr><th>下游与输出</th><td>文件内容、修改结果、进程输出或终端句柄，返回工具层。</td></tr>
+    <tr><th>不归本章负责</th><td>能够读写本地路径并不代表已经隔离；安全约束由第 9 课补齐。</td></tr>
+    <tr><th>放进具体场景</th><td>读源码用文件能力，运行测试用进程能力；长期交互 shell 需要独立终端生命周期。</td></tr>
+  </tbody></table>
+  <p>接着看下方「可视化图解」：局部模块图解释职责，时序图解释一次调用，分支图解释异常与边界。</p>
+  </section>
+  <!-- 章节定位与对比：结束 -->
+
+  <section id="visual-diagrams">
+  <h2>可视化图解</h2>
+  <p>模块图说明依赖和数据去向；时序图展示一次代表性调用；分支图列出关键异常与边界。示例链路不代表所有扩展都已默认装配。</p>
+  <figure class="course-diagram"><figcaption>模块关系 · 本地能力</figcaption>
+    <a href="../assets/diagrams/0008-modules.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0008-modules.svg" alt="本地能力的模块关系图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0008-modules.svg">打开大图</a> · <a href="../assets/diagrams/0008-modules.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>调用时序 · 本地能力</figcaption>
+    <a href="../assets/diagrams/0008-sequence.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0008-sequence.svg" alt="本地能力的调用时序图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0008-sequence.svg">打开大图</a> · <a href="../assets/diagrams/0008-sequence.mmd">Mermaid 图源</a></p></figure>
+  <figure class="course-diagram"><figcaption>异常分支 · 本地能力</figcaption>
+    <a href="../assets/diagrams/0008-branches.svg" target="_blank" rel="noopener"><img src="../assets/diagrams/0008-branches.svg" alt="本地能力的异常分支图" loading="lazy"></a>
+    <p><a href="../assets/diagrams/0008-branches.svg">打开大图</a> · <a href="../assets/diagrams/0008-branches.mmd">Mermaid 图源</a></p></figure>
+  <p><a href="../reference/deepseek-harness-build-roadmap.html#site-architecture">查看全站总体架构</a></p>
+  </section>
 
   <h2>本课导览</h2>
   <table><tbody>
@@ -14,15 +57,16 @@
     <tr><th>解决的问题</th><td>防止路径逃逸、凭证泄漏和孤儿进程，同时支持真实编码任务需要的文件、命令与交互终端。</td></tr>
   </tbody></table>
 
+  <p id="concept-index" class="callout">点击下面的概念名称，可直达该概念的三框架实现、区别与依据。原有能力清单、示例和验收描述面向 harness-lab 教学实现；不要将其直接当作上游框架能力声明。</p>
   <h2>完整能力清单</h2>
   <table><thead><tr><th>能力</th><th>具体覆盖</th><th>安全边界</th></tr></thead><tbody>
-    <tr><td>工作区路径</td><td>解析相对路径，检查现有目标和待创建目标的真实父目录。</td><td>拒绝绝对路径、上级路径和符号链接逃逸。</td></tr>
-    <tr><td>文件操作</td><td>原子写入、有限读取、目录列举、字面字符串搜索和展示裁剪。</td><td>读取硬上限与展示截断分别报告。</td></tr>
-    <tr><td>子进程</td><td>设置参数、工作目录、环境、超时和取消，分别收集标准输出与标准错误。</td><td>默认清洗密钥、口令、令牌和 DSH_ 环境变量。</td></tr>
-    <tr><td>进程收敛</td><td>向进程组发送终止信号，宽限期后升级强制终止，运行时释放时等待全部进程。</td><td>非零退出是业务结果，不伪装成基础设施异常。</td></tr>
-    <tr><td>输出溢出</td><td>内存保留可展示前缀，完整大输出写入私有溢出文件并可回读。</td><td>输出上限不会导致进程失控或内存无限增长。</td></tr>
-    <tr><td>终端命令</td><td>固定工作区和解释器执行命令，返回结构化退出码与输出。</td><td>命令失败作为结果交还模型。</td></tr>
-    <tr><td>真实伪终端</td><td>创建交互终端，支持写入、调整尺寸、读取输出和等待退出。</td><td>释放运行时时关闭仍存活的终端。</td></tr>
+    <tr><td><a href="#concept-0008-1">工作区路径</a></td><td>解析相对路径，检查现有目标和待创建目标的真实父目录。</td><td>拒绝绝对路径、上级路径和符号链接逃逸。</td></tr>
+    <tr><td><a href="#concept-0008-2">文件操作</a></td><td>原子写入、有限读取、目录列举、字面字符串搜索和展示裁剪。</td><td>读取硬上限与展示截断分别报告。</td></tr>
+    <tr><td><a href="#concept-0008-3">子进程</a></td><td>设置参数、工作目录、环境、超时和取消，分别收集标准输出与标准错误。</td><td>默认清洗密钥、口令、令牌和 DSH_ 环境变量。</td></tr>
+    <tr><td><a href="#concept-0008-4">进程收敛</a></td><td>向进程组发送终止信号，宽限期后升级强制终止，运行时释放时等待全部进程。</td><td>非零退出是业务结果，不伪装成基础设施异常。</td></tr>
+    <tr><td><a href="#concept-0008-5">输出溢出</a></td><td>内存保留可展示前缀，完整大输出写入私有溢出文件并可回读。</td><td>输出上限不会导致进程失控或内存无限增长。</td></tr>
+    <tr><td><a href="#concept-0008-6">终端命令</a></td><td>固定工作区和解释器执行命令，返回结构化退出码与输出。</td><td>命令失败作为结果交还模型。</td></tr>
+    <tr><td><a href="#concept-0008-7">真实伪终端</a></td><td>创建交互终端，支持写入、调整尺寸、读取输出和等待退出。</td><td>释放运行时时关闭仍存活的终端。</td></tr>
   </tbody></table>
 
   <h2>主概念深挖：受控本地执行</h2>
@@ -44,6 +88,39 @@
     <tr><th>方案对比</th><td>直接调用系统 shell 最灵活但参数和边界不透明；结构化进程接口更安全，确需 shell 语义时再通过 LocalShell 显式进入。</td></tr>
   </tbody></table>
 
+  <h2>场景穷举</h2>
+  <pre><code>本地操作
+├─ 工作区内正常文件 → 读/写/列举/搜索
+├─ ../、绝对路径、符号链接 → 拒绝逃逸
+├─ 小输出进程 → 内存返回
+├─ 大输出进程 → 前缀 + SpillRef
+├─ 超时/取消 → SIGTERM → 宽限 → SIGKILL
+├─ 非零退出 → 结构化业务结果
+└─ 交互程序 → PTY write/resize/read/exit</code></pre>
+  <table><thead><tr><th>场景</th><th>关键风险</th><th>控制措施</th></tr></thead><tbody>
+    <tr><td>新建文件</td><td>目标不存在，无法 realpath 自身。</td><td>逐级寻找真实父目录并确认仍在工作区。</td></tr>
+    <tr><td>符号链接</td><td>字符串路径在根内，真实目标在根外。</td><td>读取目标和写入父目录都检查 realpath。</td></tr>
+    <tr><td>凭证环境</td><td>子进程继承 API_KEY/TOKEN。</td><td>默认清洗敏感名称，只允许显式覆盖。</td></tr>
+    <tr><td>进程树</td><td>只杀父进程，孙进程继续存活。</td><td>POSIX 使用独立进程组并向组发信号。</td></tr>
+    <tr><td>输出洪泛</td><td>无限 stdout 耗尽内存。</td><td>内存预算后溢出磁盘，保留完整内容摘要。</td></tr>
+    <tr><td>平台差异</td><td>PTY、信号或沙箱不可用。</td><td>运行能力探测，明确失败或声明降级。</td></tr>
+  </tbody></table>
+
+  <h2>多方案对比</h2>
+  <table><thead><tr><th>方案</th><th>灵活性</th><th>安全边界</th><th>选择条件</th></tr></thead><tbody>
+    <tr><td>直接 shell 字符串</td><td>最高。</td><td>参数、引用和副作用不透明。</td><td>用户明确提供的复杂 shell 语义。</td></tr>
+    <tr><td>结构化 argv 子进程</td><td>高。</td><td>无 shell 注入，环境和 cwd 明确。</td><td>框架内部启动工具。</td></tr>
+    <tr><td>容器/虚拟机执行</td><td>中。</td><td>隔离最强。</td><td>不可信代码、多租户、跨平台一致性要求高。</td></tr>
+    <tr><td>宿主 OS 沙箱</td><td>高。</td><td>依赖平台能力。</td><td>本地编码助手，需要访问真实工作区。</td></tr>
+  </tbody></table>
+
+  <h2>关键设计反问</h2>
+  <dl>
+    <dt>路径前缀检查为什么不够？</dt><dd>符号链接能让字符串仍以工作区开头但实际解析到外部；安全判断必须基于规范化真实路径。</dd>
+    <dt>非零退出为什么不是异常？</dt><dd>测试失败、grep 未命中都用退出码表达正常业务结果；抛异常会丢失 stdout/stderr 和可修正上下文。</dd>
+    <dt>为什么既需要 Shell 又需要 ProcessRuntime？</dt><dd>Shell 负责命令语言，ProcessRuntime 负责生命周期和字节流；分开后无 shell 的结构化程序也能复用安全收敛能力。</dd>
+  </dl>
+
   <h2>分层</h2>
   <pre><code>Agent Tool
   ├── fs_read/write/list/search ──&gt; WorkspaceFs
@@ -61,6 +138,29 @@
     <tr><td>PTY</td><td>终端分配、write、resize、终端输出</td><td>后台 Job id</td></tr>
   </tbody></table>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0008-6" data-concept="终端命令">
+  <h3>终端命令：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>连续两次命令之间会保留 cd 和 shell 变量吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">bash-local 每次启动新的非登录 bash -c，不保留 shell 状态；超时与上游取消分别报告 timedOut 和 aborted。持久终端由另一个提供方负责。 <a href="../deepseek-harness/packages/shell/bash-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LocalShellBackend 的 execute 使用宿主 shell 执行，以 root_dir 为工作目录；该接口不等于持久交互终端。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">TerminalTool 面向持久会话，支持 tmux、subprocess 或 PowerShell 后端；不要将它与 Workspace 单次命令接口混同。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/terminal/definition.py">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>测试连续 cd/export 时，先确定比较的是单次执行接口还是有状态终端。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0008-7" data-concept="真实伪终端">
+  <h3>真实伪终端：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>交互命令等待输入时，谁判定就绪并发送中断？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">terminal-bash 消费 spawnTerminal：进程提供方分配 PTY，终端后端结合提示符和前台状态判定就绪；取消发送真正 SIGINT，不用写入控制字符模拟。 <a href="../deepseek-harness/packages/terminal/terminal-bash/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LocalShellBackend 的执行接口不是 PTY 协议；交互终端需由所选沙箱/自定义工具另外提供，不能从 execute 推导 resize、前台进程组等能力。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">TerminalTool 自动选择平台后端，Unix 优先 tmux、否则 subprocess，Windows 用 PowerShell；“终端工具”并不保证所有后端均为同一种 PTY 实现。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/terminal/definition.py">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>持久状态、终端仿真和伪终端是不同能力，平台回退时要逐项验证交互行为。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>文件安全</h2>
   <pre><code>用户路径
   → 拒绝绝对路径
@@ -71,6 +171,29 @@
   → 执行读写</code></pre>
   <div class="callout"><strong>只检查字符串前缀不够。</strong><code>workspace/escape -&gt; /outside</code> 看起来位于 root 下，真正访问时却已越界，所以现有路径和可写父目录都必须检查 realpath。</div>
 
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0008-1" data-concept="工作区路径">
+  <h3>工作区路径：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>配置 cwd 后，文件工具还能访问根目录之外吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">fs-local 的 cwd 只是相对路径基准，绝对路径和 .. 可越出；realpath 用于目标身份。需要写入围栏时另装 fs-sandbox，不能把本课 WorkspaceFs 的限制当作上游默认。 <a href="../deepseek-harness/packages/fs/fs-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">FilesystemBackend 需 root_dir 配合 virtual_mode 才启用路径限制；启用 shell 后，该限制不能防止命令访问其他路径。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">Workspace 设定本地或远程执行位置；LocalWorkspace 可访问宿主，目录本身不等于文件访问隔离。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>工作目录回答“相对路径从哪里算”，访问围栏回答“允许到哪里”，两者必须分开配置。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0008-2" data-concept="文件操作">
+  <h3>文件操作：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>一次编辑的存储语义和模型展示由谁负责？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">fs-local 提供原子 writeText、目标锁内 editText 和可选版本防护；流式读取与工具行窗口分层，搜索不是这个本地存储提供方的职责。 <a href="../deepseek-harness/packages/fs/fs-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">内置读写编辑和搜索工具通过 Backend 操作；StateBackend 写图状态，FilesystemBackend 写真实文件，换后端会改变持久化位置。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">Workspace 提供文件上传下载；模型编辑工具则由 ToolDefinition/Executor 实现。不能用上传成功推断编辑工具具备原子替换和版本校验。 <a href="https://docs.openhands.dev/sdk/arch/tool-system">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>对比文件能力要落到实际操作与后端，不能从“都有文件工具”推导相同并发写入保证。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
+
   <h2>进程生命周期</h2>
   <pre><code>spawn detached process group
   ├── stdout/stderr → 有限内存前缀 + 完整 spill
@@ -78,6 +201,39 @@
   ├── grace 到期    → SIGKILL
   └── runtime dispose → 终止并等待所有后台进程和 PTY</code></pre>
   <p>父进程环境会默认删除名字匹配 <code>KEY|PASSWORD|SECRET|TOKEN</code> 以及 <code>DSH_*</code> 的变量。只有调用方显式传入的环境项才可以恢复它们。</p>
+
+  <!-- 概念内对比：开始 -->
+  <article class="concept-comparison" id="concept-0008-3" data-concept="子进程">
+  <h3>子进程：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>命令以谁的环境和权限启动？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">subprocess-local 清洗形似凭据及 DSH_* 的继承变量，再合并显式 env；普通进程以显式 stdio 启动，底层不负责解释 shell 命令。 <a href="../deepseek-harness/packages/subprocess/subprocess-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LocalShellBackend 在宿主用 subprocess.run(shell=True) 执行，提供 env/inherit_env、超时和输出预算，没有内置隔离。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">LocalWorkspace 直接启动子进程；RemoteWorkspace 经 HTTP 委托 Agent Server，实际进程在远端环境中。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>环境继承、shell 解释和执行位置是三个独立问题；远程执行也需要检查远端凭据与权限。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0008-4" data-concept="进程收敛">
+  <h3>进程收敛：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>工具返回取消后，后代进程一定都停止了吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">terminate 先 TERM 再 KILL，waitForExit 等待受管进程树，dispose 终止并等待；守护化逃逸与 Windows 尽力而为清理仍是明确边界。 <a href="../deepseek-harness/packages/subprocess/subprocess-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">LocalShellBackend 的 timeout 是命令预算；公开后端说明未承诺与 DeepSeek 相同的整棵进程树等待协议，不能据超时字段断言后代已回收。 <a href="https://docs.langchain.com/oss/python/deepagents/backends">依据</a></td>
+    <td data-framework="openhands">Workspace 上下文退出用于资源管理；LocalWorkspace 保留本地资源，远程实现可停止容器。它与逐命令进程树确认是不同生命周期。 <a href="https://docs.openhands.dev/sdk/arch/workspace">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>验收应观察后代是否存活，而不只是等待 API 返回；资源拥有者与终止范围必须明确。</p>
+  </article>
+  <article class="concept-comparison" id="concept-0008-5" data-concept="输出溢出">
+  <h3>输出溢出：三框架分别怎么做？</h3>
+  <p><strong>同一个问题：</strong>模型只看到截断输出时，完整内容还能找回来吗？</p>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th scope="col">DeepSeek Harness 原实现</th><th scope="col">LangChain DeepAgents</th><th scope="col">OpenHands SDK</th></tr></thead><tbody><tr>
+    <td data-framework="deepseek">收集模式保留内存尾部，可选 spill 保存完整流；超过 spill 总上限会丢弃不完整文件，仅返回截断尾部。完成文件留在临时目录供外部清理。 <a href="../deepseek-harness/packages/subprocess/subprocess-local/README.zh.md">依据</a></td>
+    <td data-framework="deepagents">大工具结果可卸载到 Backend 后按文件读取；若下层执行后端已经截断，后续卸载不能找回被丢弃字节。 <a href="https://docs.langchain.com/oss/python/deepagents/context-engineering">依据</a></td>
+    <td data-framework="openhands">TerminalObservation 渲染使用 maybe_truncate，并传入 full_output_save_dir 保存输出；这是终端结果展示层机制，不等于底层进程采集无损无上限。 <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/terminal/definition.py">依据</a></td>
+  </tr></tbody></table></div>
+  <p><strong>这个概念的区别：</strong>区分采集上限、落盘上限与模型展示上限；“有文件引用”必须同时说明文件是否完整。</p>
+  </article>
+  <!-- 概念内对比：结束 -->
 
   <h2>运行与调试</h2>
   <pre><code>cd harness-lab
