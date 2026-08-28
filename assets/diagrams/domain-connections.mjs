@@ -121,7 +121,7 @@ export function renderDomains(groups) {
     // 透明宽路径扩大细线命中区域；真实线条仍保持原有粗细。
     lines.push(`<g data-edge="${id}" data-from="${from}" data-to="${to}" data-kind="${kind}" tabindex="0" aria-label="${id} ${escape(label)}"><title>${id} ${escape(a.title)} → ${escape(b.title)}：${escape(label)}</title><path class="edge-hit" d="M${points.map(p => p.join(',')).join(' L')}" fill="none" stroke="transparent" stroke-width="16" pointer-events="stroke"/><polyline points="${points.map(p => p.join(',')).join(' ')}" fill="none" stroke="${color}" stroke-width="2"${dashed ? ' stroke-dasharray="7 5"' : ''}/><polygon points="${arrow}" fill="${color}"/></g>`);
     const caption = `${id} ${label}`, labelWidth = 46 + label.length * 17;
-    labels.push(`<g data-edge-label="${id}" fill="${color}"><rect x="${labelX - 3}" y="${labelY - 17}" width="${labelWidth}" height="22" rx="4" fill="#fff" fill-opacity=".96"/>${text(labelX, labelY, caption, 16)}</g>`);
+    labels.push(`<g data-edge-label="${id}" data-start-name="${escape(a.title)}" data-end-name="${escape(b.title)}" data-relation="${escape(label)}" tabindex="0" aria-label="${id} ${escape(a.title)}到${escape(b.title)}：${escape(label)}" fill="${color}"><rect x="${labelX - 3}" y="${labelY - 17}" width="${labelWidth}" height="22" rx="4" fill="#fff" fill-opacity=".96"/>${text(labelX, labelY, caption, 16)}</g>`);
     mermaid.push(`  ${from} ${dashed ? '-.->' : '-->'}|"${caption}"| ${to}`);
     table.push(`      <tr data-edge="${id}"><th scope="row">${id} · ${kinds[kind][1]}</th><td>${a.title} → ${b.title}</td><td>${label}</td></tr>`);
   }
@@ -174,5 +174,60 @@ export function renderDomains(groups) {
     if (event.key === 'Escape') { selected.clear(); update(); }
   });
 })();`;
-  return { svg: svg.join('').replace('</title>', '</title><style>' + styles.join('\n') + '</style>').replace('</svg>', '<script><![CDATA[' + interaction + ']]></script></svg>'), mermaid: mermaid.join('\n') + '\n', connections: table.join('\n') };
+  // 浮层置于最后绘制，并禁止命中鼠标，避免遮住编号后触发反复进出。
+  const tooltip = '<g id="edge-tooltip" visibility="hidden" pointer-events="none" role="tooltip"><rect id="edge-tooltip-box" width="480" height="100" rx="9" fill="#172033" stroke="#d97706" stroke-width="2"/><g fill="#fff" font-family="PingFang SC,Microsoft YaHei,sans-serif"><text id="edge-tooltip-title" x="14" y="25" font-size="15" font-weight="700"/><text id="edge-tooltip-start" x="14" y="53" font-size="14"/><text id="edge-tooltip-end" x="14" y="80" font-size="14"/></g></g>';
+  // 坐标从屏幕反变换到 SVG；浮层保持屏幕字号，兼容 object 缩放和独立打开。
+  const tooltipScript = `
+(() => {
+  const root = document.documentElement;
+  const tip = document.getElementById('edge-tooltip');
+  const box = document.getElementById('edge-tooltip-box');
+  const title = document.getElementById('edge-tooltip-title');
+  const start = document.getElementById('edge-tooltip-start');
+  const end = document.getElementById('edge-tooltip-end');
+  const labels = [...document.querySelectorAll('[data-edge-label]')];
+  // 鼠标移出或焦点离开立即收起，不改变类别选择与连线高亮。
+  function hide() { tip.setAttribute('visibility', 'hidden'); }
+  function show(label, event, target) {
+    const matrixcal = root.getScreenCTM(); // 当前 SVG 到视口的缩放矩阵。
+    if (!matrixcal) return;
+    const rect = root.getBoundingClientRect();
+    const width = Math.max(120, Math.min(480, rect.width - 16));
+    const height = 100;
+    const position = target.getBoundingClientRect();
+    const cursorX = Number.isFinite(event.clientX) ? event.clientX : position.left + position.width / 2;
+    const cursorY = Number.isFinite(event.clientY) ? event.clientY : position.bottom;
+    let x = cursorX + 16, y = cursorY + 18;
+    if (x + width > rect.right - 8) x = cursorX - width - 16;
+    if (y + height > rect.bottom - 8) y = cursorY - height - 16;
+    x = Math.max(rect.left + 8, Math.min(x, rect.right - width - 8));
+    y = Math.max(rect.top + 8, Math.min(y, rect.bottom - height - 8));
+    const point = root.createSVGPoint();
+    point.x = x; point.y = y;
+    const local = point.matrixTransform(matrixcal.inverse());
+    const scale = Math.hypot(matrixcal.a, matrixcal.b);
+    tip.setAttribute('transform', 'translate(' + local.x + ' ' + local.y + ') scale(' + 1 / scale + ')');
+    box.setAttribute('width', width);
+    title.textContent = label.getAttribute('data-edge-label') + ' · ' + label.getAttribute('data-relation');
+    start.textContent = '起点：' + label.getAttribute('data-start-name');
+    end.textContent = '→ 终点：' + label.getAttribute('data-end-name');
+    [title, start, end].forEach(node => node.setAttribute('font-size', Math.min(14, (width - 28) / Math.max(1, node.textContent.length))));
+    tip.setAttribute('visibility', 'visible');
+  }
+  labels.forEach(label => {
+    const id = label.getAttribute('data-edge-label');
+    const edge = document.querySelector('[data-edge="' + id + '"]');
+    // 原生 title 留作无脚本回退，启用自定义浮层时移除，避免双提示。
+    edge?.querySelector('title')?.remove();
+    [label, edge].filter(Boolean).forEach(target => {
+      target.addEventListener('pointerenter', event => show(label, event, target));
+      target.addEventListener('pointermove', event => show(label, event, target));
+      target.addEventListener('pointerleave', hide);
+      target.addEventListener('focus', event => show(label, event, target));
+      target.addEventListener('blur', hide);
+    });
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
+})();`;
+  return { svg: svg.join('').replace('</title>', '</title><style>' + styles.join('\n') + '</style>').replace('</svg>', tooltip + '<script><![CDATA[' + interaction + ']]></script><script><![CDATA[' + tooltipScript + ']]></script></svg>'), mermaid: mermaid.join('\n') + '\n', connections: table.join('\n') };
 }
