@@ -126,8 +126,9 @@ export function renderDomains(groups) {
     table.push(`      <tr data-edge="${id}"><th scope="row">${id} · ${kinds[kind][1]}</th><td>${a.title} → ${b.title}</td><td>${label}</td></tr>`);
   }
   table.push('    </tbody></table></details>');
-  // 纯 CSS 联动，无需页面脚本；悬浮与键盘聚焦采用相同的高亮规则。
+  // 图例选择由内嵌脚本保留；悬浮联动继续由 CSS 处理。
   const styles = ['[data-node],[data-edge],[data-edge-label]{cursor:pointer;outline:none}', '[data-node]:is(:hover,:focus-visible)>rect{fill:#fff2c2;stroke:#b56b00;stroke-width:3}', '[data-node]:is(:hover,:focus-visible)>text{font-weight:700}'];
+  styles.push('[data-legend]{cursor:pointer;outline:none}', '[data-legend]:is(:hover,:focus-visible)>rect{stroke:#b56b00;stroke-width:2}', '[data-legend][aria-pressed="true"]>rect{fill:#fff2c2;stroke:#b56b00;stroke-width:2}', '[data-legend][aria-pressed="true"]>text{font-weight:700;fill:#92400e}', '[data-legend][aria-pressed="true"]>path{stroke-width:5}', '[data-edge].kind-selected>polyline{stroke:#d97706;stroke-width:5}', '[data-edge].kind-selected>polygon{fill:#d97706}', '[data-edge-label].kind-selected>text{fill:#92400e;font-weight:700}', '[data-edge-label].kind-selected>rect{fill:#fff2c2}');
   for (const [index, [from, to]] of relations.entries()) {
     const id = `R${String(index + 1).padStart(2, '0')}`;
     const edgeActive = `:root:has([data-edge="${id}"]:is(:hover,:focus-visible),[data-edge-label="${id}"]:hover)`;
@@ -138,8 +139,40 @@ export function renderDomains(groups) {
   const svg = [`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title"><title id="title">全站总体架构：七个领域、42 个子系统与48条连线</title><rect width="${width}" height="${height}" fill="#fbfcfe"/><g font-family="PingFang SC,Microsoft YaHei,sans-serif" fill="#172033">`, text(180, 45, '全站总体架构 · 领域边界、内部协作与跨领域数据流', 27), text(180, 80, '保留 42 个子系统；箭头表示调用或数据方向，虚线表示观测或横切支撑。交叉处不表示连接。', 18)];
   Object.entries(kinds).forEach(([key, [color, name]], index) => {
     const x = 180 + index * 248;
-    svg.push(`<path d="M${x} 119 h35" stroke="${color}" stroke-width="3"${['telemetry', 'assembly'].includes(key) ? ' stroke-dasharray="6 4"' : ''}/>`, text(x + 42, 125, name, 16));
+    svg.push(`<g data-legend="${key}" role="button" tabindex="0" aria-pressed="false" aria-label="切换${name}高亮"><rect x="${x - 8}" y="99" width="240" height="40" rx="7" fill="transparent" stroke="transparent"/><path d="M${x} 119 h35" stroke="${color}" stroke-width="3"${['telemetry', 'assembly'].includes(key) ? ' stroke-dasharray="6 4"' : ''}/>`, text(x + 42, 125, name, 16), '</g>');
   });
   svg.push(text(180, 163, '请求：R31 → R33 → R36 / R38；回传：R35 / R32；恢复：R40 / R41；观测：R43。', 17, 100), text(180, 191, '线上的 R 编号可在页面“全部连线”中查找；具体能力是否挂载取决于产品装配。', 17), ...background, ...lines, ...nodes, ...labels, text(180, 4600, '权威存储、派生索引、观测存储各自独立；Headless 走 R34，不需要 Web 服务入口。', 18), '</g></svg>\n');
-  return { svg: svg.join('').replace('</title>', '</title><style>' + styles.join('\n') + '</style>'), mermaid: mermaid.join('\n') + '\n', connections: table.join('\n') };
+  // 脚本随 SVG 一起发布，独立打开与 object 嵌入均可用；支持多选与键盘操作。
+  const interaction = `
+(() => {
+  const selected = new Set(); // 保存已选择的连线类别。
+  const legends = [...document.querySelectorAll('[data-legend]')]; // 五个图例按钮。
+  const edges = [...document.querySelectorAll('[data-edge]')]; // 全部连线及其类别。
+  const labels = new Map([...document.querySelectorAll('[data-edge-label]')].map(label => [label.getAttribute('data-edge-label'), label]));
+  // 同步按钮、线条、箭头和标签，不改变原有悬浮状态。
+  function update() {
+    legends.forEach(button => button.setAttribute('aria-pressed', String(selected.has(button.getAttribute('data-legend')))));
+    edges.forEach(edge => {
+      const active = selected.has(edge.getAttribute('data-kind'));
+      edge.classList.toggle('kind-selected', active);
+      labels.get(edge.getAttribute('data-edge'))?.classList.toggle('kind-selected', active);
+    });
+  }
+  // 再次选择同一项即取消，其他已选类别保持不变。
+  function toggle(button) {
+    const kind = button.getAttribute('data-legend');
+    if (selected.has(kind)) selected.delete(kind); else selected.add(kind);
+    update();
+  }
+  legends.forEach(button => {
+    button.addEventListener('click', () => toggle(button));
+    button.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(button); }
+    });
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { selected.clear(); update(); }
+  });
+})();`;
+  return { svg: svg.join('').replace('</title>', '</title><style>' + styles.join('\n') + '</style>').replace('</svg>', '<script><![CDATA[' + interaction + ']]></script></svg>'), mermaid: mermaid.join('\n') + '\n', connections: table.join('\n') };
 }
