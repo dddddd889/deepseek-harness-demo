@@ -1,0 +1,51 @@
+name: 发布课程到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 发布串行执行，避免中断正在上线的部署。
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建静态站点
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出课程仓库
+        uses: actions/checkout@v4
+        # 源码链接指向子模块固定版本，不需要拉取子模块或安装实验室依赖。
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 构建并检查站点链接
+        run: node scripts/build-pages.mjs "$RUNNER_TEMP/course-pages"
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/course-pages
+
+  deploy:
+    name: 发布站点
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 配置 GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: 发布到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
