@@ -36,23 +36,27 @@ function rewrite(html, path) {
   });
 }
 
-// 递归处理站点目录，不跟随符号链接，也不复制构建脚本和测试工具。
-async function publish(directory) {
+// 递归处理站点目录；preserveHtml 用于原样发布带沙盒和 CSP 的独立可视化。
+async function publish(directory, preserveHtml = false) {
   for (const entry of await readdir(resolve(root, directory), { withFileTypes: true })) {
     const path = `${directory}/${entry.name}`;
     if (entry.isSymbolicLink()) throw new Error(`不允许发布符号链接：${path}`);
-    if (entry.isDirectory()) { await publish(path); continue; }
+    if (entry.isDirectory()) { await publish(path, preserveHtml); continue; }
     if (!extensions.has(extname(path))) continue;
     await mkdir(dirname(resolve(output, path)), { recursive: true });
     if (extname(path) === '.html') {
-      const html = rewrite(await readFile(resolve(root, path), 'utf8'), path);
-      await writeFile(resolve(output, path), html);
+      // 独立可视化按字节复制，其他课程页面继续转换源码链接。
+      const sourceHtml = await readFile(resolve(root, path), 'utf8');
+      const html = preserveHtml ? sourceHtml : rewrite(sourceHtml, path);
+      if (preserveHtml) await copyFile(resolve(root, path), resolve(output, path));
+      else await writeFile(resolve(output, path), html);
       pages.push([path, html]);
     } else await copyFile(resolve(root, path), resolve(output, path));
     published.add(path);
   }
 }
 for (const directory of ['assets', 'lessons', 'reference']) await publish(directory);
+await publish('sites', true);
 
 // 根路径跳转到课程路线图；相对地址兼容用户名站点和仓库子路径。
 await writeFile(resolve(output, 'index.html'), '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0;url=reference/deepseek-harness-build-roadmap.html"><title>DeepSeek Harness 课程</title></head><body><a href="reference/deepseek-harness-build-roadmap.html">进入课程路线图</a></body></html>\n');
