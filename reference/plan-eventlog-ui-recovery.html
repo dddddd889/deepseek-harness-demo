@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Plan：日志、UI、恢复与 LLM 消息</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+<p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="qa-eventlog-ui-recovery.html">QA 完整链路</a> · <a href="workflow-eventlog-ui-recovery.html">Workflow 独立专题</a></p>
+<h1>Plan：日志、UI、恢复与 LLM 消息</h1><p class="lead">分别说明计划模式、方案正文、任务清单和用户批准如何保存、显示、恢复，以及进入模型上下文。</p>
+<div class="callout"><strong>Plan 关心方案和决定：</strong>当前是否处于规划模式、方案正文是什么、任务清单怎样更新、用户是否批准。保存方案不等于保存执行位置。</div>
+<figure class="course-diagram"><figcaption>Plan 的四条链路</figcaption><pre><code>模式选择 / 方案正文 / Todo / 用户批准
+                 ├→ 模式事件、工具消息、checkpoint 或计划文件
+                 ├→ UI 模式按钮、正文、清单与评审卡片
+                 ├→ 恢复已存状态；等待点另看 pending / interrupt
+                 └→ LLM：system prompt、工具调用 / 结果或文件读取</code></pre></figure><section id="terms"><h2>先把 Plan 拆成三件事</h2>
+  <table><thead><tr><th>对象</th><th>例子</th><th>恢复时问什么</th></tr></thead><tbody>
+    <tr><td>计划模式</td><td>现在只探索和设计，暂不进入执行。</td><td>重启后策略、工具配置和模式状态能否恢复？</td></tr>
+    <tr><td>计划正文 / Todo</td><td>先查接口，再改前端，最后验证。</td><td>正文、任务清单保存在哪里？是否重新进入模型上下文？</td></tr>
+    <tr><td>计划批准</td><td>用户点击“批准并执行”。</td><td>批准决定是否落盘？等待中的交互是否还能回答？</td></tr>
+  </tbody></table>
+  <p>Todo 是进度清单，不自动产生依赖边、失败重试和工作流 checkpoint。Plan mode 也不天然等于只读沙箱；实际约束要看工具和权限实现。</p></section>
+<p>核对日期：2026-10-09。DeepSeek 使用本仓库固定源码；另外两家的一手源码链接到 main，版本变化后需要重新核对。事件示例省略时间、序号等字段，不是实际运行记录。</p>
+<nav aria-label="专题阅读导航"><a href="#plan-dsh">DeepSeek</a> · <a href="#plan-lg">Deep Agents</a> · <a href="#plan-oh">OpenHands</a> · <a href="#recovery">恢复对照</a> · <a href="#verify">验证路径</a></nav>
+<section id="plan-dsh"><h2>Plan ① DeepSeek：模式、正文与批准各走不同路径</h2>
+  <h3>模式状态的日志与 UI</h3>
+  <pre><code>/plan → command/run（记录用户选择）
+      → 无 open turn：立即写 plan/mode {active:true}
+      → 有 open turn：在下一个被接受的 pre-step 写 plan/mode
+
+UI plan 投影：command/run 记录 wanted；plan/mode 更新 active 并清 wanted
+              → {active, pending} → 输入区 Plan 状态按钮
+
+LLM：读取当前模式 → 激活 plan:policy system prompt 段落</code></pre>
+  <p><code>plan/mode</code> 最新值决定已提交模式，默认 inactive。UI 还折叠 command/run 来展示待应用选择。<strong>投影能重建 pending 展示，不等于执行端 pendingIntents 已恢复。</strong>运行中选择尚未到接受边界，或模型批准后的退出尚未写 plan/mode 时，进程退出可能丢失执行端待切换意图，需要重申选择。</p>
+  <p>裸 /plan、/plan off 及其命令结果不进入普通消息历史。/plan 的任务后缀作为 user 文本进入消息；模式控制通过 system prompt 生效。某些用户主动切换会额外记录模型可读通知，不能因此将所有 plan/mode 事件都转换成用户消息。模式改变影响请求前缀，不只是聊天尾部追加。</p>
+  <h3>正文与用户批准的日志、UI 和 LLM</h3>
+  <figure class="course-diagram"><figcaption>计划评审就是带展示意图的 QA</figcaption><pre><code>assistant/message：exit_plan_mode({plan:"# 改造方案\n..."})
+          ↓ tool/call
+userQuestions.ask：detail=计划正文，intent.kind=plan-review
+          ↓ question/requested
+UI：PlanReviewPanel，显示正文和批准 / 继续规划选项
+          ↓ 用户决定
+批准 → tool/result（确认文本）→ 下个接受边界 plan/mode {active:false}
+拒绝 → 错误 tool/result（反馈）→ 保持 plan mode
+关闭 → 错误 tool/result（用户接管提示）→ 保持 plan mode</code></pre></figure>
+  <p>方案正文保存在 assistant 工具调用参数及 tool/call 中，历史工具卡片通过 presentCall 展示；不是 plan/mode 中保存了整份计划。成功工具 API 值为 <code>{approved:true}</code>，模型可读结果由 render 生成“计划批准并退出”的确认文本，不能把 API 值与最终 LLM 内容混为一谈。拒绝反馈由错误工具结果进入模型。</p>
+  <p>已批准并提交模式切换后，历史工具调用/结果和模式状态可恢复。刷新但主机活着时，评审请求由 pendingQuestions 重发；崩溃后待批准 Promise 不会从日志复活，按 QA 中断修复规则处理。计划模式是提示策略，独立沙箱/权限才负责强制限制。</p>
+  <p><a href="../deepseek-harness/packages/plan/plan-mode/src/index.ts">plan/mode、投影、exit_plan_mode 与边界提交</a> · <a href="../deepseek-harness/packages/plan/plan-mode/README.md">模型体验和恢复限制</a> · <a href="../deepseek-harness/packages/client/ui-plan/README.md">模式 UI</a> · <a href="../deepseek-harness/packages/client/ui-user-questions/src/client/PlanReviewPanel.tsx">计划评审 UI</a> · <a href="qa-eventlog-ui-recovery.html#deepseek">评审通道的 QA 恢复细节</a></p>
+  <h3>Todo 是另一份计划数据</h3>
+  <p><code>todo_write</code> 整体替换任务清单并追加 <code>todo/write</code>。该事件是 UI/重放快照，不另产生 LLM 消息；模型通过自身工具调用参数知道完整清单，通过工具结果知道更新摘要。当前 UI todos 投影在下一次 turn/start 清空：持久历史还在，不代表新一轮仍显示旧清单。</p>
+  <p><a href="../deepseek-harness/packages/todo/tool-todo/src/index.ts">todo/write 与 UI 投影</a> · <a href="../deepseek-harness/packages/todo/tool-todo/README.md">模型消息与整体替换约束</a></p></section>
+<section id="plan-lg"><h2>Plan ② Deep Agents：显式启用 Todo；批准另外建模</h2>
+  <div class="callout"><strong>版本提醒：</strong>Python Deep Agents 0.7.0 起，create_deep_agent 不再默认加入 TodoListMiddleware、write_todos 和 todos 状态。需要通过 middleware 显式添加；旧资料里的“默认内置”不适用于这个版本。</div>
+  <pre><code>AIMessage.tool_calls：write_todos（完整列表）
+                     ↓ 工具返回 Command
+state.todos          ← 最新列表（checkpoint 保存，供 UI 读取）
+state.messages       ← ToolMessage（更新内容，关联工具调用 ID）
+                     ↓
+UI：订阅 todos state 并显示；恢复时读取 checkpoint
+LLM：AIMessage 调用 + ToolMessage；不是自动把全部 state 字段变成消息</code></pre>
+  <p>TodoListMiddleware 的工具同时更新 todos 和 messages 两条状态通道。它还提供工具使用 system prompt。清单内容可以通过工具消息进入模型；todos 状态供 UI 使用，但没有自动完成任务、自动恢复外部副作用的保证。</p>
+  <p>方案正文若存文件，恢复依赖所选 backend；若存自定义 plan 字段，则依赖图 state/checkpointer，并由模型节点显式读取。需要“提交方案 → 用户批准”时，可以另建 interrupt 节点或应用层 ask_user 交互，将批准决定写入状态和消息。<strong>这是应用组合方案，不能宣称 TodoListMiddleware 自带 DeepSeek 的 plan/mode 或 exit_plan_mode 协议。</strong></p>
+  <p>持久化 checkpoint 可以恢复清单和等待点；只有内存 saver 不提供跨进程恢复。重载历史 ToolMessage 可以重建已完成的工具行；重新显示未批准交互还需要 pending interrupt。</p>
+  <p><a href="https://github.com/langchain-ai/deepagents/blob/main/libs/deepagents/CHANGELOG.md">0.7.0 变更</a> · <a href="https://github.com/langchain-ai/langchain/blob/master/libs/langchain_v1/langchain/agents/middleware/todo.py">todos 与 ToolMessage 双通道更新</a> · <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">应用层批准节点</a></p></section>
+<section id="plan-oh"><h2>Plan ③ OpenHands：PLAN.md 和任务清单分别保存</h2>
+  <h3>方案正文：Planning preset + 文件</h3>
+  <pre><code>Planning Agent：planning prompt + Glob / Grep / PlanningFileEditor
+              ↓ 工具 ActionEvent
+执行器读写 PLAN.md（默认 .agents_tmp/PLAN.md，兼容根目录旧文件）
+              ↓ ObservationEvent（内容 / 修改结果）
+EventLog → UI 工具卡片；View → LLM 工具调用和结果
+
+完整方案：工作区文件；日志：某次操作和结果，不天然等于文件快照。</code></pre>
+  <p>PlanningFileEditor 可以读其他文件，但编辑被限制到计划文件。方案标题和章节由 planning preset 提示规定；这比纯提示限制更具体，但不代表所有自定义 planning Agent 都有相同约束。</p>
+  <p>重载 EventLog 能恢复操作历史；完整 PLAN.md 的恢复还依赖工作区文件保留。模型可以通过此前的编辑/读取结果知道方案，或重新读取文件；文件存在不代表它会自动完整注入后续每次 LLM 请求。UI 可显示工具结果或通过应用层文件面板显示正文，SDK 不保证统一的“批准计划”卡片。</p>
+  <p><a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/preset/planning.py">Planning preset</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/planning_file_editor/definition.py">计划路径、初始化与工具定义</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/planning_file_editor/impl.py">限制编辑文件的执行器</a></p>
+  <h3>任务清单：TaskTracker + 独立文件</h3>
+  <p><code>task_tracker</code> 的 plan 命令更新列表，view 命令读取列表；ActionEvent/ObservationEvent 进入 EventLog，Observation 的 task_list 可用于 UI。执行器以 persistence_dir 作为 save_dir 时，实际通过 <code>TASKS.json</code> 保存/恢复任务列表（不是只靠 EventLog，源码部分说明文字提到 TASKS.md，但实际读写路径为 JSON）。保存失败会告警，工具成功不能独自证明该文件已落盘。</p>
+  <p>plan 的结果 content 通常是更新数量摘要；view 的结果 content 才格式化完整清单。ActionEvent 通过 tool_call 生成 assistant 工具调用；ObservationEvent 通过 observation.to_llm_content 加 extended_content 生成 role=tool 消息。TaskTrackerObservation 沿用默认 to_llm_content，读取 content（错误时附加错误头），不会额外序列化 task_list。配置了持久化目录可以恢复清单；任务状态并不恢复业务步骤执行位置。</p>
+  <p>用户对方案的文字确认可以作为 User MessageEvent 保存；若需要结构化批准及持久等待点，应用层还需定义状态和恢复协议。执行批准和方案批准是不同业务决定。</p>
+  <p><a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/task_tracker/definition.py">TaskTracker 状态、TASKS.json 和展示</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/event/llm_convertible/action.py">ActionEvent 转模型消息</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/event/llm_convertible/observation.py">ObservationEvent 转模型消息</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/tool/schema.py">Observation.to_llm_content</a></p></section>
+<section id="recovery"><h2>Plan 的恢复能力对照</h2>
+<div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>问题</th><th>DeepSeek Harness</th><th>Deep Agents / LangGraph</th><th>OpenHands SDK</th></tr></thead><tbody><tr><th>Plan 存在哪？</th><td>模式 plan/mode；正文在 exit 工具参数；批准在结果；Todo 在 todo/write。</td><td>显式 Todo middleware 的 todos/messages；正文依存储选择；批准由应用定义。</td><td>方案 PLAN.md；清单 TASKS.json；操作历史 EventLog。</td></tr><tr><th>Plan 怎样给 LLM？</th><td>模式激活 system prompt；正文/批准走工具消息；Todo 事件不再注入一次。</td><td>Todo 工具调用/结果 + prompt；自定义 state 字段需显式组装。</td><td>文件编辑/读取与 task_tracker view 结果；用户确认走消息。</td></tr><tr><th>待批准时崩溃？</th><td>pending RPC 不复活；修复缺失工具结果，模式以落盘事实为准。</td><td>应用使用持久化 interrupt 后可恢复；Todo 本身没有审批等待点。</td><td>默认没有统一方案审批等待点；按应用实现判断。</td></tr></tbody></table></div></section>
+<section id="verify"><h2>稳定核验路径</h2>
+<p>以下是建议验证流程；本次核对源码并检查静态站点，没有运行三家真实模型会话。使用固定工具调用或可控适配器触发，避免依赖模型是否主动调用工具。</p>
+<ol><li><strong>计划模式：</strong>在 idle 和 open turn 分别切换 /plan，检查 command/run、plan/mode 与 system prompt。边界前重启，区分 UI pending 和执行端待切换意图。</li><li><strong>方案与批准：</strong>固定正文，分别批准、拒绝、关闭和评审时重启；检查工具结果、反馈及模式切换的先后关系。</li><li><strong>Todo：</strong>检查清单快照或 todos checkpoint，并核对工具调用/结果。DeepSeek 下一轮清空 UI 投影不等于删除历史清单。</li><li><strong>文件恢复：</strong>分别保留和移走 OpenHands PLAN.md、TASKS.json，证明操作日志、方案文件和当前任务状态不是同一份存储。</li><li><strong>模型上下文：</strong>核对模式提示、正文参数、批准反馈、Todo 结果或文件读取内容，避免把结构化 UI 字段误认成模型消息。</li></ol></section>
+<p><a href="deepseek-harness-build-roadmap.html">返回课程首页 →</a> · <a href="workflow-eventlog-ui-recovery.html">阅读 Workflow 专题 →</a></p>
+</main></body></html>

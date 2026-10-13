@@ -1044,3 +1044,8 @@ Issue 中的 Proposed Solution 只能证明有人提出过方案，不能证明�
 - [Agent Delegation Example](https://github.com/OpenHands/software-agent-sdk/blob/main/examples/01_standalone_sdk/25_agent_delegation.py)
 - [Delegate 实现](https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-tools/openhands/tools/delegate/impl.py)
 - [后台 Subagent enhancement](https://github.com/OpenHands/software-agent-sdk/issues/2047)
+
+
+## Workflow 与 Plan 的日志和投影
+
+见 [Workflow：日志、UI、恢复与 LLM 消息](workflow-eventlog-ui-recovery.html) 和 [Plan：日志、UI、恢复与 LLM 消息](plan-eventlog-ui-recovery.html)。专题区分模式、正文、批准、任务清单和执行 checkpoint，并对照三家方案的真实存储和消息投影。

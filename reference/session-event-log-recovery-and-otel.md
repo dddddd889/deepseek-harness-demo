@@ -944,3 +944,13 @@ Session Telemetry 的 handoff cursor 表示记录已经交给后端 SDK，而不
 - [本地 Jobs 说明](../deepseek-harness/packages/jobs/jobs-local/README.zh.md)
 - [Workflow 说明](../deepseek-harness/packages/workflow/workflow/README.md)
 - [Subagent Continuation 实现](../deepseek-harness/packages/subagent/subagent/src/continuation.ts)
+
+
+## QA 的完整链路
+
+见 [QA 如何进入日志、UI、恢复与 LLM 消息](qa-eventlog-ui-recovery.html)。该专题对照 DeepSeek Harness、Deep Agents 和 OpenHands，说明问题与答案怎样持久化、历史 UI 和待回答交互怎样分别恢复，以及下一次模型请求实际读取什么。
+
+
+## Workflow 与 Plan 的日志和投影
+
+见 [Workflow：日志、UI、恢复与 LLM 消息](workflow-eventlog-ui-recovery.html) 和 [Plan：日志、UI、恢复与 LLM 消息](plan-eventlog-ui-recovery.html)。专题区分模式、正文、批准、任务清单和执行 checkpoint，并对照三家方案的真实存储和消息投影。

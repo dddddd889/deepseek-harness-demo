@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workflow：日志、UI、恢复与 LLM 消息</title><link rel="stylesheet" href="../assets/course.css">
+</head><body><main>
+<p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="qa-eventlog-ui-recovery.html">QA 完整链路</a> · <a href="plan-eventlog-ui-recovery.html">Plan 独立专题</a></p>
+<h1>Workflow：日志、UI、恢复与 LLM 消息</h1><p class="lead">用“并行检查接口和前端 → 汇总”说明三家方案如何记录执行、显示进度、恢复，以及把结果交给模型。</p>
+<div class="callout"><strong>Workflow 关心执行编排：</strong>步骤怎样串行、并行、传结果、失败和取消。进度日志能恢复界面，不一定能恢复执行位置。</div>
+<figure class="course-diagram"><figcaption>Workflow 的四条链路</figcaption><pre><code>编排脚本 / 图节点 → 执行 → 进度事实与结果
+                              ├→ 持久化日志 / checkpoint
+                              ├→ UI 进度视图
+                              ├→ 历史重放或执行恢复（取决于实现）
+                              └→ LLM：显式消息与工具结果</code></pre></figure>
+<p>核对日期：2026-10-09。DeepSeek 使用本仓库固定源码；另外两家的一手源码链接到 main，版本变化后需要重新核对。事件示例省略时间、序号等字段，不是实际运行记录。</p>
+<nav aria-label="专题阅读导航"><a href="#workflow-dsh">DeepSeek</a> · <a href="#workflow-lg">Deep Agents / LangGraph</a> · <a href="#workflow-oh">OpenHands</a> · <a href="#recovery">恢复对照</a> · <a href="#verify">验证路径</a></nav>
+<section id="workflow-dsh"><h2>Workflow ① DeepSeek：执行日志、UI 与最终结果分流</h2>
+  <h3>日志如何产生</h3>
+  <pre><code>父 Session：
+assistant/message → workflow 工具调用（脚本、meta、args）
+tool/call         → 开始执行该工具
+tool-workflow/run-start    {runId: r1, name: module-audit}
+tool-workflow/agent-start  {runId: r1, seq: 1, label: 接口检查, phase: 检查, childId: s1}
+tool-workflow/agent-start  {runId: r1, seq: 2, label: 前端检查, phase: 检查, childId: s2}
+tool-workflow/agent-end    {runId: r1, seq: 1, outcome: 子调用结局}
+tool-workflow/agent-end    {runId: r1, seq: 2, outcome: 子调用结局}
+tool-workflow/run-end      {runId: r1, stopReason: completed}
+tool/result               → workflow 最终汇总
+
+子 Session s1 / s2：各自记录消息和工具执行；不会自动整份复制到父消息历史。</code></pre>
+  <p>执行引擎产生 <code>workflow/*</code> 观察事件；<code>tool-workflow</code> 的 recorder 将其中的成员开始/结束，加上 run 开始/结束，桥接成上述四种持久化 Session 事件。<strong>不是所有 workflow/* 都落盘：</strong>phase/log 的实时叙述不等于独立的持久化 phase/log 事件；成员记录携带 phase 分组信息。</p>
+  <p>四种记录只覆盖顶层 workflow 工具调用。嵌套 Code Mode 调用或直接调用 WorkflowEngine 的消费者不自动得到它们；recording 出错会停用该 run 的记录并告警，不能把“工具执行成功”当成“进度日志完整”。</p>
+  <p><a href="../deepseek-harness/packages/workflow/tool-workflow/src/index.ts">createWorkflowRecorder 与工具执行</a> · <a href="../deepseek-harness/packages/workflow/tool-workflow/src/types.ts">四种事件字段</a> · <a href="../deepseek-harness/packages/workflow/workflow/README.md">引擎契约与限制</a></p>
+  <h3>怎样投影到 UI 和 LLM</h3>
+  <figure class="course-diagram"><figcaption>同一工作流的两个读模型</figcaption><pre><code>tool-workflow/* ──按 runId、成员 seq 折叠──→ Workflow UI
+                                           run → phase → member
+                                           历史状态、展开层级
+
+assistant/message ──────────────────────→ LLM：workflow 调用参数
+tool/result ────────────────────────────→ LLM：最终工具结果
+tool-workflow/* ──log-only───────────────→ 不新增 LLM 消息</code></pre></figure>
+  <p><code>ui-workflow-run</code> 重建独立 Chat 节点；缺少 start 的历史尾部等待补齐更早的分页，缺少终结且所属 Turn/Step 已关闭的成员显示中断。子会话跳转只在当前事实证明成员仍运行、同父且可见时开放。UI 节点展示身份和状态，不负责还原脚本、输出、错误全文或控制执行。</p>
+  <p>模型收到最终 JSON 汇总的文本渲染（包含工作流名和子调用数量，可能按配置截断），而非所有子任务中间输出。脚本可读取子输出，但父模型只收到消费者生成的最终 tool/result。<code>meta.phases</code> 是进度分组，不自动形成 DAG；执行顺序由脚本的 parallel/pipeline/await 决定。</p>
+  <p><a href="../deepseek-harness/packages/client/ui-workflow-run/README.md">UI 投影、分页与中断状态</a> · <a href="../deepseek-harness/packages/workflow/workflow-worker-thread/README.md">parallel / pipeline 与中间结果</a> · <a href="../deepseek-harness/packages/core/session/src/surface.ts">日志到 LLM 的映射</a></p>
+  <h3>重启后恢复什么</h3>
+  <p>已结束工作流可以恢复进度 UI 和最终工具结果。执行中崩溃后，可以重放已记录的进度，修复悬空工具消息并在新一轮决定是否重新执行；<strong>没有脚本位置、中间变量和 child progress 的执行 checkpoint，不能接着原 Worker 跑。</strong>重新执行可能重复子任务副作用，必须先核验外部状态。</p></section>
+<section id="workflow-lg"><h2>Workflow ② Deep Agents / LangGraph：图状态与 checkpoint</h2>
+  <p>Deep Agents 提供 Agent harness；显式业务流程可以在 LangGraph 外层图中组织。以下是<strong>自定义图的示意</strong>，不是内置 workflow 工具或统一 workflow/* 日志协议。</p>
+  <pre><code>制定方案节点 → 人工确认节点 → 并行检查节点 → 汇总节点
+       │             │              │              │
+       └─────────────┴──────────────┴──────────────┘
+                     持久化图状态 / checkpoint
+
+UI ← 选定的 state 字段、stream updates、pending interrupt
+LLM ← 节点明确组装的 messages、prompt 或工具结果</code></pre>
+  <p>checkpoint 保存图状态和调度恢复所需信息；不是将每条 stream 更新自动追加成 DeepSeek 的 eventlog。UI 可从流更新展示节点进度，刷新后读取持久状态和 pending interrupt；若产品需要完整进度审计轨迹，要额外保存事件，不能只把流存在浏览器。</p>
+  <p>图里 <code>plan</code>、<code>audit_results</code> 等业务字段不会因为保存了就自动进入 LLM。调用模型的节点必须将它们写入消息或组装 prompt。把子图结果接进父状态也取决于节点接口和 reducer；不能假定整个子图消息历史自动合并。</p>
+  <p>配置持久化 checkpointer、沿用 thread_id 后，可以从 checkpoint 恢复。恢复会重放相关代码，不是旧进程调用栈的内存快照；副作用要用可恢复 task、幂等键或外部状态核验约束。图的进度标签与任务清单也不能替代真正的恢复边界。</p>
+  <p><a href="https://docs.langchain.com/oss/python/langgraph/workflows-agents">官方 Workflow 模式</a> · <a href="https://docs.langchain.com/oss/python/langgraph/persistence">持久化与 checkpointer</a> · <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">中断、恢复及重执行规则</a> · <a href="https://github.com/langchain-ai/deepagents/blob/main/libs/deepagents/deepagents/graph.py">Deep Agents 图装配</a></p></section>
+<section id="workflow-oh"><h2>Workflow ③ OpenHands：会话编排与外层流程</h2>
+  <p>SDK 可以被程序或自动化脚本调用来组织“分析 → 修改 → 验证”，会话有持久化、暂停/继续与工具执行事件。这些会话能力不等于默认提供一个可恢复的业务 DAG 引擎。</p>
+  <pre><code>外层程序决定步骤、依赖和分支
+            ↓
+Conversation：MessageEvent / ActionEvent / ObservationEvent
+            ↓ append_event
+EventLog ─────────→ 订阅回调 → UI 消息/工具卡片
+    ↓ 当前分支 View
+prepare_llm_messages → assistant / user / tool 消息</code></pre>
+  <p>Agent 调用工具成为 ActionEvent，结果成为 ObservationEvent；下一次模型请求从 View 转换这些事件。外层程序的“当前第几个阶段”“业务 runId”“是否等用户批准”等状态不会自动成为这份会话 EventLog 的事实。想展示完整流程，需另行保存并投影外层状态；想让模型知道某个阶段的结果，需显式发消息或返回工具结果。</p>
+  <p>会话冷恢复重建 EventLog/View；<code>pause()</code> 后 <code>run()</code> 可继续会话。外层程序执行位置、跨会话依赖、业务重试和幂等性需要外层编排负责。本文没有把 GitHub Actions 的 workflow 或其他产品界面当成 SDK 原生 DAG 恢复能力。</p>
+  <p><a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/impl/local_conversation.py">事件写入与回调</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/state.py">恢复与 View</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/agent/utils.py">LLM 消息组装</a> · <a href="https://docs.openhands.dev/sdk/guides/convo-pause-and-resume">暂停与继续</a></p></section>
+<section id="recovery"><h2>Workflow 的恢复能力对照</h2>
+<div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>问题</th><th>DeepSeek Harness</th><th>Deep Agents / LangGraph</th><th>OpenHands SDK</th></tr></thead><tbody><tr><th>能恢复 Workflow UI 吗？</th><td>顶层工具的四种记录重放为 run/phase/member 状态；不是执行恢复。</td><td>可由 checkpoint state 重建当前视图；完整历史审计需另保存事件。</td><td>可恢复会话消息/工具历史；外层业务流程状态需另存。</td></tr><tr><th>能恢复执行位置吗？</th><td>不能恢复原 Worker 脚本位置和中间变量。</td><td>持久化 checkpoint 支持图恢复；代码可能重执行。</td><td>可恢复 Agent 会话；不能据此保证外层脚本/DAG 位置恢复。</td></tr></tbody></table></div></section>
+<section id="verify"><h2>稳定核验路径</h2>
+<p>以下是建议验证流程；本次核对源码并检查静态站点，没有运行三家真实模型会话。使用固定工具调用或可控适配器触发，避免依赖模型是否主动调用工具。</p>
+<ol><li><strong>日志与进度：</strong>固定两个 child，一个完成、一个停在受控等待点；检查 run/member 记录和最终工具结果是否分别保存。</li><li><strong>刷新客户端：</strong>验证 run、phase、member 或图 state 能否重建，区分最新状态与完整历史审计。</li><li><strong>杀后端重启：</strong>DeepSeek 检查旧进度显示与中断结果；LangGraph 检查持久化 checkpoint 的恢复；OpenHands 分别核对会话与外层编排状态。不能用 UI 恢复证明执行续跑。</li><li><strong>模型上下文：</strong>检查下一次 LLM 请求是否含最终汇总；观察事件、自定义 state 和子任务消息不会自动全部进入父模型。</li><li><strong>副作用：</strong>用可控计数器验证重试是否重复执行；幂等性需单独证明。</li></ol></section>
+<p><a href="deepseek-harness-build-roadmap.html">返回课程首页 →</a> · <a href="plan-eventlog-ui-recovery.html">阅读 Plan 专题 →</a></p>
+</main></body></html>

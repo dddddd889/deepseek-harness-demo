@@ -242,5 +242,18 @@ fail:  0
 
   <p>下一课接入可控的流式 LLM seam：先做 fake provider，再接真实 DeepSeek API，让每个 chunk 都能暂停和复现。</p>
   <p><a href="../reference/deepseek-harness-build-roadmap.html">返回完整路线 →</a></p>
+
+  <section id="qa-eventlog-reading">
+    <h2>QA 的日志、UI 与恢复链路</h2>
+    <p><a href="../reference/qa-eventlog-ui-recovery.html">三家方案专题：QA 如何进入 eventlog、投影到 UI、恢复等待点，并进入 LLM 消息 →</a></p>
+    <p>用“数据库选哪个？→ PostgreSQL”的同一个例子，对照 DeepSeek Harness、Deep Agents 与 OpenHands。区分已完成问答的历史重放、客户端重连，以及后端崩溃后的恢复。</p>
+  </section>
+
+  <section id="workflow-plan-reading">
+    <h2>Workflow 与 Plan 的完整链路</h2>
+    <p><a href="../reference/workflow-eventlog-ui-recovery.html">Workflow：日志、UI、恢复与 LLM 消息 →</a></p>
+    <p><a href="../reference/plan-eventlog-ui-recovery.html">Plan：日志、UI、恢复与 LLM 消息 →</a></p>
+    <p>区分进度日志与执行 checkpoint，拆开计划模式、方案正文、用户批准和 Todo 清单，附源码依据与可控验证路径。</p>
+  </section>
 </main></body>
 </html>

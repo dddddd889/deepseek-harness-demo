@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QA 如何进入日志、UI、恢复与 LLM 消息</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body><main>
+  <p><a href="deepseek-harness-build-roadmap.html">← 返回课程路线</a> · <a href="../lessons/0004-session-projections.html">消息投影</a> · <a href="../lessons/0010-persistence-recovery.html">持久化恢复</a> · <a href="../lessons/0016-web-production-loop.html">Web 交互</a></p>
+  <h1>QA 如何进入日志、UI、恢复与 LLM 消息</h1>
+  <p class="lead">沿着同一个例子看完整链路：Agent 问“数据库选哪个？”，用户答“PostgreSQL”。重点是事实如何保存、界面如何投影，以及恢复后模型实际读到什么。</p>
+  <div class="callout"><strong>先分清两种恢复：</strong>历史重放可以重建“问过什么、答了什么”；重新显示一个可提交的问答卡片，还需要有效的等待请求或持久化中断。只有未完成的工具调用，不代表原来的等待现场还能恢复。</div>
+  <p>核对日期：2026-10-09。DeepSeek Harness 按本仓库固定源码版本；Deep Agents 指 LangChain 的 <code>deepagents-code</code> 问答实现，OpenHands 指当前 Software Agent SDK 的普通澄清问答。后两者链接到上游 main，后续版本可能变化。以下省略无关字段的记录和代码是说明例，不是可直接运行的完整事件文件。</p>
+  <nav aria-label="专题阅读导航"><a href="#overview">三家对照</a> · <a href="#deepseek">DeepSeek Harness</a> · <a href="#deepagents">Deep Agents</a> · <a href="#openhands">OpenHands</a> · <a href="#scenarios">恢复场景</a> · <a href="#verification">验证路径</a></nav>
+
+  <section id="overview"><h2>同一份 QA，三种职责</h2>
+  <figure class="course-diagram"><figcaption>事实、展示与模型上下文的分流</figcaption><pre><code>Agent 产生问题 Q ──→ 消息 / 工具调用事实 ──→ 持久化
+                              │                  │
+                              ├─→ UI 历史投影 ←──┘ 重放
+                              └─→ LLM 消息投影 ←─┘ 重建
+
+等待请求 / 图中断 ──→ 可回答的 UI ──→ 用户回答 A
+                                         │
+                                         └─→ 工具结果 / 用户消息事实
+                                                   │
+                                                   └─→ 持久化与下一次 LLM 请求</code></pre><p>待回答状态和答案事实不是同一个东西。问答卡片提交成功后，仍要确认答案确实成为持久化消息或工具结果。</p></figure>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>维度</th><th>DeepSeek Harness</th><th>Deep Agents / code</th><th>OpenHands SDK</th></tr></thead><tbody>
+    <tr><th>Q 的事实</th><td>assistant/message 中的工具调用；tool/call 记录开始执行</td><td>AIMessage.tool_calls；checkpoint 另存中断</td><td>Agent MessageEvent，内含 assistant 消息</td></tr>
+    <tr><th>A 的事实</th><td>tool/result，含结构化答案的 JSON 文本</td><td>ToolMessage，含 Q/A 文本</td><td>User MessageEvent，内含 user 消息</td></tr>
+    <tr><th>等待点</th><td>主机 pendingQuestions 与工具 Promise</td><td>LangGraph interrupt 与 checkpoint</td><td>普通文本回答结束本轮，等待下一条用户消息</td></tr>
+    <tr><th>LLM 读取</th><td>assistant 工具调用 + 对应工具结果</td><td>AIMessage 工具调用 + 对应 ToolMessage</td><td>assistant 问题 + user 答案</td></tr>
+  </tbody></table></div></section>
+
+  <section id="deepseek"><h2>DeepSeek Harness：日志和实时 pending 分开</h2>
+  <h3>① QA 怎么进入 eventlog</h3>
+  <pre><code>assistant/message
+  message.content: [tool-call(id=c1, name=ask_user_question, arguments=问题参数)]
+
+tool/call
+  callId: c1
+  name: ask_user_question
+  arguments: {"questions":[{"id":"database","question":"数据库选哪个？",...}]}
+
+── 工具等待 userQuestions.ask()，此时还没有 tool/result ──
+
+tool/result
+  message.source.callId: c1
+  结果文本: {"answers":[{"id":"database","selected":["PostgreSQL"]}]}</code></pre>
+  <p><strong>Q 出现两次，但不重复进入 LLM：</strong><code>assistant/message</code> 是模型提出的工具调用；<code>tool/call</code> 是执行生命周期事实。用户回答兑现 Promise，工具将答案序列化，Agent Loop 再通过 <code>appendToolResult()</code> 写入结果。Session append 是内存事实入口，持久化插件负责存储。</p>
+  <p><a href="../deepseek-harness/packages/interaction/tool-ask-user/src/index.ts">工具：问题映射、答案序列化</a> · <a href="../deepseek-harness/packages/core/agent-loop/src/tool-calls.ts">appendToolCall / appendToolResult</a></p>
+  <h3>② 同一日志怎样投影成 UI</h3>
+  <pre><code>历史工具行：
+tool/call(c1) ──start──→ 工具节点 ──update──← tool/result(c1)
+                           │
+                           └─→ AskQuestionRow：等待 / 已回答数量 / 取消
+
+可回答卡片：
+question/requested(rpcId=q1) → PendingWait → QuestionComposer
+question/resolved(q1)        → settle pending → 收起卡片</code></pre>
+  <p><code>toolDefinition.match()</code> 用 callId 关联工具节点，重放历史事件可以重建该节点。<code>QuestionComposer</code> 则接管输入区域，它读取实时 pending 请求。<strong>tool/call 只能还原历史工具行，不能凭空生成可提交的 RPC 请求。</strong></p>
+  <p><a href="../deepseek-harness/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts">工具节点投影</a> · <a href="../deepseek-harness/packages/client/ui-tool/src/client/tool/toolviews/ask-question-row.tsx">QA 日志行</a> · <a href="../deepseek-harness/packages/client/runtime/src/client/sessions/session.ts">question 控制帧 → pending</a> · <a href="../deepseek-harness/packages/client/ui-user-questions/src/client/index.ts">问答卡片注册</a></p>
+  <h3>③ 日志怎样恢复成 LLM 消息</h3>
+  <table><thead><tr><th>输入</th><th>deriveEventMessage 的结果</th></tr></thead><tbody>
+    <tr><td>assistant/message</td><td>原 assistant 消息，已经包含 ask_user_question 的工具调用和 Q。</td></tr>
+    <tr><td>tool/call</td><td>null；不重复生成工具调用。</td></tr>
+    <tr><td>tool/result</td><td>原工具结果消息，含 A。</td></tr>
+    <tr><td>question/requested / resolved</td><td>传输控制帧，不走持久化 Session 消息投影。</td></tr>
+  </tbody></table>
+  <p><code>Session.deriveMessages()</code> 从当前有效 surface 取消息节点；下一次模型请求使用这份消息列表。日志全部事实仍保留，压缩或替换可以改变有效消息面。</p>
+  <pre><code>// OpenAI 风格的模型协议示意；不是 Harness 内部存储结构
+assistant: tool_calls=[{id:"c1", name:"ask_user_question", arguments:问题参数}]
+tool:      tool_call_id="c1", content=答案 JSON</code></pre>
+  <p>Harness 内部工具结果使用 <code>role: 'user'</code>、<code>source.kind: 'tool'</code> 和 <code>tool-result</code> 内容块表达，模型适配器再转换为供应商协议。因此不能只看内部 role 就误判答案变成了普通用户聊天消息。</p>
+  <p><a href="../deepseek-harness/packages/core/session/src/surface.ts">deriveEventMessage</a> · <a href="../deepseek-harness/packages/core/session/src/index.ts">Session.deriveMessages</a> · <a href="../deepseek-harness/packages/core/agent-loop/src/agent.ts">模型请求组装</a></p>
+  <h3>④ 刷新与进程崩溃怎么恢复</h3>
+  <p><strong>刷新页面：</strong>主机仍活着，<code>pendingQuestions</code> 仍在。重新订阅时重发同一 rpcId 的 question/requested，前端重建卡片，答案回到原 Promise。rpcId 关联整批问答，题目 id 关联每个问题；callId 配对日志中的工具调用和结果。</p>
+  <p><strong>进程崩溃：</strong>Promise 和 pending 丢失。冷加载扫描日志；已开始但无结果的调用补错误 tool/result（<code>TOOL_OUTCOME_UNKNOWN</code>），未记录开始的调用补 <code>TOOL_NOT_STARTED</code>，再关闭未结束的 step/turn。模型看到中断事实后决定下一步，不是恢复旧 Promise，也不会仅凭旧调用自动弹出原问卷。</p>
+  <p><a href="../deepseek-harness/packages/host/apiproxy/src/api-proxy.ts">pendingQuestions 与重连重发</a> · <a href="../deepseek-harness/packages/core/session/src/repair.ts">interruptedTurnClosers</a> · <a href="../deepseek-harness/packages/session/session-persistence/src/coordinator.ts">冷加载、修复与 Session seed</a></p></section>
+
+  <section id="deepagents"><h2>Deep Agents：消息保存 QA，checkpoint 保存等待点</h2>
+  <p>这里讨论 deepagents-code 的 ask_user；不要把应用层问答组件当成所有 create_deep_agent() 都内置的 UI。LangGraph 的 checkpoint 也不是 DeepSeek 同款 Session Event Log。</p>
+  <figure class="course-diagram"><figcaption>工具中断 → 回答 → 消息状态</figcaption><pre><code>AIMessage.tool_calls：ask_user(Q)，tool_call_id=c1
+                  ↓
+interrupt({type:"ask_user", questions:[...], tool_call_id:"c1"})
+                  ↓
+checkpoint：图状态 + pending interrupt；客户端显示问题
+                  ↓
+Command(resume={中断ID: {answers:["PostgreSQL"]}})
+                  ↓
+节点重新执行，到对应 interrupt() 时取回回答
+                  ↓
+Command(update={messages:[ToolMessage(Q/A文本, tool_call_id="c1")]})
+                  ↓
+消息状态持久化；下一次模型调用读取 AIMessage + ToolMessage</code></pre></figure>
+  <p>中断 ID 定位等待点，tool_call_id 关联工具结果；answers 按问题数组位置对应。<code>_parse_answers()</code> 将回答整理成 <code>Q: 数据库选哪个？\nA: PostgreSQL</code>，写入 ToolMessage。<strong>interrupt 对象本身不单独变成一条 LLM 消息。</strong></p>
+  <p>实时 UI 读取 AskUserRequest 挂载内联组件；用户提交后，工具行保留到真正收到 ToolMessage，再显示最终答案和状态。已完成 QA 的消息历史可用于重建工具行；等待中的交互需要读取 checkpoint 的 pending interrupt，而不是从文本猜测是否待回答。</p>
+  <p>跨进程恢复依赖持久化 checkpointer 和相同 thread_id。LangGraph 恢复时重新执行节点，interrupt 之前的代码也会再次执行，所以不能把有副作用的操作随意放在中断前。这里说明的是图恢复机制，不声称所有前端版本都会自动重新挂载问答组件；客户端仍需处理 pending interrupt。</p>
+  <p><a href="https://github.com/langchain-ai/deepagents/blob/main/libs/code/deepagents_code/ask_user.py">工具和 ToolMessage 写入</a> · <a href="https://github.com/langchain-ai/deepagents/blob/main/libs/code/deepagents_code/_ask_user_types.py">问题、答案和中断类型</a> · <a href="https://github.com/langchain-ai/deepagents/blob/main/libs/code/deepagents_code/tui/textual_adapter.py">UI 中断处理与 Command resume</a> · <a href="https://docs.langchain.com/oss/python/langgraph/interrupts">LangGraph 持久化和恢复规则</a></p></section>
+
+  <section id="openhands"><h2>OpenHands：普通 QA 直接是消息事件</h2>
+  <pre><code>Q = MessageEvent(source="agent",
+    llm_message=Message(role="assistant", content="数据库选哪个？"))
+A = MessageEvent(source="user",
+    llm_message=Message(role="user", content="PostgreSQL"))
+
+事件回调 → ConversationState.append_event → EventLog
+                                 │
+                                 ├─→ 订阅回调 → 客户端渲染消息
+                                 └─→ 当前分支 View
+                                          ↓
+                                  prepare_llm_messages
+                                          ↓
+                              LLMConvertibleEvent.events_to_messages
+                                          ↓
+                                MessageEvent.to_llm_message</code></pre>
+  <p>Q/A 的角色已经存进 llm_message，转换时拷贝该消息并加入 extended_content。因此模型直接读到 assistant 问题和 user 回答，不需要 ask_user 工具调用配对。默认持久化回调先于调用方订阅回调，例如 PubSub 发布，保证对外发布的事件已写入日志；内置 visualizer 的执行顺序需另看回调组合，不能把所有展示都概括为先落盘。</p>
+  <p>模型输出普通文本后，SDK 将本轮 execution_status 设为 FINISHED，等待下一条用户消息。冷加载重新打开 EventLog，恢复元数据并 rebuild_view()，从当前分支重建有效模型上下文。客户端可重放问题和答案；普通 QA 没有一个必须恢复的问卷 Promise。</p>
+  <p><strong>能力边界：</strong>MessageEvent 的基础协议不包含 questions/options/answers 问卷结构。结构化选项弹窗需要应用层另建交互协议；执行批准属于另一种流程。旧版 OpenHands 0.60.0 的 MessageAction(wait_for_response=True) / AWAITING_USER_INPUT 也不能直接套到当前 SDK。</p>
+  <p><a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/impl/local_conversation.py">事件回调与持久化</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/state.py">EventLog、当前分支 View 与冷加载</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/agent/utils.py">prepare_llm_messages</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/event/llm_convertible/message.py">MessageEvent 转换</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/agent/response_dispatch.py">普通消息结束本轮</a></p></section>
+
+  <section id="scenarios"><h2>用四个场景检查“恢复”的真实含义</h2>
+  <div class="comparison-scroll"><table class="framework-matrix"><thead><tr><th>场景</th><th>DeepSeek Harness</th><th>Deep Agents</th><th>OpenHands 普通 QA</th></tr></thead><tbody>
+    <tr><th>已回答后重载</th><td>工具调用/结果重建 UI；assistant/message 和 tool/result 重建 LLM 历史。</td><td>AIMessage 和 ToolMessage 保留 QA；客户端重建历史展示。</td><td>两条 MessageEvent 重建对话和 LLM 历史。</td></tr>
+    <tr><th>待回答时刷新</th><td>活主机重发 pending RPC，卡片继续可答。</td><td>客户端读取 pending interrupt，重建交互。</td><td>重显问题，用户发送新消息。</td></tr>
+    <tr><th>待回答时进程崩溃</th><td>pending 丢失；修复悬空工具结果，再开始新一轮。</td><td>持久化 checkpoint 可恢复图中断；内存 saver 不提供跨进程持久性。</td><td>重载事件和状态，继续普通对话。</td></tr>
+    <tr><th>用户点击后立即崩溃</th><td>以持久化 tool/result 为准；按钮点击或 RPC 回执不能代替结果落盘。</td><td>以持久化 ToolMessage/checkpoint 为准；组件提交不等于工具完成。</td><td>以持久化用户 MessageEvent 为准。</td></tr>
+  </tbody></table></div>
+  <div class="callout">“已经回答”“回答已经送达后端”“回答已写入日志”“模型已经读到回答”是四个不同时间点。验证恢复必须检查最后成功持久化的事实。</div></section>
+
+  <section id="verification"><h2>具体怎么验证</h2>
+  <p>以下是建议验证路径，本次只核对源码并构建文档站，没有运行三家真实模型端到端会话。为了稳定验证，使用可控模型输出或直接调用问答服务，避免依赖模型是否愿意提问。</p>
+  <ol>
+    <li><strong>先固定 Q：</strong>让模型/测试适配器输出一个 callId 固定的问答工具调用。OpenHands 普通 QA 则输出固定 assistant 问题。</li>
+    <li><strong>等待时检查存储：</strong>DeepSeek 应已有 assistant/message 与 tool/call，尚无 tool/result；Deep Agents 检查 pending interrupt 与 checkpoint；OpenHands 检查 Agent MessageEvent。</li>
+    <li><strong>仅刷新客户端：</strong>保持后端进程，验证卡片或消息恢复。DeepSeek 要检查是否重发原 rpcId，不能只检查有没有问题文字。</li>
+    <li><strong>另开一轮杀掉后端：</strong>验证 DeepSeek 合成错误结果；Deep Agents 使用持久化 saver 后恢复同一 thread_id 的中断；OpenHands 重载问题消息再接收回答。</li>
+    <li><strong>回答后查下一次 LLM 请求：</strong>DeepSeek 是工具结果 JSON，Deep Agents 是 ToolMessage 的 Q/A 文本，OpenHands 是 user 消息。必须确认调用 ID 配对、答案没有重复注入。</li>
+  </ol>
+  <p>设计自己的 QA 时，先决定需要哪种保证：只恢复历史、客户端重连继续答、还是后端重启后也能恢复待回答点。后者必须持久化等待状态或采用可恢复 checkpoint，单独保存 tool/call 不够。</p>
+  <p><a href="session-event-log-recovery-and-otel.md">继续阅读：Session Event Log 恢复与 OTel Logs</a> · <a href="deepseek-harness-build-roadmap.html">返回课程路线 →</a></p></section>
+
+  <section id="workflow-plan-reading">
+    <h2>Workflow 与 Plan 的完整链路</h2>
+    <p><a href="workflow-eventlog-ui-recovery.html">Workflow：日志、UI、恢复与 LLM 消息 →</a></p>
+    <p><a href="plan-eventlog-ui-recovery.html">Plan：日志、UI、恢复与 LLM 消息 →</a></p>
+    <p>区分进度日志与执行 checkpoint，拆开计划模式、方案正文、用户批准和 Todo 清单，附源码依据与可控验证路径。</p>
+  </section>
+</main></body>
+</html>
