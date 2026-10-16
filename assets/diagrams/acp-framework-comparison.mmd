@@ -1,0 +1,15 @@
+flowchart TB
+    subgraph DSH[DeepSeek Harness：已提交答案输出]
+        DL[LLM 分片] --> DE[Session Event Log]
+        DE -->|只选 assistant/message| DP[逐块选取非空 text / image]
+        DP --> DC[agent_message_chunk]
+        DE -.不导出.-> DX[assistant/chunk / reasoning / tools / plan]
+        DR[核心 agents.resume] -.不等于.-> DA[ACP session/load：未实现]
+    end
+    subgraph OH[OpenHands CLI：事件展示 + 可选 token 输出]
+        OE[Conversation Events] --> OP[EventSubscriber + SharedEventHandler]
+        OP --> OC[ACP 正文 / 思考 / 工具 / plan 更新]
+        OT[LLM token callbacks] --> OS[TokenBasedEventSubscriber]
+        OS --> OC
+        OR[ACP session/load] --> OL[读取 state.events → EventSubscriber 重放]
+    end

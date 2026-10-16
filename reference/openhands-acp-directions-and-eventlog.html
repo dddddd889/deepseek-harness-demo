@@ -3,26 +3,139 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="OpenHands ACP 的两个方向：CLI 对外服务与 SDK 接入外部 Agent；对照固定源码解释 eventlog、token 回调、ACP 更新、权限确认与恢复。">
-  <title>OpenHands ACP：两个方向与 Event Log 映射</title>
+  <meta name="description" content="对照 DeepSeek Harness 与 OpenHands 的 ACP：eventlog 到协议消息映射、实时与已提交输出、会话恢复和外部 Agent 接入；附固定源码与交互示例。">
+  <title>ACP 对照：DeepSeek Harness 与 OpenHands 的事件、流式输出和恢复</title>
   <link rel="stylesheet" href="../assets/course.css">
   <link rel="stylesheet" href="../assets/eventlog-projections.css">
 </head>
 <body><main class="eventlog-page">
   <p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="eventlog-projections-and-types.html">Event Log 与类型层次</a> · <a href="qa-eventlog-ui-recovery.html">QA 专题</a></p>
-  <p class="eyebrow">OPENHANDS · AGENT CLIENT PROTOCOL</p>
-  <h1>谁提供 Agent，谁消费 Agent？<br>OpenHands ACP 的两个方向</h1>
-  <p class="lead">在 IDE 里使用 OpenHands，与在 OpenHands 里使用外部 Agent，方向相反。两边都使用 ACP，但事件的生产者、工具的执行者、消息的转换位置和恢复所需的数据各不相同。</p>
-  <div class="callout"><strong>先记住两个入口：</strong><code>openhands acp</code> 把 OpenHands 作为 Agent 提供给外部客户端；SDK 的 <code>ACPAgent</code> 则把外部 ACP Agent 接进 OpenHands。ACP 是 Agent Client Protocol，这里讨论的是编码 Agent 与客户端的会话协议。</div>
+  <p class="eyebrow">DEEPSEEK HARNESS × OPENHANDS · AGENT CLIENT PROTOCOL</p>
+  <h1>同样使用 ACP，输出与恢复差在哪？<br>DeepSeek Harness × OpenHands</h1>
+  <p class="lead">比较 eventlog 怎样变成协议消息、什么时候发出正文，以及重连以后能恢复什么。先看两家的输出边界，再展开对外服务与接入外部 Agent 两个方向的源码链路。</p>
+  <div class="callout"><strong>最关键的差别：</strong>DeepSeek Harness 的 ACP 面向自动化，只发送已提交助手消息中的文本 / 图片；OpenHands CLI 面向客户端展示，会投影工具、思考、计划，并可选实时 token 输出。Harness 核心能恢复 Session，但当前 ACP 适配器没有历史加载入口；OpenHands CLI 实现了 <code>session/load</code>。</div>
   <div class="facts">
-    <div class="fact"><strong>2 个方向</strong><span>OpenHands 既可以提供 Agent，也可以消费外部 Agent</span></div>
-    <div class="fact"><strong>2 路输出来源</strong><span>完整事件投影 + 可选的实时 token 回调</span></div>
-    <div class="fact"><strong>多对多映射</strong><span>一次事件可产生多条协议消息，也有事件被跳过</span></div>
+    <div class="fact"><strong>2 种输出边界</strong><span>已提交消息内容，与实时展示增量</span></div>
+    <div class="fact"><strong>2 个接入方向</strong><span>对外提供 Agent，与消费外部 Agent</span></div>
+    <div class="fact"><strong>3 层恢复问题</strong><span>核心会话、ACP 历史、外部 Agent 原生状态</span></div>
   </div>
-  <p class="subtle">核对日期：2026-10-16。CLI 固定到 <code>0403f1a79a9fc62a6c7be21c17d7b51f64245ad2</code>，SDK 固定到 <code>12e967664c2353f4cb85dd27da04ade035ff078c</code>。分别说明两个仓库的实现，不表示已验证这两个快照混装。示例是简化教学数据，未调用真实模型或执行真实工具。</p>
-  <nav aria-label="专题阅读导航"><a href="#directions">两个方向</a><a href="#outbound">对外服务</a><a href="#mapping">事件映射表</a><a href="#explorer">点击看协议</a><a href="#streaming">实时分片</a><a href="#permission">权限确认</a><a href="#inbound">接入外部 Agent</a><a href="#layers">协议类型</a><a href="#recovery">恢复边界</a><a href="#verify">核验路径</a></nav>
+  <p class="subtle">核对日期：2026-10-16。DeepSeek Harness 固定到子模块提交 <code>99f6f02fecdb7dff40c3fbc9470f5907c29f74ca</code>；OpenHands CLI 固定到 <code>0403f1a79a9fc62a6c7be21c17d7b51f64245ad2</code>，SDK 固定到 <code>12e967664c2353f4cb85dd27da04ade035ff078c</code>。分别核对各实现，不表示已验证这些快照互连或混装。示例是简化教学数据，未调用真实模型或执行真实工具。原页面地址和 OpenHands 章节锚点保留。</p>
+  <nav aria-label="专题阅读导航"><a href="#comparison">两家总览</a><a href="#dsh-mapping">Harness 映射</a><a href="#stream-comparison">流式对照</a><a href="#compare-explorer">同场景对照</a><a href="#recovery-comparison">恢复对照</a><a href="#client-comparison">外部 Agent 接入</a><a href="#directions">OpenHands 两个方向</a><a href="#mapping">OpenHands 映射细节</a><a href="#explorer">ACP JSON 示例</a><a href="#verify">核验路径</a></nav>
 
-  <section id="directions"><h2>同样叫 ACP，OpenHands 站的位置不同</h2>
+  <section id="comparison"><h2>两家对照：相同的 ACP 标签，不保证相同的输出粒度</h2>
+    <figure class="course-diagram"><figcaption>对比的是当前 ACP 适配器的实际行为，不是两个框架全部 UI 与存储能力</figcaption><img src="../assets/diagrams/acp-framework-comparison.svg" alt="Harness 只输出已提交消息的文本图片；OpenHands 既投影事件也可发送实时 token；两家 ACP 历史加载支持不同"><p><a href="../assets/diagrams/acp-framework-comparison.mmd">Mermaid 对照图源</a></p></figure>
+    <div class="table-scroll"><table><thead><tr><th>比较项</th><th>DeepSeek Harness：dsh-acp</th><th>OpenHands CLI：openhands acp</th></tr></thead><tbody>
+      <tr><td>主要用途</td><td>程序化自动化；向父 Agent 等客户端返回已提交的答案内容。</td><td>IDE / 客户端集成；输出回答及工具、思考、计划等展示信息。</td></tr>
+      <tr><td>事件入口</td><td>订阅 session/event，只将 assistant/message 的指定内容块投影为输出。</td><td>Conversation callbacks → EventSubscriber / SharedEventHandler；历史重放复用转换器。</td></tr>
+      <tr><td>agent_message_chunk 的粒度</td><td>一个完整已提交助手消息中，每个非空 text / image 块对应一条更新。</td><td>可来自完整事件的展示文本；启用 streaming 时，也可来自实时 token delta。</td></tr>
+      <tr><td>工具 / reasoning / Plan</td><td>保留在会话日志供其他界面消费，ACP 不发送这些展示更新。</td><td>按事件分支转换成 tool_call、tool_call_update、agent_thought_chunk、plan。</td></tr>
+      <tr><td>图片输出</td><td>从耐久附件引用重新读取并校验，转成 ACP 内联 base64；保持文本 / 图片块顺序。</td><td>本页核对的事件与 token 文字路径主要发展示文本；不能据此声称与 Harness 的图片输出路径对等。</td></tr>
+      <tr><td>prompt 响应边界</td><td>等待准入、整个 Agent 空闲、输出交付队列停稳，再结算；不只等待一个 turn/end。</td><td>本次 Conversation runner 返回后生成 PromptResponse；正文与工具更新在此前独立发送。</td></tr>
+      <tr><td>ACP 加载历史</td><td>未实现；只新建会话，不公布 loadSession。</td><td>实现 session/load：遍历 state.events 再投影；CLI --resume 也有历史重放路径。</td></tr>
+      <tr><td>核心持久化</td><td>SessionPersistence 可保存事件并通过 agents.resume 恢复；不是 ACP load 的实现。</td><td>Conversation 保存自己的事件与状态；ACP 历史显示依赖这份数据。</td></tr>
+      <tr><td>权限通道</td><td>approval/request → request_permission；只提供一次允许 / 拒绝，按实际 callId 关联。</td><td>WAITING_FOR_CONFIRMATION → request_permission；允许策略切换，确认卡片可表示一组动作。</td></tr>
+    </tbody></table></div>
+    <p><a href="../deepseek-harness/packages/acp/acp/README.zh.md">Harness ACP 完整约定</a> · <a href="../deepseek-harness/packages/acp/acp/src/index.ts">Harness 协议适配器</a> · <a href="#mapping">OpenHands 事件逐项映射</a></p>
+  </section>
+
+  <section id="dsh-mapping"><h2>Harness：从 Event Log 选择已提交消息的内容</h2>
+    <pre><code>session/prompt
+  → admitAcpPrompt：校验文本 / 图片 / 资源引用
+  → 图片先入附件存储，用户消息只保留引用
+  → createUserMessage → agent.followup → Inbox / Agent Loop
+
+session/event
+  ├─ assistant/chunk：留在日志，不发 ACP 正文
+  ├─ assistant/message：遍历已提交 message.content
+  │    ├─ 非空 text → agent_message_chunk { content: {type:"text", text} }
+  │    ├─ image → 读附件并校验 → agent_message_chunk {content:{type:"image", ...}}
+  │    └─ reasoning / tool-call 等 → 不导出
+  ├─ tool/call、tool/result、todo/write 等：不转成 ACP 展示更新
+  └─ turn/end：记录关联结果，用于 prompt 结算，不生成回放帧</code></pre>
+    <p>转换点是 <code>assistantBlockToAcp()</code>，异步图片读取经过每个会话独立的 <code>outputTail</code> 串行交付。因此已提交的 text → image → text 不会因读取耗时而乱序；缺失 / 损坏图片会导致转换失败，不使用占位符。</p>
+    <p><strong>“已提交”指进入 Session 的逻辑事件，不等于已经 fsync 落盘。</strong>ACP 监听器没有在每条通知前等待 SessionPersistence flush。模型输出完整成形、事件追加、磁盘耐久和客户端收到通知，是不同的时点。</p>
+    <p>也不能把“只发已提交答案”理解成“整项任务成功后只发最后一句”。每个 assistant/message 中的正文都可能发出；先前步骤已提交的文字不会因后续步骤失败而自动撤回。桥接拥有的 Agent 被同进程其他生产者驱动时，也可以产生输出。</p>
+    <p>输入侧保留文本与受支持图片的顺序，resource_link 展平为引用文本。图片能力取决于附件存储与确切模型路由；音频、嵌入资源、非空 additionalDirectories 和非空 mcpServers 不在当前适配范围。</p>
+    <h3>权限请求是一条独立控制链路</h3>
+    <p>属于桥接拥有的同一 Agent、且携带 callId 的 <code>approval/request</code> 进入 ACP <code>session/request_permission</code>。选项仅为 allow-once / reject-once；取消返回 cancelled，非允许选项按拒绝处理。模型不会直接读到协议选项，工具结果通过常规日志路径记录后续结果。</p>
+    <p><a href="../deepseek-harness/packages/acp/acp/src/index.ts">session/event、outputTail 与 approval/request</a> · <a href="../deepseek-harness/packages/acp/acp/src/content.ts">admitAcpPrompt / assistantBlockToAcp</a> · <a href="../deepseek-harness/packages/acp/acp/tests/edges.spec.ts">已有测试：省略展示事件</a> · <a href="../deepseek-harness/packages/acp/acp/tests/turns.spec.ts">已有测试：顺序交付、部分失败与结束边界</a></p>
+  </section>
+
+  <section id="stream-comparison"><h2>流式对照：发得早，和发得完整，是不同选择</h2>
+    <pre><code>同一段模型输出：“配置中的端口是 8080。”
+
+时点                         Harness ACP                  OpenHands CLI（开启适用的 streaming）
+模型刚输出“配置中的”         日志可记 assistant/chunk      可立即发 agent_message_chunk
+继续输出“端口是 8080。”      继续记 chunks，不发原始 delta  继续发正文增量
+完整消息形成                 assistant/message 提交        完整事件到来，避免重复输出流式正文
+                             → 按 text / image 块发 ACP
+工具开始 / 结束              日志记录，不发工具展示帧       工具起始 / 更新；分片阶段可能已建卡片
+回合结束                     等准入、Agent idle、输出排空  runner 返回 → prompt result
+历史加载                     ACP 没有加载入口              从完整事件重投影，不重放 token 节奏</code></pre>
+    <p><strong>失败场景尤其能区分两者：</strong>模型只输出“配置中的”就失败，且没有形成该次完整助手消息时，Harness 会保留原始 chunks，但不会把这些部分正文发到 ACP。OpenHands 的流式路径可能已把这段文字显示给客户端，后续错误处理不等于自动撤回已发通知。</p>
+    <p>OpenHands 非流式路径与开启 token 回调的路径要分开比较；其本地 CLI 开关还有 Responses API 路径限制。反过来，Harness 本身在日志 / Web 界面具备流式观测材料，也不代表 dsh-acp 会导出逐 token 更新。</p>
+    <p>Harness 的输出转换和 prompt 结算是异步的。正常停止、达到 token 上限、取消与错误的处理也不同：当前 prompt 处理器将关联 max-tokens 结算为 end_turn，显式 ACP 取消结算为 cancelled；关联错误在停稳后拒绝请求。不能只读 codec.ts 的枚举转换就推断最终 wire 结果。</p>
+    <p><a href="../deepseek-harness/packages/acp/acp/src/index.ts">settleAfterQuiescence 的最终优先级</a> · <a href="../deepseek-harness/packages/acp/acp/src/codec.ts">底层结束原因转换</a> · <a href="#streaming">OpenHands 流式回调与去重细节</a></p>
+  </section>
+
+  <section id="compare-explorer"><h2>同一个场景，两家 ACP 客户端看到什么？</h2>
+    <p>选择场景，对照当前实现的输出和恢复边界。说明器是静态教学数据，不连接任何 Agent。</p>
+    <div class="event-buttons" role="group" aria-label="选择两家 ACP 对照场景">
+      <button type="button" data-compare-case="partial" aria-pressed="true">刚输出半句</button>
+      <button type="button" data-compare-case="committed" aria-pressed="false">完整消息提交</button>
+      <button type="button" data-compare-case="tool" aria-pressed="false">工具开始与结果</button>
+      <button type="button" data-compare-case="failure" aria-pressed="false">半途失败</button>
+      <button type="button" data-compare-case="load" aria-pressed="false">重连读历史</button>
+      <button type="button" data-compare-case="external" aria-pressed="false">接入外部 Agent</button>
+    </div>
+    <div class="result-grid" aria-live="polite" aria-atomic="true">
+      <article class="result-card"><h3>DeepSeek Harness</h3><p id="compare-dsh">原始 assistant/chunk 可以入日志；ACP 尚未发送这段正文。等待完整 assistant/message 提交。</p></article>
+      <article class="result-card"><h3>OpenHands</h3><p id="compare-oh">启用适用的 streaming 时，token callback 可以立即发送 agent_message_chunk；这不是已落盘事件的逐条回放。</p></article>
+    </div>
+    <noscript><p>关闭脚本时，可阅读上方流式对照与下方恢复表，内容相同。</p></noscript>
+  </section>
+
+  <section id="recovery-comparison"><h2>恢复对照：核心能恢复，不等于 ACP 暴露了恢复入口</h2>
+    <div class="table-scroll"><table><thead><tr><th>恢复对象</th><th>DeepSeek Harness</th><th>OpenHands</th></tr></thead><tbody>
+      <tr><td>框架自身的持久会话</td><td>配置 SessionPersistence 后，Header + Event Log 可重建 Session，agents.resume 重新组装 Agent；中断生命周期补齐，再接受新 Turn。</td><td>Conversation 的持久事件和状态用于重新建立会话；不能据此恢复旧执行栈或工具进程。</td></tr>
+      <tr><td>ACP 连接加载旧 Session</td><td>dsh-acp 只调用 agents.create；没有 loadSession handler，没有读取旧日志并回放 ACP 的路径。</td><td>CLI 有 session/load / --resume 路径，加载 state.events 后调用 EventSubscriber。</td></tr>
+      <tr><td>客户端历史展示</td><td>通过当前 ACP 不能请求旧 transcript；需要其他已有宿主入口或额外适配，不应假装已有 ACP replay。</td><td>历史被重新投影成 ACP 展示更新。用户消息在该 subscriber 中跳过，完整 UI 仍需核对客户端整合。</td></tr>
+      <tr><td>原始 token 序列</td><td>持久日志可保留 assistant/chunk；当前 ACP 不提供它们的实时或历史导出。</td><td>token 回调不是历史重放来源；session/load 不保证原 token 粒度、时间和中间画面重现。</td></tr>
+      <tr><td>断开连接</td><td>桥接停止准入，取消并等待活动和输出交付，释放该连接拥有的 Agent 与相应可继续后代。</td><td>本页已核对 load 与 CLI 本地会话路径；不把不同客户端、remote 实现或断线场景推定为统一自动续传。</td></tr>
+      <tr><td>接入外部 ACP Agent 后继续</td><td>subagent-acp 每次新进程 + newSession，没有原生 session/load 重连流程。</td><td>SDK ACPAgent 可按持有的原生 session ID 尝试 load_session；仍需要外部 Agent 自身的历史数据。</td></tr>
+    </tbody></table></div>
+    <div class="callout"><strong>两个问题分别问：</strong>“我能通过框架恢复这份会话吗？”与“外部客户端能通过当前 ACP 连接加载它吗？”Harness 对第一个问题支持，对第二个问题当前未实现。也不能把子 Agent 的 continuable Session 恢复能力套到所有 ACP 子进程提供方上。</div>
+    <p><a href="../deepseek-harness/packages/core/agent/src/index.ts">AgentStore.resume</a> · <a href="../deepseek-harness/packages/session/session-persistence/src/coordinator.ts">持久会话读取与修复</a> · <a href="../deepseek-harness/packages/acp/acp/README.zh.md">ACP 仅新会话与连接生命周期</a> · <a href="#recovery">OpenHands 恢复源码展开</a></p>
+  </section>
+
+  <section id="client-comparison"><h2>反方向也对照：外部 ACP 更新怎样进入本框架？</h2>
+    <pre><code>Harness：父 Agent → subagent-acp → 外部 ACP 子进程
+                          ← agent_message_chunk 文本累积
+                          → SubagentResult.output → 父工具结果 / 父会话
+
+OpenHands：Conversation → ACPAgent → 外部 ACP 子进程
+                          ← token / thought / 工具 / usage 等更新
+                          → ACPToolCallEvent、FinishAction / Observation 等 → 本地会话</code></pre>
+    <div class="table-scroll"><table><thead><tr><th>项目</th><th>Harness subagent-acp</th><th>OpenHands SDK ACPAgent</th></tr></thead><tbody>
+      <tr><td>正文</td><td>按序累积收到的 agent_message_chunk 文本，作为 SubagentResult.output。不是自动为每条 ACP 通知创建父日志事件。</td><td>文字实时回调并累积；正常结束时生成 FinishAction / FinishObservation。</td></tr>
+      <tr><td>工具、思考、计划</td><td>消费但不向父级展示这些更新；父级工具结果不等于子 Agent 的完整事件流。</td><td>工具开始 / 首次终态写 ACPToolCallEvent，思考累积到结果事件；该 handler 对 plan 没有专门入库分支。</td></tr>
+      <tr><td>权限</td><td>配置 allow / reject；默认 reject，不向人展示。allow 会查找允许类型的选项。</td><td>当前 SDK bridge 自动选择第一个选项并返回 AllowedOutcome；不同于 CLI 对外请求人工确认。</td></tr>
+      <tr><td>上下文 / 恢复</td><td>新进程、全新远端会话；不继承父对话，不执行 session/load。</td><td>外部 Agent 自己拥有模型上下文；SDK 可尝试恢复其原生会话。</td></tr>
+    </tbody></table></div>
+    <p><strong>别把服务端和客户端的保证混在一起：</strong>dsh-acp 服务端只发已提交内容，但 subagent-acp 客户端只看通知类型，不验证远端“提交”时点。如果它连接启用实时输出的其他 ACP Server，已经收到的部分文本也会累积，取消 / 错误结果可保留这些文本。输入提示词转换当前也只转发文本块。</p>
+    <p><a href="../deepseek-harness/packages/subagent/subagent-acp/src/run.ts">正文 fold、权限策略、newSession 与部分结果</a> · <a href="../deepseek-harness/packages/subagent/subagent-acp/src/index.ts">提供方配置、默认 reject 与能力声明</a> · <a href="../deepseek-harness/packages/subagent/subagent-acp/README.zh.md">ACP 子进程提供方说明</a> · <a href="#inbound">OpenHands 反向更新入库细节</a></p>
+    <h3>两家对照的稳定核验方法</h3>
+    <ol>
+      <li>固定同一段半句分片后故意失败：核对 DSH 事件存在但 ACP 不泄漏该次部分正文；对照 OpenHands streaming 已显示的文本。</li>
+      <li>固定完整文本 / 图片 / 文本消息：核对 DSH 按块输出且等待交付排空；不要把每块通知当作 token。</li>
+      <li>固定工具与 Todo 更新：分别核对 DSH 日志存在但无 ACP 展示帧，以及 OpenHands 的工具 / plan 分支。</li>
+      <li>分别调用框架恢复入口和 ACP session/load：区分 DSH 核心恢复成功与 ACP 未提供该方法；对照 OpenHands 历史投影。</li>
+      <li>让外部假 ACP Server 先发正文再取消：核对 DSH subagent-acp 仍可返回累积文本，证明客户端不替外部 Server 校验提交边界。</li>
+    </ol>
+    <p class="subtle">以上是核验方案与已有源码测试的阅读依据；本次只修改文档页面，未运行两家 Agent 的真实模型会话或恢复集成测试。</p>
+  </section>
+
+  <section id="directions"><h2>OpenHands 展开：对外服务与接入外部 Agent</h2>
     <figure class="course-diagram"><figcaption>先找 ACP 连接两端的角色，再看哪个进程调用模型和工具</figcaption><img src="../assets/diagrams/openhands-acp-directions.svg" alt="方向 A：外部 IDE 使用 OpenHands CLI；方向 B：OpenHands ACPAgent 使用外部 ACP Agent"><p><a href="../assets/diagrams/openhands-acp-directions.mmd">Mermaid 架构图源</a> · <a href="../assets/diagrams/openhands-acp-sequence.mmd">一次工具调用的时序图源</a></p></figure>
     <div class="table-scroll"><table><thead><tr><th>问题</th><th>方向 A：OpenHands 对外服务</th><th>方向 B：OpenHands 接入外部 Agent</th></tr></thead><tbody>
       <tr><td>谁是 ACP Client？</td><td>IDE 或自己写的 ACP 客户端。</td><td>OpenHands SDK 里的客户端桥接器。</td></tr>
@@ -36,7 +149,7 @@
     <p><a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/agent/launcher.py">CLI 协议启动入口</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/12e967664c2353f4cb85dd27da04ade035ff078c/openhands-sdk/openhands/sdk/agent/acp_agent.py">SDK ACPAgent 与客户端桥接</a></p>
   </section>
 
-  <section id="outbound"><h2>方向 A：外部 IDE 让 OpenHands 完成一次任务</h2>
+  <section id="outbound"><h2>OpenHands 方向 A：外部 IDE 提交任务</h2>
     <p>例如在 IDE 中输入：“读取 config.json，解释配置”。IDE 发出 ACP 请求，CLI 把输入转换成 OpenHands 用户消息，驱动 Conversation；产生的事件再经订阅器变成 ACP 更新。</p>
     <pre><code>IDE → initialize → 能力协商
 IDE → session/new → 创建 Conversation，返回 sessionId
@@ -56,7 +169,7 @@ Conversation 运行结束 → 原 session/prompt 请求的响应
     <p><a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/agent/base_agent.py">请求、响应、方法支持与 load_session</a> · <a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/agent/local_agent.py">Conversation 与 callbacks / token_callbacks 装配</a></p>
   </section>
 
-  <section id="mapping"><h2>Event Log 怎样映射成 ACP 消息？先看非流式事件路径</h2>
+  <section id="mapping"><h2>OpenHands 映射展开：非流式事件路径</h2>
     <p>入口是 <code>EventSubscriber.__call__(event)</code>。它按照事件类分派，SharedEventHandler 再构造具体更新。多数文字来自 <code>event.visualize.plain</code>，工具的结构化输入、输出另放 rawInput / rawOutput。</p>
     <div class="table-scroll"><table><thead><tr><th>OpenHands 事件 / 子类型</th><th>ACP 输出</th><th>映射细节</th></tr></thead><tbody>
       <tr><td>普通 <code>ActionEvent</code></td><td><code>tool_call</code>，status=in_progress</td><td>tool_call_id → toolCallId；计算 title、kind、locations；action.model_dump() → rawInput。reasoning 与 thought 非空时先分别发送 agent_thought_chunk。</td></tr>
@@ -77,7 +190,7 @@ Conversation 运行结束 → 原 session/prompt 请求的响应
     <p><a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/events/event.py">事件分派、用户消息跳过与 Action thought</a> · <a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/events/shared_event_handler.py">动作 / 结果 / Plan / 错误映射</a> · <a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/events/utils.py">工具标题、位置、内容块与 metrics</a></p>
   </section>
 
-  <section id="explorer"><h2>选一个场景，看转换结果和 JSON-RPC 外壳</h2>
+  <section id="explorer"><h2>OpenHands 消息示例：转换结果与 JSON-RPC 外壳</h2>
     <p>固定示例只说明字段与路径；无网络请求，也不会执行示例工具。协议使用 camelCase，Python 构造参数通常使用 snake_case。</p>
     <div class="event-buttons" role="group" aria-label="选择 ACP 映射场景">
       <button type="button" data-acp-case="action" aria-pressed="true">普通动作</button>
@@ -111,7 +224,7 @@ Conversation 运行结束 → 原 session/prompt 请求的响应
     <noscript><p>切换场景需要 JavaScript；上下文中的映射表和时序说明不依赖脚本。</p></noscript>
   </section>
 
-  <section id="streaming"><h2>实时 token 路径：不是每条 ACP 更新都来自耐久事件</h2>
+  <section id="streaming"><h2>OpenHands 实时 token 路径：独立于完整事件投影</h2>
     <pre><code>非流式：完整事件 → EventSubscriber → SharedEventHandler → session/update
 
 开启 --streaming 且满足当前适配条件：
@@ -127,7 +240,7 @@ Conversation 运行结束 → 原 session/prompt 请求的响应
     <p><a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/events/token_streamer.py">分片转换、工具调用归并与完整事件去重</a> · <a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/agent/local_agent.py">streaming_enabled 条件与两路回调</a></p>
   </section>
 
-  <section id="permission"><h2>权限确认：单独的请求 / 响应，不是“再发一条事件”</h2>
+  <section id="permission"><h2>OpenHands 权限确认：单独的请求 / 响应</h2>
     <pre><code>ActionEvent 已出现
   → Conversation 进入 WAITING_FOR_CONFIRMATION
   → runner 读取尚未匹配结果的 pending actions
@@ -140,11 +253,11 @@ Conversation 运行结束 → 原 session/prompt 请求的响应
 
 最终 session/prompt 的响应有自己的 id；不会拿权限请求的 id 替代。</code></pre>
     <p>CLI 的选项包括一次允许、一次拒绝、持续允许和按风险确认。确认请求使用 <code>confirmation-{sessionId}</code> 作为确认卡片 toolCallId，可以代表一组待执行动作；不要强行把它当成某个原始工具调用的 ID。</p>
-    <p>取消也走控制面：CLI 的 session/cancel 请求会 pause 会话并等待运行任务停止。历史里出现某个工具卡片或暂停说明，不代表旧进程中的等待对象可在重启后原样复活。</p>
+    <p>取消也走控制面：CLI 的 session/cancel 通知会 pause 会话并等待运行任务停止。历史里出现某个工具卡片或暂停说明，不代表旧进程中的等待对象可在重启后原样复活。</p>
     <p><a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/confirmation.py">权限选项与 request_permission</a> · <a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/runner.py">等待、拒绝、暂缓与继续</a> · <a href="https://github.com/OpenHands/OpenHands-CLI/blob/0403f1a79a9fc62a6c7be21c17d7b51f64245ad2/openhands_cli/acp_impl/agent/base_agent.py">session/cancel</a></p>
   </section>
 
-  <section id="inbound"><h2>方向 B：外部 ACP 消息怎样进入 OpenHands Event Log？</h2>
+  <section id="inbound"><h2>OpenHands 方向 B：外部 ACP 更新怎样入库？</h2>
     <p>这个方向使用 SDK 的 ACPAgent。OpenHands 把一个用户回合交给外部 Agent，外部 Agent 决定怎样调用自己的模型与工具；OpenHands 接收协议更新，并转换成自己的展示事件和回合结果。</p>
     <pre><code>OpenHands 的用户 MessageEvent
   → _build_acp_prompt：文本 / 支持的图片 + 可选上下文后缀
@@ -199,7 +312,7 @@ Conversation 运行结束 → 原 session/prompt 请求的响应
     <p>Python 里的 tool_call_id、raw_input 等字段序列化到 ACP wire 时对应 toolCallId、rawInput。UI 端拿到的是协议读模型，不能直接按 OpenHands 原始事件类去解释每条通知。</p>
   </section>
 
-  <section id="recovery"><h2>恢复：历史展示和外部 Agent 续聊各需要什么？</h2>
+  <section id="recovery"><h2>OpenHands 恢复展开：历史展示与外部 Agent 续聊</h2>
     <div class="table-scroll"><table><thead><tr><th>场景</th><th>现有路径</th><th>不能推导出的保证</th></tr></thead><tbody>
       <tr><td>方向 A：重新显示 OpenHands 历史</td><td>session/load 读取 Conversation；遍历 state.events，用新的 EventSubscriber 逐条投影。--resume 的相应路径也重放历史。</td><td>不是原始 token 时序的无损回放；该 subscriber 跳过 user role 消息，完整用户历史展示还需核对客户端整合。</td></tr>
       <tr><td>方向 A：等待确认时中断</td><td>恢复持久会话状态后，runner 可处理 WAITING_FOR_CONFIRMATION 并重新发起确认。</td><td>原 JSON-RPC 请求、旧连接和 Promise 不会原地复活；具体恢复条件依赖实际保存的状态。</td></tr>
@@ -222,16 +335,61 @@ Conversation 运行结束 → 原 session/prompt 请求的响应
       <li><strong>结束与恢复：</strong>正常完成后核对 FinishAction / FinishObservation；分别保留、移走外部 Agent 原生历史，验证“能显示旧卡片”和“外部 Agent 仍记得前文”是两个检查。</li>
     </ol>
     <details><summary>用一句话回答最容易问混的问题</summary><dl>
-      <dt>ACP 对外提供什么？</dt><dd>提供可被 IDE 或程序驱动的编码 Agent 会话服务：接任务、持续反馈执行信息、处理控制与确认。</dd>
+      <dt>两家的 ACP 对外提供什么？</dt><dd>都可由程序驱动 Agent 会话；Harness 的当前适配器只传已提交正文 / 图片和必要控制，OpenHands CLI 还提供执行展示。具体能力由适配器声明和实现决定。</dd>
       <dt>OpenHands UI 直接消费 ACP 吗？</dt><dd>在方向 B 的结构中，ACP 终止于 SDK bridge；它再把可展示的事件交给 OpenHands 会话与上层 UI。</dd>
       <dt>Event Log 与 ACP 是同一种格式吗？</dt><dd>各自有类型和用途。转换器可以拆分、归并、格式化、跳过；token 回调还可以独立产生更新。</dd>
       <dt>可否把方向 A 和 B 串起来就认为完全等价？</dt><dd>不能自动这样推断。CLI subscriber 的分派没有 ACPToolCallEvent 专门分支，SDK bridge 也没有把所有 SessionUpdate 都保存；需要明确适配和验证。</dd>
-      <dt>本页的“思考”都来自模型 reasoning 吗？</dt><dd>不是。CLI 也把系统提示、暂停与压缩事件的展示文本映射到 agent_thought_chunk。</dd>
+      <dt>本页的“思考”都来自模型 reasoning 吗？</dt><dd>不是。OpenHands CLI 也把系统提示、暂停与压缩事件的展示文本映射到 agent_thought_chunk；当前 Harness ACP 不输出这类展示消息。</dd>
     </dl></details>
   </section>
   <p><a href="deepseek-harness-build-roadmap.html">返回课程首页 →</a> · <a href="eventlog-projections-and-types.html">Event Log 与类型层次 →</a> · <a href="qa-eventlog-ui-recovery.html">QA 的历史与等待点 →</a></p>
 </main>
 <script>
+// 对照说明只描述固定源码，不启动 Agent；两个列对应同一场景的不同结果。
+const comparisonExamples = {
+  partial: [
+    '原始 assistant/chunk 可以入日志；ACP 尚未发送这段正文。等待完整 assistant/message 提交。',
+    '启用适用的 streaming 时，token callback 可以立即发送 agent_message_chunk；这不是已落盘事件的逐条回放。',
+  ],
+  committed: [
+    '逐个读取已提交 assistant/message 中的非空文本与图片块，按顺序各发一条 agent_message_chunk。已提交不等于已完成磁盘 flush。',
+    '非流式时从完整事件的展示文本发送；流式时正文通常已由 token callback 输出，完整事件路径避免再重发整段流式正文。',
+  ],
+  tool: [
+    'tool/call 与 tool/result 在会话日志中；当前 dsh-acp 不导出工具展示帧。权限控制可另走 request_permission。',
+    '普通 ActionEvent 映射 tool_call；ObservationEvent 更新卡片。特殊 Think / Finish / TaskTracker 另走思考、正文或计划分支。',
+  ],
+  failure: [
+    '若这次尝试只产生原始 chunks，没有完整助手消息，则不发出这段部分正文；先前已提交步骤的输出仍保留。请求在停稳后报告相关错误。',
+    '启用适用的 streaming 时，部分正文可能已显示；后续错误不会自动让已发通知消失。非流式与流式必须分别比较。',
+  ],
+  load: [
+    '核心可用 SessionPersistence + agents.resume 恢复；但当前 ACP 只支持新会话，没有 session/load 与历史投影入口。',
+    'CLI session/load 读取 state.events 并调用 EventSubscriber；恢复的是事件展示，不是原始 token 时序或旧进程现场。',
+  ],
+  external: [
+    'subagent-acp 每次新进程 / newSession，只累积收到的正文文本并返回 SubagentResult；默认拒绝权限，不实现原生会话重连。',
+    'SDK ACPAgent 归并工具为 ACPToolCallEvent，正常结束生成 Finish 事件；可以尝试 load 外部 Agent 的原生会话。',
+  ],
+};
+
+// 缓存对照区节点，与下方原有 JSON-RPC 说明器分别维护选中状态。
+const comparisonButtons = document.querySelectorAll('[data-compare-case]');
+const comparisonDsh = document.getElementById('compare-dsh');
+const comparisonOpenHands = document.getElementById('compare-oh');
+
+// 同时更新两列文字，保留当前按钮焦点及键盘操作，不把文本当作 HTML 执行。
+function selectComparison(key) {
+  const explanation = comparisonExamples[key];
+  if (!explanation) return;
+  comparisonButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.compareCase === key)));
+  comparisonDsh.textContent = explanation[0];
+  comparisonOpenHands.textContent = explanation[1];
+}
+
+// 每次点击只切换静态对照，不执行网络、工具或恢复操作。
+comparisonButtons.forEach(button => button.addEventListener('click', () => selectComparison(button.dataset.compareCase)));
+
 // 教学示例只包含固定协议字段，不连接 ACP 服务，也不执行示例工具。
 const acpExamples = {
   action: {
