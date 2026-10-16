@@ -1,0 +1,19 @@
+flowchart TB
+    subgraph OUT[方向 A：把 OpenHands 提供给外部客户端]
+        IDE[IDE / ACP Client] <-->|JSON-RPC over stdio| CLI[openhands acp：协议服务进程]
+        CLI <-->|prompt / callback| CONV[OpenHands Conversation + 内置 Agent]
+        CONV --> LLM[LLM + 工具 / 工作区]
+        CONV --> LOG[会话事件与持久化]
+        LOG -->|历史重放| SUB[EventSubscriber]
+        CONV -->|实时事件回调| SUB
+        SUB -->|session/update| IDE
+        CONV -.token callback：独立实时路径.-> IDE
+    end
+    subgraph IN[方向 B：OpenHands 接入外部 Agent]
+        UI[OpenHands UI / SDK] <--> C[Conversation]
+        C <--> BR[ACPAgent + ACP Client Bridge]
+        BR <-->|JSON-RPC over stdio| EXT[外部 ACP Agent 子进程]
+        EXT --> OWN[外部 Agent 自己的模型 / 工具 / 会话存储]
+        BR -->|ACPToolCallEvent / FinishAction + Observation| C
+        C --> STORE[OpenHands 事件持久化]
+    end

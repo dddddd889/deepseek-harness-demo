@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 760" role="img" aria-labelledby="title desc">
+<title id="title">OpenHands ACP 的两个方向</title>
+<desc id="desc">方向 A 由 IDE 启动 OpenHands CLI，CLI 作为 ACP Agent 服务；方向 B 由 OpenHands ACPAgent 启动外部 ACP Agent，OpenHands 成为客户端。两者通过不同适配规则连接事件和协议。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#657799"/></marker></defs>
+<rect width="1040" height="760" rx="16" fill="#fbfcfe"/>
+<g font-family="PingFang SC,Microsoft YaHei,sans-serif" fill="#172033" text-anchor="middle">
+<rect x="16" y="15" width="1008" height="344" rx="15" fill="#edf2ff" stroke="#c6d2eb"/>
+<rect x="16" y="383" width="1008" height="357" rx="15" fill="#eef7f2" stroke="#b9d8c7"/>
+<text x="520" y="51" font-size="21" font-weight="700">方向 A · 对外服务：OpenHands 是 ACP Agent</text>
+<text x="520" y="418" font-size="21" font-weight="700">方向 B · 接入外部 Agent：OpenHands 是 ACP Client</text>
+<g stroke="#657799" stroke-width="2" fill="none" marker-end="url(#arrow)">
+<path d="M280 120H376" marker-start="url(#arrow)"/><path d="M664 120H760" marker-start="url(#arrow)"/>
+<path d="M890 158V207H580V244"/><path d="M890 158V207H870V244"/>
+<path d="M470 280H150V158"/>
+<path d="M890 158V187H48V158" stroke-dasharray="6 5"/>
+<path d="M280 487H376" marker-start="url(#arrow)"/><path d="M664 487H760" marker-start="url(#arrow)"/>
+<path d="M890 525V579"/><path d="M520 525V579"/>
+</g>
+<g stroke="#aebed8" stroke-width="1.5">
+<rect x="20" y="85" width="260" height="73" rx="10" fill="white"/>
+<rect x="376" y="85" width="288" height="73" rx="10" fill="#dce7ff"/>
+<rect x="760" y="85" width="260" height="73" rx="10" fill="white"/>
+<rect x="470" y="244" width="220" height="72" rx="10" fill="white"/>
+<rect x="740" y="244" width="260" height="72" rx="10" fill="white"/>
+<rect x="20" y="451" width="260" height="74" rx="10" fill="white"/>
+<rect x="376" y="451" width="288" height="74" rx="10" fill="#d8eee1"/>
+<rect x="760" y="451" width="260" height="74" rx="10" fill="white"/>
+<rect x="376" y="579" width="288" height="80" rx="10" fill="white"/>
+<rect x="760" y="579" width="260" height="80" rx="10" fill="white"/>
+</g>
+<g font-size="18">
+<text x="150" y="115">IDE / 自建 ACP 客户端</text><text x="150" y="141" font-size="14">提交任务，显示更新，回答确认</text>
+<text x="520" y="115" font-weight="700">openhands acp</text><text x="520" y="141" font-size="14">CLI 协议进程 + EventSubscriber</text>
+<text x="890" y="115">OpenHands Conversation</text><text x="890" y="141" font-size="14">内置 Agent → 模型与工具</text>
+<text x="329" y="103" font-size="12">stdio</text><text x="713" y="103" font-size="12">会话操作</text>
+<text x="580" y="274">会话事件 / 历史重放</text><text x="580" y="300" font-size="13">转换后发送 ACP 更新</text>
+<text x="870" y="274">token callbacks</text><text x="870" y="300" font-size="13">独立实时路径，可早于完整事件</text>
+<text x="260" y="266" font-size="14">session/update</text>
+<text x="260" y="307" font-size="14" fill="#667085">事件到协议：选择、格式化、拆分、跳过</text>
+<text x="520" y="341" font-size="14" fill="#667085">虚线：开启流式输出时，模型 token 经转换直接成为 ACP 更新</text>
+<text x="150" y="481">OpenHands UI / SDK</text><text x="150" y="507" font-size="14">通过 Conversation 交互</text>
+<text x="520" y="481" font-weight="700">ACPAgent + Client Bridge</text><text x="520" y="507" font-size="14">转交 prompt，归并外部更新</text>
+<text x="890" y="481">外部 ACP Agent 子进程</text><text x="890" y="507" font-size="14">Claude Code / Codex / Gemini 等</text>
+<text x="329" y="470" font-size="12">会话</text><text x="713" y="470" font-size="12">stdio</text>
+<text x="520" y="610">OpenHands 事件记录</text><text x="520" y="636" font-size="14">工具开始 / 终态；完整回合结束事件</text>
+<text x="890" y="610">外部 Agent 自己管理</text><text x="890" y="636" font-size="14">模型、工具、历史与恢复数据</text>
+<text x="520" y="703" font-size="15" fill="#526b5d">协议到事件：并非每条进度都保存，也不还原外部 Agent 的全部内部历史</text>
+</g></g></svg>

@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant IDE as IDE（ACP Client）
+    participant CLI as OpenHands CLI（ACP Agent）
+    participant C as Conversation / Agent
+    participant T as 工具
+    IDE->>CLI: initialize / session/new
+    CLI-->>IDE: 能力 / sessionId
+    IDE->>CLI: session/prompt（请求 id=2）
+    CLI->>C: send_message + run
+    C-->>CLI: ActionEvent
+    CLI-->>IDE: session/update：tool_call（toolCallId=call-1）
+    opt 策略要求确认
+        CLI->>IDE: session/request_permission（独立 RPC id）
+        IDE-->>CLI: 允许 / 拒绝
+    end
+    C->>T: 执行工具（批准后）
+    T-->>C: ObservationEvent
+    C-->>CLI: 事件回调
+    CLI-->>IDE: session/update：tool_call_update
+    C-->>CLI: FinishAction / 助手消息
+    CLI-->>IDE: session/update：agent_message_chunk
+    CLI-->>IDE: 请求 id=2 的 result：stopReason=end_turn
