@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="对比 DeepSeek Harness、OpenHands、Codex 的 Agent Loop 部署位置，解释云端循环调用本地工具的连接、权限、断线恢复，以及对会话评估和复现的影响。">
+  <meta name="description" content="对比 DeepSeek Harness、OpenHands、Codex 的 Agent Loop 部署位置，解释三种架构下 Skill 的加载、引用、脚本执行，以及远程工具、会话评估和复现。">
   <title>Agent Loop 放在哪：部署、远程工具与会话评估</title>
   <link rel="stylesheet" href="../assets/course.css">
   <link rel="stylesheet" href="../assets/eventlog-projections.css">
@@ -15,7 +15,21 @@
   <p class="lead">本地 Loop 便于使用个人环境，云端 Loop 便于持续调度和跨设备协作。两者都能评估，关键是保留实际模型输入、执行事实和结果证据；混合架构还要把两端记录接起来。</p>
   <div class="callout"><strong>先拆开三个位置：</strong>模型生成下一步动作；Loop 负责上下文、请求、调度和停止；工具执行器实际访问文件、进程与服务。云端模型不代表云端 Loop，本地工具也不证明 Loop 在本机。</div>
   <p class="subtle">核对日期：2026-10-16。Harness 依据本地子模块 99f6f02fecdb7dff40c3fbc9470f5907c29f74ca；OpenHands 指当前 Software Agent SDK，排除旧 V0；Codex 按执行模式区分。下方设备网关、远程调用状态和评估证据清单均为设计建议，本次没有实现远程执行协议，也没有运行生产会话评测。</p>
-  <nav aria-label="专题阅读导航"><a href="#location">三家运行位置</a><a href="#tradeoffs">本地与云端取舍</a><a href="#hybrid">混合架构</a><a href="#failures">断线与权限</a><a href="#evaluation">会话评估</a><a href="#replay">回放与重跑</a><a href="#integration">Harness 接入位置</a><a href="#sources">来源与详解</a></nav>
+  <nav aria-label="专题阅读导航"><a href="#stateful-game-server">有状态 Game Server 类比</a><a href="#location">三家运行位置</a><a href="#tradeoffs">本地与云端取舍</a><a href="#hybrid">混合架构</a><a href="#failures">断线与权限</a><a href="#skills">Skill 加载与执行</a><a href="#evaluation">会话评估</a><a href="#replay">回放与重跑</a><a href="#integration">Harness 接入位置</a><a href="#sources">来源与详解</a></nav>
+
+  <section id="stateful-game-server"><h2>用有状态 Game Server 理解 AI Workspace</h2>
+    <p>Agent 改了三个文件、启动测试，用户关闭页面后再回来，希望能继续工作。这像玩家重新上线回到同一个世界：连接可以更换，已经发生的事实和产物需要保留。</p>
+    <div class="table-scroll"><table><thead><tr><th>游戏概念</th><th>AI 工作空间</th><th>职责</th></tr></thead><tbody>
+      <tr><td>世界与存档</td><td>持久状态与产物</td><td>保存目标、约束、会话事件、操作进度及文件版本。</td></tr>
+      <tr><td>游戏引擎</td><td>Runtime / 会话编排与执行服务</td><td>驱动 Agent、执行工具，处理权限、取消与恢复。</td></tr>
+      <tr><td>玩家或 NPC 控制逻辑</td><td>Agent</td><td>根据当前事实决定下一步，保存继续任务所需信息。</td></tr>
+      <tr><td>客户端画面</td><td>UI 投影</td><td>展示状态；页面断线不自动表示后端停止。</td></tr>
+    </tbody></table></div>
+    <p class="callout"><strong>三种恢复分别判断：</strong>会话从持久状态重建；文件依赖持久存储或快照；进程需要执行器查询与接管能力。Event Log 不会自动还原旧调用栈、丢失的磁盘或已经发生但未回写的外部副作用。</p>
+    <p>多 Agent 共享目录时，先串行写入或使用独立 worktree，再合并结果；事件版本号不能阻止 Shell 互相覆盖文件。这个类比说明逻辑职责，不要求固定 Tick、每个工作区常驻一个进程，或每个模块独立部署。</p>
+    <p>OpenHands V1 中，Conversation 编排，ConversationState 与 EventLog 保存会话状态及历史，Workspace 抽象执行环境，Agent Server 提供远程服务。这里的 Workspace 比产品层“整个工作空间”的含义更窄。以上并发与恢复方案属于设计建议。</p>
+    <p><a href="session-event-log-recovery-and-otel.md#stateful-game-server">完整讲解：架构图、故障路径、并发边界及 OpenHands EventLog → View → Messages 对照</a> · <a href="https://docs.openhands.dev/sdk/arch/conversation">OpenHands Conversation</a> · <a href="https://docs.openhands.dev/sdk/arch/workspace">Workspace</a></p>
+  </section>
 
   <section id="location"><h2>三家 Loop 分别在哪里运行？</h2>
     <div class="table-scroll"><table><thead><tr><th>产品与模式</th><th>Loop 所在位置</th><th>边界</th></tr></thead><tbody>
@@ -92,6 +106,50 @@
     <p>本地限定目录、命令和能力；审批绑定具体调用与参数。来自云端的请求仍需校验，工具输出按不可信数据处理。凭证留在本机使用，也要避免通过日志与输出泄漏。</p>
   </section>
 
+  <section id="skills"><h2>Skill：三种架构怎样加载、读取引用和执行脚本？</h2>
+    <p class="callout"><strong>Skill 需要可访问，不要求整个目录都下载到 Loop 宿主。</strong>说明与引用要能读给负责决策的 Agent；脚本、模块、模板与依赖要能由对应执行器使用。两端同机时安装在一起最直接，混合架构则可以通过连接器读取和执行。</p>
+    <pre><code>check-project/
+├── SKILL.md                  使用条件与流程
+├── references/
+│   ├── rules.md              检查规则
+│   └── repair-guide.md       修复说明
+├── scripts/
+│   ├── check.py              检查入口
+│   ├── repair.py             修复入口
+│   └── helpers.py            公共模块
+└── assets/
+    └── report-template.md    报告模板</code></pre>
+    <p>例如流程要求“先读规则、运行检查，发现问题再读修复说明并修复”。Agent 先发现 skill 名称和描述，选择后加载正文，再按需读引用、调用脚本；选中 skill 不等于执行全部脚本，链接存在也不等于引用已进入上下文。</p>
+    <div class="table-scroll"><table><thead><tr><th>阶段</th><th>本地 Loop＋本地工具</th><th>云端 Loop＋云端工具</th><th>云端 Loop＋本地工具</th></tr></thead><tbody>
+      <tr><td>资源准备与发现</td><td>本机安装或从仓库发现，生成可用摘要。</td><td>云端检出、安装或挂载资源，生成摘要。</td><td>可完整留在本机；连接器上报获准可见的摘要、版本和设备关联。</td></tr>
+      <tr><td>加载 SKILL.md</td><td>本地读取正文，交给 Loop 使用。</td><td>读取云端可访问的正文，交给 Loop 使用。</td><td>云端经连接器请求本地正文，内容回传到云端上下文。</td></tr>
+      <tr><td>读取引用 Markdown</td><td>按 skill 资源基底读取选中的本地文件。</td><td>按云端资源基底读取；URL 等资料经资源接口获取。</td><td>经连接器按 skill 身份、版本和相对路径读取；本地绝对路径不能直接在云端打开。</td></tr>
+      <tr><td>执行脚本</td><td>本机解释器运行脚本，使用本机依赖和目标项目。</td><td>云端进程运行脚本，使用云端依赖和工作区。</td><td>本地进程运行；脚本、公共模块、模板和凭证可以留本机，结果回传云端。</td></tr>
+      <tr><td>容易缺失的条件</td><td>模块、运行时、路径或本地权限。</td><td>仅同步正文，漏掉引用、模块和模板；环境版本不一致。</td><td>设备离线、两端版本不一致、资源不可达、重复执行与结果补传。</td></tr>
+    </tbody></table></div>
+    <p><strong>Markdown 和源码的作用不同：</strong>读取规则后，规则内容可能进入模型上下文。执行 check.py 时，Python 可以自行导入 helpers.py、读取模板，模型未必看过这些文件全文；它通常先看到执行结果。即使 Loop 在本地，调用云端模型时，请求中包含的说明和引用内容仍会上传。</p>
+    <h3>混合架构的完整一条路径</h3>
+    <pre><code>本地登记 skill 摘要与固定版本
+  → 云端选择 skill
+  → 经连接器读取本地 SKILL.md
+  → 按需读取本地 references/rules.md
+  → 请求本地执行 scripts/check.py，明确目标工作区
+  → 本地进程加载公共模块、模板并完成检查
+  → 保存并回传结果
+  → 云端决定是否读取修复指南，执行修复与复查</code></pre>
+    <p>这是建议的本地资源代理方案，不要求本地再跑一个模型 Loop。也可以同步说明到云端、脚本留本机，但必须让说明与脚本使用同一资源版本。Markdown 内容上传与整个 skill 包下载到云端磁盘是两回事。</p>
+    <h3>路径、分发和版本要分别明确</h3>
+    <ul>
+      <li><strong>Skill 根与项目根分开：</strong>前者定位说明、脚本和模板，后者定位要操作的项目；不要依赖偶然的 cwd 或作者电脑上的绝对路径。</li>
+      <li><strong>引用按来源解析：</strong>目录、URL、提供方管理的资源使用各自读取机制。云端能读某份资源，不表示本地脚本也能访问；需要另行同步或传入内容。</li>
+      <li><strong>分发覆盖实际依赖：</strong>安装、挂载或资源服务都可以，但不能只复制 SKILL.md。保留脚本需要的公共模块、模板、运行时与第三方依赖，凭证通过执行环境注入。</li>
+      <li><strong>版本与证据固定：</strong>记录实际读取的文件、实际执行的脚本、资源快照、环境、参数、设备与产物。仅有名称或无法取回内容的哈希，不够重建评估证据。</li>
+    </ul>
+    <p><strong>具体失败：</strong>云端新版说明要求新增参数，本地旧脚本却不支持。保持两端版本不一致即可复现；应由资源版本固定或能力校验提前暴露问题，不能事后简单归为模型能力差。</p>
+    <p>当前 Harness 已区分 skill 来源与资源基底，但文件系统提供方会在后续加载时重新读取正文；目录摘要不是完整资源包的版本锁。本地设备资源代理与不可变多文件快照需要另外实现。</p>
+    <p><a href="../COURSE_06_AGENT_LOOP_QA.md#q26skill-的加载引用和脚本执行分别是谁负责">详细 QA：Q26–Q29，含混合架构 Mermaid 时序</a> · <a href="../deepseek-harness/docs/subsystems/skills.md">Harness Skill 子系统</a> · <a href="../deepseek-harness/packages/skill/skill-filesystem/README.zh.md">文件系统提供方的加载与版本边界</a> · <a href="https://learn.chatgpt.com/docs/build-skills">Codex 官方 Skill 文档</a></p>
+  </section>
+
   <section id="evaluation"><h2>会话评估：把决策、执行、传输与交付接起来</h2>
     <p>本地 Loop 需要持久记录和可靠补传；云端 Loop 易集中收集，但不会自动知道本机的真实执行结果。评估器可以独立部署，部署位置不决定判断能力。</p>
     <pre><code>模型正确选择测试命令 → 本地测试通过 → 回传断线 → 云端超时
@@ -130,7 +188,9 @@
 
   <section id="sources"><h2>来源与详细问答</h2>
     <ul>
+      <li><a href="eventlog-storage-quota-warehouse.html">后续专题：Event Log 存储分层、账号额度与数据库异步入仓，含三组时序图与故障例子</a></li>
       <li><a href="../COURSE_06_AGENT_LOOP_QA.md#q21deepseek-harnessopenhands-和-codex-的-agent-loop-分别运行在哪端">第 6 课 QA：Q21–Q25，位置、取舍、Mermaid 时序、失败分支与接入位置</a></li>
+      <li><a href="../COURSE_06_AGENT_LOOP_QA.md#q26skill-的加载引用和脚本执行分别是谁负责">第 6 课 QA：Q26–Q29，Skill 发现、正文与引用加载、脚本执行、路径与版本</a></li>
       <li><a href="../LONG_CONVERSATION_EFFECT_EVALUATION_QA.md#q11agent-loop-放本地云端或采用混合架构对会话评估有什么影响">长对话评估 QA：Q11，证据清单、失败归因与实验口径</a></li>
       <li><a href="../deepseek-harness/docs/architecture.md">Harness 架构</a> · <a href="../deepseek-harness/packages/core/agent-loop/src/agent.ts">具体 Loop</a> · <a href="https://docs.openhands.dev/sdk/arch/conversation">OpenHands Conversation：本地与远程执行</a></li>
       <li><a href="https://developers.openai.com/codex/cli">Codex CLI</a> · <a href="https://developers.openai.com/codex/app-server">Codex App Server 与远程连接</a> · <a href="https://developers.openai.com/codex/cloud">Codex Cloud</a></li>

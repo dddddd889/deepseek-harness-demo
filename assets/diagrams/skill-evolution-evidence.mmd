@@ -1,0 +1,13 @@
+flowchart TB
+  subgraph OH["OpenHands · 已公开的指令流程"]
+    O1["PR 评审评论"] --> O2["过滤噪声 · 提炼重复模式"] --> O3["Skill / AGENTS.md 候选"] --> O4["Draft PR · 人工评审"]
+  end
+  subgraph DSH["Harness dsh-code-review · 文档方案 / 私有工具 / Note 仍 proposed"]
+    D1["有 commit 锚点的人工反馈"] --> D2["核实采纳 · 双评审"] --> D3["候选 diff + 源 blob + 证据"] --> D4["维护者决定 · PR 推广"]
+  end
+  subgraph NEXT["进一步补齐 · 设计建议，尚未实现"]
+    N1["加载记录绑定 Skill / bundle 身份"] --> N2["执行日志 + 结果 / 评分"] --> N3["固定任务集 · 比较旧 / 新版本"] --> N4["采用 / 回滚 · 留下决定"]
+    N4 -. "下一轮" .-> N1
+  end
+  O4 -. "文件更新不自动等于效果提升" .-> N1
+  D4 -. "维护版本不自动等于运行关联" .-> N1

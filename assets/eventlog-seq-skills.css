@@ -1,0 +1,45 @@
+/* 本页专用布局：保持课程配色，用分层容器解释事件的实际嵌套。 */
+.seq-skills-page .hero-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 28px; align-items: center; margin: 24px 0 30px; }
+.seq-skills-page .hero-grid h1 { font-size: clamp(2rem, 4vw, 2.8rem); }
+.seq-skills-page .hero-grid .lead { margin-bottom: 0; }
+.seq-skills-page .envelope { border: 1px solid #c6d2eb; border-radius: 14px; padding: 17px; background: #edf2ff; }
+.seq-skills-page .envelope .envelope { margin-top: 12px; background: white; }
+.seq-skills-page .envelope .payload { background: #eef7f2; border-color: #b9d8c7; }
+.seq-skills-page .envelope .chunk { background: #faf5e9; border-color: #e8d5a3; }
+.seq-skills-page .envelope-title { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-weight: 700; }
+.seq-skills-page .envelope small { display: block; color: var(--muted); margin-top: 5px; }
+.seq-skills-page .seq-tag { background: #3157d5; color: white; padding: 3px 10px; border-radius: 6px; font: 700 .9rem ui-monospace, monospace; white-space: nowrap; }
+.seq-skills-page .status { display: inline-block; padding: 3px 9px; border-radius: 5px; font-size: .8rem; font-weight: 700; margin-bottom: 7px; }
+.seq-skills-page .status.current { background: #e6f4eb; color: #246044; }
+.seq-skills-page .status.partial { background: #fff2d6; color: #7c5709; }
+.seq-skills-page .status.design { background: #edf2ff; color: #3157d5; }
+.seq-skills-page .explorer-layout { display: grid; grid-template-columns: 1.05fr 1fr; gap: 18px; align-items: start; }
+.seq-skills-page .explorer-layout pre { margin: 0; min-height: 310px; font-size: .85rem; }
+.seq-skills-page .explanation { border: 1px solid var(--line); padding: 20px; border-radius: 12px; background: white; }
+.seq-skills-page .explanation h3 { margin: 0 0 10px; color: var(--accent); }
+.seq-skills-page .explanation p { margin: 12px 0; }
+.seq-skills-page .field-location { overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+.seq-skills-page .trace-strip { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0; }
+.seq-skills-page .trace-item { flex: 0 0 128px; border: 1px solid var(--line); border-radius: 9px; background: white; padding: 12px; font-size: .8rem; }
+.seq-skills-page .trace-item strong { display: block; font: 700 1rem ui-monospace, monospace; color: var(--accent); margin-bottom: 6px; }
+.seq-skills-page .trace-item.delta { border-color: #9bb0f0; background: #edf2ff; }
+.seq-skills-page .trace-item.end { border-color: #a5cbb6; background: #eef7f2; }
+.seq-skills-page .source-list li { margin-bottom: 12px; }
+.seq-skills-page .source-list code { font-size: .82rem; overflow-wrap: anywhere; }
+.seq-skills-page .diagram-scroll { overflow-x: auto; }
+.seq-skills-page .diagram-scroll img { min-width: 740px; }
+.seq-skills-page .compact-note { font-size: .92rem; color: var(--muted); }
+.seq-skills-page .compare-table th:first-child { width: 18%; }
+.seq-skills-page .compare-table th:not(:first-child) { width: 41%; }
+.seq-skills-page .result-card p + p { margin-top: 10px; }
+@media (max-width: 760px) {
+  .seq-skills-page .hero-grid, .seq-skills-page .explorer-layout { grid-template-columns: 1fr; }
+  .seq-skills-page .hero-grid { gap: 20px; }
+  .seq-skills-page .explorer-layout pre { min-height: 0; }
+  .seq-skills-page .envelope { padding: 12px; }
+}
+@media print {
+  .seq-skills-page .event-buttons { display: none; }
+  .seq-skills-page .hero-grid, .seq-skills-page .explorer-layout { grid-template-columns: 1fr; }
+  .seq-skills-page .diagram-scroll img { min-width: 0; }
+}

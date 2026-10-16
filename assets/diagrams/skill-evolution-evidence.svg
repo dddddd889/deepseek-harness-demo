@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 620" role="img" aria-labelledby="title desc">
+<title id="title">Skill 经验改进与运行证据的三条路径</title>
+<desc id="desc">OpenHands 通过公开指令从评审评论提炼 Skill 并提出草稿 PR。Harness 专项维护方案核实采纳并保存源 blob，工具私有且 Note 仍 proposed。进一步建议绑定加载版本、执行结果和固定任务集对比，再采用或回滚。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#657799"/></marker></defs>
+<rect width="1100" height="620" fill="#fbfcfe" rx="16"/>
+<g font-family="PingFang SC,Microsoft YaHei,sans-serif" fill="#172033">
+<rect x="20" y="18" width="1060" height="154" rx="12" fill="#eef7f2" stroke="#b9d8c7"/>
+<rect x="20" y="196" width="1060" height="154" rx="12" fill="#faf5e9" stroke="#e8d5a3"/>
+<rect x="20" y="418" width="1060" height="180" rx="12" fill="#edf2ff" stroke="#c6d2eb" stroke-dasharray="7 4"/>
+<text x="42" y="52" font-size="20" font-weight="700">OpenHands · 公开的评审学习 Skill</text>
+<text x="42" y="230" font-size="20" font-weight="700">Harness · 专项维护约定；工具私有，Note 仍 proposed</text>
+<text x="42" y="452" font-size="20" font-weight="700">进一步补齐 · 设计建议，尚未实现</text>
+<g fill="none" stroke="#657799" stroke-width="2" marker-end="url(#arrow)">
+<path d="M252 112H304"/><path d="M510 112H562"/><path d="M768 112H820"/>
+<path d="M252 290H304"/><path d="M510 290H562"/><path d="M768 290H820"/>
+<path d="M252 508H304"/><path d="M510 508H562"/><path d="M768 508H820"/>
+<path d="M925 538V570H148V538" stroke-dasharray="6 4"/>
+</g>
+<g fill="white" stroke="#aebed8">
+<rect x="46" y="80" width="206" height="64" rx="9"/><rect x="304" y="80" width="206" height="64" rx="9"/><rect x="562" y="80" width="206" height="64" rx="9"/><rect x="820" y="80" width="236" height="64" rx="9"/>
+<rect x="46" y="258" width="206" height="64" rx="9"/><rect x="304" y="258" width="206" height="64" rx="9"/><rect x="562" y="258" width="206" height="64" rx="9"/><rect x="820" y="258" width="236" height="64" rx="9"/>
+<rect x="46" y="476" width="206" height="64" rx="9"/><rect x="304" y="476" width="206" height="64" rx="9"/><rect x="562" y="476" width="206" height="64" rx="9"/><rect x="820" y="476" width="236" height="64" rx="9"/>
+</g>
+<g text-anchor="middle" font-size="17">
+<text x="149" y="119">历史 PR 评审评论</text><text x="407" y="107">过滤噪声</text><text x="407" y="131" font-size="14">提炼重复反馈模式</text><text x="665" y="107">Skill / 指引候选</text><text x="665" y="131" font-size="14">写成文件</text><text x="938" y="119">Draft PR · 人工评审</text>
+<text x="149" y="285">人工反馈 + commit</text><text x="149" y="309" font-size="14">合并前的证据锚点</text><text x="407" y="285">核实采纳</text><text x="407" y="309" font-size="14">两个独立评审适配器</text><text x="665" y="285">候选 diff + 源 blob</text><text x="665" y="309" font-size="14">保存反馈与检查结果</text><text x="938" y="285">维护者决定 · PR 推广</text><text x="938" y="309" font-size="14">源 Skill 漂移则停止</text>
+<text x="550" y="389" font-size="17" fill="#667085">文件有修改历史，还需要把具体版本与运行效果连接起来。</text>
+<text x="149" y="503">加载绑定内容身份</text><text x="149" y="527" font-size="14">commit / bundle 哈希</text><text x="407" y="503">执行日志 + 结果</text><text x="407" y="527" font-size="14">加载位置 / 评分关联</text><text x="665" y="503">固定任务集对比</text><text x="665" y="527" font-size="14">旧 / 新版本与环境记录</text><text x="938" y="503">采用 / 回滚</text><text x="938" y="527" font-size="14">留下证据与决定</text>
+<text x="548" y="588" font-size="13" fill="#465e93">下一轮使用已决定的版本，再收集新的证据</text>
+</g></g></svg>

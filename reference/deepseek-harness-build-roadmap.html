@@ -267,14 +267,18 @@
 
   <section id="agent-loop-deployment-reading">
     <h2>Agent Loop 的部署与会话评估</h2>
+    <p><a href="agent-loop-deployment-and-evaluation.html#stateful-game-server">有状态 Game Server 类比：Workspace 状态、Runtime 与 Agent 怎样拆分，断线和重启后恢复什么？→</a></p>
     <p><a href="agent-loop-deployment-and-evaluation.html">Loop 放本地还是云端？云端怎样调用本地工具，评估与复现受什么影响？→</a></p>
     <p>对照 DeepSeek Harness、OpenHands 与 Codex 的执行模式，拆开模型、循环与工具的位置，说明设备连接、权限、断线对账、证据采集和实验边界。</p>
   </section>
 
   <section id="eventlog-projections-reading">
     <h2>Event Log 的投影与类型层次</h2>
+    <p><a href="eventlog-storage-quota-warehouse.html">Event Log 量大以后：存储分层、额度预占结算，以及数据库到数仓的异步同步 →</a></p>
     <p><a href="eventlog-projections-and-types.html">Event Log 怎样映射成 UI、LLM messages、JSONL 与 OTel？有多少层 type？→</a></p>
     <p>用一张总图和可点击的事件说明器，区分八类类型、嵌套 type 与事件标签数量，逐条对照模型、界面、持久化和遥测的映射规则。</p>
+    <p><a href="eventlog-seq-and-skill-evolution.html">Event Log 结构与 seq：位置、水位，以及两家的 Skill 版本追踪和自我改进机制 →</a></p>
+    <p>切换查看同一段事件在 UI、JSONL、消息来源和遥测中的序号；区分 Skill 正文快照、安装版本、持久记忆与可验证的改进闭环。</p>
     <p><a href="openhands-acp-directions-and-eventlog.html">ACP 对照：DeepSeek Harness 与 OpenHands 的事件映射、流式输出、恢复及外部 Agent 接入 →</a></p>
     <p><a href="deepseek-acp-streaming-load-design.html">设计建议：Harness ACP 支持实时输出和 session/load，需要改哪些层？→</a></p>
   </section>

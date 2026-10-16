@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="../assets/eventlog-projections.css">
 </head>
 <body><main class="eventlog-page">
-  <p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="qa-eventlog-ui-recovery.html">QA 专题</a> · <a href="plan-eventlog-ui-recovery.html">Plan 专题</a></p>
+  <p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="qa-eventlog-ui-recovery.html">QA 专题</a> · <a href="plan-eventlog-ui-recovery.html">Plan 专题</a> · <a href="eventlog-seq-and-skill-evolution.html">事件结构、seq 与 Skill 改进</a></p>
   <p class="eyebrow">DEEPSEEK HARNESS · EVENT LOG</p>
   <h1>同一份事件，怎样成为<br>UI、模型消息、磁盘日志和观测数据？</h1>
   <p class="lead">事件记录“发生了什么”；每个消费者再选择、归并或编码这些事实。读懂映射规则，也就能分清：什么可以恢复、模型实际读到了什么、界面为何这样显示。</p>
@@ -58,6 +58,7 @@
   </section>
 
   <section id="nested"><h2>一个 JSON 内为什么会出现好几个 type？</h2>
+    <p><a href="eventlog-seq-and-skill-evolution.html#structure">继续读：seq 在哪一层？原始事件、投影水位、JSONL 打包与 Skill 版本身份有什么区别？→</a></p>
     <p>看这条通过 UI 通道发送的流式事件。三个 <code>type</code> 分别回答“传什么”“发生什么”“分片怎么更新”。</p>
     <pre><code>{
   "type": "session/event",           // 传输帧：里面是一条会话事件

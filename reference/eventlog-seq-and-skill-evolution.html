@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="解释 DeepSeek Harness 的 Event Log 结构、seq 的层级与投影位置，对照 OpenHands 与 DeepSeek Harness 的 Skill 版本、加载记录、持久记忆和经验改进机制。">
+  <title>Event Log 的结构与 seq · 两家的 Skill 版本与改进机制</title>
+  <link rel="stylesheet" href="../assets/course.css">
+  <link rel="stylesheet" href="../assets/eventlog-projections.css">
+  <link rel="stylesheet" href="../assets/eventlog-seq-skills.css">
+</head>
+<body><main class="eventlog-page seq-skills-page">
+  <p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="eventlog-projections-and-types.html">Event Log 投影与类型</a> · <a href="openhands-acp-directions-and-eventlog.html">两家 ACP 对照</a></p>
+  <p class="eyebrow">EVENT STRUCTURE · SEQUENCE · SKILL EVOLUTION</p>
+  <div class="hero-grid">
+    <div><h1>事件的位置，<br>与知识的版本。</h1><p class="lead"><code>seq</code> 说明一件事在会话中何时发生；Skill 版本说明当时读的是哪份知识。把执行结果与版本关联起来，才能进一步比较一次修改有没有帮助。</p></div>
+    <div class="envelope" aria-label="UI 传输帧内的事件层级">
+      <div class="envelope-title">UI 传输帧 <code>session/event</code></div><small>sessionId 在这一层；传输帧并非每种都有 seq</small>
+      <div class="envelope"><div class="envelope-title">SessionEvent <span class="seq-tag">seq = 5</span></div><small>type · seq · time · data 同级</small>
+        <div class="envelope payload"><div class="envelope-title">data</div><small>turn = 1 · step = 1</small>
+          <div class="envelope chunk"><div class="envelope-title">chunk</div><small>type = text-delta · index = 0 · text = 检查</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="callout"><strong>先分开两种身份：</strong><code>(sessionId, seq)</code> 定位日志事件；Git commit、内容哈希或发布版本标识 Skill。一个 Skill 可以加载很多次，每次加载有自己的事件位置。版本不能由 seq 推断。</div>
+  <p class="subtle">核对日期：2026-10-16。事件结构按本仓库 Harness 子模块 <code>99f6f02</code>；Skill 另核对上游 <code>86a4022</code>；OpenHands SDK <code>12e9676</code>、extensions <code>7cec6d3</code>。文末提供完整提交与证据。所有交互数据均为教学示例。</p>
+  <nav aria-label="专题阅读导航"><a href="#structure">事件结构</a><a href="#seq">seq 规则</a><a href="#explorer">切换查看 seq</a><a href="#watermarks">水位与恢复</a><a href="#skill-records">Skill 加载记录</a><a href="#comparison">两家总览</a><a href="#openhands">OpenHands</a><a href="#harness">DeepSeek Harness</a><a href="#evolution">改进闭环缺什么</a><a href="#verify">核验路径</a></nav>
+
+  <section id="structure"><h2>Event Log 的外层：Session 管会话，Event 管事实</h2>
+    <pre><code>Session
+├─ header：id、存储格式 version、cwd、parentSession、seedLength 等
+└─ events[]：SessionEvent 数组
+   └─ events[5]
+      ├─ type: "assistant/chunk"   ← 发生什么
+      ├─ seq: 5                    ← 会话内位置
+      ├─ time: 1792108800005        ← 记录时间
+      └─ data                     ← 此类事件的具体数据
+         ├─ turn: 1
+         ├─ step: 1
+         └─ chunk
+            ├─ type: "text-delta"  ← 如何更新内容块
+            ├─ index: 0
+            └─ text: "检查"</code></pre>
+    <p><code>SessionEvent</code> 最外层固定有 <code>type / seq / time / data</code>；可选 <code>ignorable</code> 表示未知事件是否可安全跳过。消息类事件还可携带顶层 <code>surfaceOp</code> 和 <code>sourceEventSeqs</code>。并非每类事件都有 turn、step 或 message：它们由 <code>data</code> 对应的事件类型决定。</p>
+    <p>原始事件不重复携带 sessionId。进程内观察者收到 <code>(session, event)</code>；UI 的 <code>session/event</code> 帧把它们组合为 <code>{ type, sessionId, event, view? }</code>。因此网络中读事件序号的路径是 <strong><code>frame.event.seq</code></strong>。</p>
+    <div class="table-scroll"><table><thead><tr><th>看起来像“版本 / 编号”的字段</th><th>真实用途</th><th>不能据此推断</th></tr></thead><tbody>
+      <tr><td>SessionHeader.version</td><td>会话存储格式兼容性。</td><td>Skill、工具或模型的版本。</td></tr>
+      <tr><td>SessionEvent.seq</td><td>会话内事件的连续位置。</td><td>知识版本、磁盘写入确认、客户端收讫。</td></tr>
+      <tr><td>data.turn / data.step</td><td>在业务上归属哪个轮次 / 步骤。</td><td>全会话事件的位置；同一步可有多个事件和重试尝试。</td></tr>
+      <tr><td>chunk.index</td><td>关联流式内容块；同一块的多个分片可用同一个 index。</td><td>分片在整个日志里的顺序。</td></tr>
+      <tr><td>projection.stateVersion / checkpoint.ver</td><td>投影缓存的结构与折叠语义版本。</td><td>Skill 内容版本。</td></tr>
+    </tbody></table></div>
+    <p><a href="../deepseek-harness/packages/core/session/src/types.ts#L404">SessionEvent 定义</a> · <a href="../deepseek-harness/packages/host/apiproxy/src/api/events.ts#L69">MuxFrame 定义</a> · <a href="../deepseek-harness/packages/session/session-projection/src/index.ts">投影与缓存字段</a></p>
+  </section>
+
+  <section id="seq"><h2>谁分配 seq？所有事件共享一条会话序列</h2>
+    <p><code>Session.append()</code> 校验并复制数据，在接受边界以当前 <code>log.length</code> 分配 seq，再把事件放进数组并通知观察者。第一个事件是 0；每成功接受一个事件加一；不会按 type、Turn 或 Step 重新编号。时间戳可能受系统时钟影响，排序用 seq。</p>
+    <pre><code>// 源码中的赋值规则：事件位置来自当前日志长度。
+seq: this.log.length
+
+// 只读定位示例；完整 Session 日志保持索引与 seq 一致。
+session.events[5].seq === 5
+
+// 注意：session.seq 是下一条将分配的序号，也就是日志长度。
+// 已有事件为 0…12 时，session.seq 为 13，最后事件的 seq 为 12。</code></pre>
+    <div class="trace-strip" aria-label="教学事件序列，横向滚动查看">
+      <div class="trace-item"><strong>0</strong>turn/start</div><div class="trace-item"><strong>1</strong>step/start</div><div class="trace-item"><strong>2</strong>user/message</div><div class="trace-item"><strong>3</strong>request/header</div><div class="trace-item"><strong>4</strong>chunk：block-start</div><div class="trace-item delta"><strong>5 · 6 · 7</strong>chunk：text-delta<br>检查 / 权限 / 边界</div><div class="trace-item"><strong>8 · 9</strong>chunk：block-end<br>chunk：finish</div><div class="trace-item end"><strong>10</strong>assistant/message</div><div class="trace-item"><strong>11 · 12</strong>step/end<br>turn/end</div>
+    </div>
+    <p class="compact-note">教学成功路径；不表示所有运行都只有这些事件。真实日志可能插入 request/context、插件事件、重试或中断标记。流式 delta 也不保证每条正好是一个 token。</p>
+    <div class="result-grid"><article class="result-card"><h3>同一会话恢复</h3><p>读取并校验已有前缀，后续追加接着其长度编号。构造种子不会自动再次发出 session/event；恢复还可能追加种子边界与中断修复事件。</p></article><article class="result-card"><h3>另一个会话 / Fork</h3><p>会话各自计数。Fork 可以继承前缀，同一个 seq 在两个 Session 中都存在；结合 sessionId，以及 parentSession / seedLength 理解来源。</p></article></div>
+    <p><a href="../deepseek-harness/packages/core/session/src/index.ts#L565">session.seq getter</a> · <a href="../deepseek-harness/packages/core/session/src/index.ts#L627">append 分配与发布</a> · <a href="../deepseek-harness/packages/core/session/src/repair.ts">恢复修复</a></p>
+  </section>
+
+  <section id="explorer"><h2>切换出口：同一个 seq 到了哪里？</h2>
+    <p>下面沿用刚才的同一段教学序列。完整消息引用来源事件；打包行只是存储编码；投影水位只是读模型进度。切换不会执行工具或发送数据。</p>
+    <div class="event-buttons" role="group" aria-label="选择 seq 所在的结构">
+      <button type="button" data-seq-view="event" aria-pressed="true">原始事件</button><button type="button" data-seq-view="wire" aria-pressed="false">UI 传输帧</button><button type="button" data-seq-view="packed" aria-pressed="false">JSONL 打包行</button><button type="button" data-seq-view="message" aria-pressed="false">完整消息来源</button><button type="button" data-seq-view="projection" aria-pressed="false">投影水位</button><button type="button" data-seq-view="otel" aria-pressed="false">OTel 前的遥测记录</button>
+    </div>
+    <div class="explorer-layout">
+      <pre aria-label="当前结构 JSON"><code id="seq-json">{
+  "type": "assistant/chunk",
+  "seq": 5,
+  "time": 1792108800005,
+  "data": {
+    "turn": 1,
+    "step": 1,
+    "chunk": { "type": "text-delta", "index": 0, "text": "检查" }
+  }
+}</code></pre>
+      <article class="explanation" aria-live="polite" aria-atomic="true"><h3 id="seq-title">原始事件：seq 与 data 平级</h3><p class="field-location" id="seq-location">读取路径：event.seq = 5</p><p id="seq-detail">seq 是 SessionEvent 的公共外层字段。data 内的 turn、step、chunk.index 各有用途，里面不会再自动分配一份日志 seq。</p><p class="compact-note" id="seq-limit">只有成功接受的追加才进入日志。多层 type 并不意味着每层都要有自己的 seq。</p></article>
+    </div>
+    <noscript><p>切换示例需要 JavaScript；下节列出了每个出口的完整规则。</p></noscript>
+  </section>
+
+  <section id="watermarks"><h2>事件位置、折叠水位、磁盘进度、发送进度，各是什么？</h2>
+    <div class="table-scroll"><table><thead><tr><th>出口 / 进度</th><th>字段位置或规则</th><th>边界</th></tr></thead><tbody>
+      <tr><td>原始事件 → UI</td><td><code>frame.event.seq</code>；原事件序号保持。</td><td>控制帧如 question/requested、session/queue 未必有事件 seq。</td></tr>
+      <tr><td>领域投影推送</td><td><code>frame.seq</code>，表示该 key 发出值时的事件水位；<code>asOfSeq</code> 是一致快照水位。</td><td>只有值变化时才需推送；不逐事件加一。不能当网络包计数器。</td></tr>
+      <tr><td>普通 JSONL 事件行</td><td>事件顶层 <code>seq</code>；首条 session header 没有事件 seq。</td><td>数组位置、文件物理行号和日志事件序号是不同概念。</td></tr>
+      <tr><td>连续 delta 打包行</td><td>k 从 0 开始：<code>seq0 + k</code> 还原成员序号；time0 加 dt 的前 k 项之和还原时间。</td><td>一行可代表多个事件；不另造打包事件，也不重排原事件。</td></tr>
+      <tr><td>完整消息来源</td><td>顶层 <code>sourceEventSeqs</code> 引用此前事件；消息自己仍有新的 seq。</td><td>这是已知来源关联，不表示恢复旧分片的网络流，也不自动关联 Skill 版本。</td></tr>
+      <tr><td>遥测 → OTel Logs</td><td><code>attributes["event.seq"]</code> 与 <code>attributes["session.id"]</code>；body 是事件 data 的副本。</td><td>当前捕获只保留每个 (turn, step) 的首条 assistant/chunk。序号有缺口不自动意味着丢失。</td></tr>
+      <tr><td>持久化 / 发送</td><td>append、持久化消费者排空、交给传输、客户端收到分别发生。</td><td>最新 seq 不是 flush 或 fsync 凭据；发送游标也不是客户端耐久接收确认。</td></tr>
+    </tbody></table></div>
+    <p><strong>“跳号”要先看消费的是哪条流。</strong>完整的 canonical Session 日志要求连续；筛选后的遥测、只变化时推送的投影、消息来源引用和分页片段都可能不连续。不能用同一条缺口规则判断。</p>
+    <p>这里的 seq 规则属于 DeepSeek Harness。OpenHands 的事件身份与会话存储使用自己的结构，不能把 Harness 的字段名或数组索引约定直接套过去。两家的 Skill 比较也不依赖拥有相同的事件格式。</p>
+    <p><a href="../deepseek-harness/packages/core/session/src/chunk-rows.ts">seq0 / dt 无损编码</a> · <a href="../deepseek-harness/packages/session/session-projection/src/index.ts">投影水位</a> · <a href="../deepseek-harness/packages/session/session-telemetry/src/coordinator.ts#L306">遥测 identityOf</a></p>
+  </section>
+
+  <section id="skill-records"><h2>Skill 的发现、加载与实际使用：三种不同的事实</h2>
+    <p>例如“代码评审”Skill：先出现在目录中，模型才知道可选；加载正文后，模型才读到具体要求；后续是否按要求检查了权限边界，还要看动作和结果。仅有加载记录无法证明遵循。</p>
+    <div class="table-scroll"><table><thead><tr><th>Harness 路径</th><th>日志留下什么</th><th>没有自动保证什么</th></tr></thead><tbody>
+      <tr><td>目录发布 / 更新</td><td><code>user/message</code>，source.kind 为 <code>skill-catalog</code>；记录名称、截断后的描述。</td><td>没有正文版本；目录 digest 基于名称与发布描述，不是正文或整个资源包哈希。</td></tr>
+      <tr><td>模型调用 skill 工具</td><td><code>tool/call</code> 记录名称参数；<code>tool/result</code> 保存渲染后的指令正文与资源基底提示。</td><td>没有统一传递 version、commit、metadata 或内容哈希。</td></tr>
+      <tr><td>用户显式 /name</td><td><code>user/message</code>，source.kind 为 <code>skill-invocation</code>；记录 name、form 和注入正文。</td><td>不是必须先出现一次 skill 工具调用；同样不自动附带版本身份。</td></tr>
+      <tr><td>宿主直接 ctx.skills.get()</td><td>只是注册表读取；是否入会话由消费方决定。</td><td>不是每次 provider 扫描或宿主读取都会自动写 SessionEvent。</td></tr>
+      <tr><td>后续工具执行</td><td>普通工具调用和结果各自留痕。</td><td>没有统一的 causedBySkillVersion，不能仅凭先后顺序证明因果。</td></tr>
+    </tbody></table></div>
+    <p><strong>有正文快照，能追溯一部分知识；有版本身份，才方便跨运行归组。</strong>文件路径可变，发布版本可能忘记更新。需要精确身份时，可用正文 / bundle 内容哈希，以及不可变的来源 commit；但这些都要在加载边界实际采集。</p>
+    <p><a href="https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/skill/tool-skill/src/index.ts">最新核对：目录、两条加载路径与 digest</a> · <a href="https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/skill/skill/src/index.ts">SkillDefinition 与来源类型</a></p>
+  </section>
+
+  <section id="comparison"><h2>两家现状：文件会更新，运行时版本链还不完整</h2>
+    <div class="table-scroll"><table class="compare-table"><thead><tr><th>比较项</th><th>OpenHands SDK / extensions</th><th>DeepSeek Harness</th></tr></thead><tbody>
+      <tr><td>Skill 身份</td><td><span class="status current">已有字段</span><br>Skill 对象含 version，默认 1.0.0；允许自定义 metadata。声明值不是内容哈希。</td><td><span class="status current">已有加载</span><br>SkillDefinition 有 name、provider、content、metadata 等；没有统一的一等 version 字段。</td></tr>
+      <tr><td>安装版本</td><td><span class="status current">Git ref 可固定</span><br>安装记录保存 source、requested_ref、resolved_ref、version；Git 来源可记录实际 commit。</td><td><span class="status partial">由来源 / 部署管理</span><br>这里核对的文件系统 provider 没有统一安装锁文件或解析 commit 的版本协议；项目文件可由 Git 管理。</td></tr>
+      <tr><td>每次加载的记录</td><td>InvokeSkillAction / Observation；结果包含 skill_name、正文；state.invoked_skills 去重记录名称。没有在此 observation 上自动带安装 commit。</td><td>模型工具结果或用户指令注入，保留渲染正文；加载结果未自动传递 metadata 中的版本。</td></tr>
+      <tr><td>跨会话经验</td><td><span class="status current">可选持久记忆</span><br>用户 / 项目两级 MEMORY.md；默认关闭，Agent 根据提示维护文件。</td><td>通过 Skill 和仓库上下文文件沉淀；本页核对的 Skill 子系统没有与 OpenHands 两级 MEMORY.md 对等的专用开关。</td></tr>
+      <tr><td>从反馈改 Skill</td><td><span class="status current">公开指令流程</span><br>learn-from-code-review 抽取历史评审模式，生成 Skill / 指引并提出 draft PR。</td><td><span class="status partial">专用维护方案</span><br>dsh-code-review 文档描述采纳证据、双评审、候选修改与推广；工具属于维护者私有设施，Note 仍 proposed。</td></tr>
+      <tr><td>效果择优升级</td><td colspan="2">这些已核对路径没有内置通用的“版本绑定执行 → 固定任务集 A/B → 达标自动采用 / 退化回滚”。不能把任务内 critic 修正、文件更新或通过 lint，当成已证明 Skill 新版本更好。</td></tr>
+    </tbody></table></div>
+    <p>这是所列固定快照和具体路径的比较；不推断闭源 Cloud、内部训练或所有第三方插件的能力。Git 历史可以支撑人工改进，日志可以帮助复盘；缺的是把这两条证据链稳定连起来。</p>
+  </section>
+
+  <section id="openhands"><h2>OpenHands：评审经验写成 Skill，项目经验写进记忆</h2>
+    <div class="result-grid"><article class="result-card"><span class="status current">公开 Skill 流程</span><h3>从代码评审提炼</h3><p>learn-from-code-review 读取已合并 PR 的评论，过滤 bot 和低信号内容；建议从 3 条以上相似反馈提炼模式；生成 Skill 或 AGENTS.md 指引，提出草稿 PR 并要求人工评审。</p><p>入口是用户请求或另行配置的周期调用。仓库里有这份 Skill，不代表默认每轮会话都执行它。</p></article><article class="result-card"><span class="status current">可选运行能力</span><h3>持久记忆</h3><p>AgentContext(load_memory=True) 在新会话加载用户级与项目级 MEMORY.md 索引；提示 Agent 记录经验、去重和清理过期条目。长细节可放每日日志，按需读取。</p><p>这是外部文本记忆；不是自动训练模型，也不是自动发布 Skill 新版本。默认关闭。</p></article></div>
+    <h3>版本管理的两条线</h3>
+    <pre><code>安装线：source + requested_ref → 解析 Git commit → .installed.json
+运行线：invoke_skill(name) → 返回渲染正文 → Observation / invoked_skills
+
+安装记录知道“装了哪份”，不自动意味着每次 Observation 都绑定该 commit。</code></pre>
+    <details><summary>源码细节：看到 version 字段，也要继续检查解析路径</summary><p>本快照的 Skill.version 默认 1.0.0。文件加载的 _create_skill_from_metadata 转发 description、license、compatibility、metadata 等字段，但未把顶层 version 或 metadata.version 显式映射到 Skill.version。因此，单纯在文件里填写版本，不应被当成安装记录已可靠体现该值；metadata 中的字符串与一等 version 字段也不是同一字段。程序直接构造 Skill 时可显式传 version。具体采用值要核对真实加载与安装结果。</p></details>
+    <p>另有 iterative refinement / critic 能在任务中根据反馈继续修改产物；它解决“这次任务做得怎样”，不自动完成“把哪版 Skill 推广给下一次任务”。</p>
+    <p><a href="https://github.com/OpenHands/software-agent-sdk/blob/12e967664c2353f4cb85dd27da04ade035ff078c/openhands-sdk/openhands/sdk/skills/skill.py#L238">version 字段与文件解析</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/12e967664c2353f4cb85dd27da04ade035ff078c/openhands-sdk/openhands/sdk/extensions/installation/info.py">安装记录</a> · <a href="https://github.com/OpenHands/software-agent-sdk/blob/12e967664c2353f4cb85dd27da04ade035ff078c/openhands-sdk/openhands/sdk/tool/builtins/invoke_skill.py">调用 observation 与名称记录</a> · <a href="https://github.com/OpenHands/extensions/blob/7cec6d351ac54aee5af6c358bd2c0d4da840a5e4/skills/learn-from-code-review/SKILL.md">评审学习 Skill</a> · <a href="https://docs.openhands.dev/sdk/guides/persistent-memory">持久记忆文档</a> · <a href="https://docs.openhands.dev/sdk/guides/iterative-refinement">任务内迭代示例</a></p>
+  </section>
+
+  <section id="harness"><h2>DeepSeek Harness：当前文件按需加载，专项维护在运行时之外</h2>
+    <p><span class="status current">运行时已实现</span><br>skill-filesystem 每次加载重新读取文件；正文修改会影响下次加载，但不会改写历史工具结果。名称、描述和可见性改变时，目录消费者可发布替换目录；只改正文不必产生新的目录消息。修改文件也不表示当前上下文里已经加载的旧指令被自动替换。</p>
+    <p><span class="status partial">公开约定 · 私有工具 · Note 仍 proposed</span><br>dsh-code-review 的维护手册描述由指定操作员运行的专项流程：先核实人类评审反馈是否被最终代码采纳，再提炼规则。这里的版本身份放在维护产物里，并非自动写入每次 SessionEvent。</p>
+    <ol>
+      <li>选取可从 master 到达的已合并 PR，读取有 commit 锚点的合并前人工反馈。</li>
+      <li>对照反馈时与最终落地 patch；不能把“PR 合并 / 讨论解决”直接当作采纳证明。</li>
+      <li>两个独立评审适配器判断作者、采纳情况和是否值得形成规则；起草后再次评审同一份 diff。</li>
+      <li>保存候选文件、源 master commit、Skill blob、反馈 ID / URL 和检查结果。</li>
+      <li>操作员决定是否推广；源 Skill blob 已变化则停止，避免覆盖新指导；经 draft PR 和正常评审落地。</li>
+    </ol>
+    <div class="callout"><strong>公开文档不等于可直接运行的开源实现。</strong>手册明确工具源码、适配器和调度设施位于维护者机器上；Note 仍为 proposed，包含部分试运行记录。不能据此宣称所有 Harness Skill 已获得自动学习能力。doc-sync / lint 验证文档与工程要求，也不能单独证明任务成功率提升。</div>
+    <p><a href="https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/skill/skill-filesystem/README.zh.md">正文重新读取与目录生命周期</a> · <a href="https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/docs/cookbook/maintaining-dsh-code-review.zh.md">维护手册与版本 manifest</a> · <a href="https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/.agents/notes/proposed/process/2026-07-13-human-review-skill-maintenance.md">proposed 状态与私有设施边界</a></p>
+  </section>
+
+  <section id="evolution"><h2>怎样连接 Event Log 与可验证的改进？</h2>
+    <figure class="course-diagram"><figcaption>上面两条是已核对的改进路径；下面一条是进一步补齐的建议</figcaption><div class="diagram-scroll"><img src="../assets/diagrams/skill-evolution-evidence.svg" alt="OpenHands 从评审模式到草稿 PR；Harness 专项私有流程核实采纳并记录 blob；建议用日志关联版本、固定任务集评测和采用回滚连接两条链"></div><p><a href="../assets/diagrams/skill-evolution-evidence.mmd">Mermaid 流程图源</a></p></figure>
+    <p><span class="status design">以下为建议，尚未实现</span><br>最小补齐可以从“加载边界记录身份”开始，再逐步加入执行关联和对比评测。不是先造一个全新的事件平台。</p>
+    <div class="table-scroll"><table><thead><tr><th>建议补的事实</th><th>怎样定位</th><th>避免什么误判</th></tr></thead><tbody>
+      <tr><td>加载身份</td><td>skill 名称、provider、来源 commit、正文哈希；依赖脚本 / 参考文件还需 bundle 摘要或不可变资源清单。</td><td>同名或同版本号不代表内容相同；只给 SKILL.md 算哈希不能覆盖脚本改动。</td></tr>
+      <tr><td>加载与执行关联</td><td>在设计的加载记录中保存身份；用 sessionId + seq 定位加载，再让相关执行显式引用。</td><td>先加载 A、后调用工具，不足以证明该工具行为由 A 导致；多个 Skill 可能共同影响一次任务。</td></tr>
+      <tr><td>评价与候选修改</td><td>关联具体运行的成功标准、人工反馈、错误类型，以及这次修改依据的证据。</td><td>一次点赞、Agent 自评或一轮任务成功，不等于版本改进成立。</td></tr>
+      <tr><td>对比与采用</td><td>用固定任务集比较旧 / 新内容身份，记录模型、工具、环境和评分器；再决定采用或回滚。</td><td>模型升级、工具变化或任务难度不同，可能被误归因给 Skill。</td></tr>
+    </tbody></table></div>
+    <pre><code>例子：评审 Skill 新增“检查权限绕过”
+旧 bundle 哈希 A → 同一批含漏洞 / 正常样例 → 漏报、误报、耗时
+新 bundle 哈希 B → 同一批含漏洞 / 正常样例 → 漏报、误报、耗时
+
+Event Log 解释：每次读了什么、做了什么、结果是什么。
+版本清单解释：A / B 各是哪份内容和依赖。
+评测记录解释：在明确条件下，B 是否比 A 更好。</code></pre>
+    <p>若接 Langfuse，可把加载身份和关联位置投影为观测元数据，再接评分 / 实验结果；当前 Harness OTel 后端发送 Logs，不能仅改 URL 就自动变成 Langfuse 的 Traces / Generations。需要另做事件到 observation 的映射。参见 <a href="https://langfuse.com/integrations/native/opentelemetry">Langfuse 官方 OTel 接入说明</a>。</p>
+  </section>
+
+  <section id="verify"><h2>怎么核验这些结论？</h2>
+    <p>本次交付是静态文档和交互说明器；没有修改两家后端，没有运行真实模型的版本对比实验。以下路径可在实施时作为验收依据。</p>
+    <ol class="source-list">
+      <li><strong>检查 seq 边界：</strong>读取 SessionEvent 定义和 append；比较 event.seq、session.seq、frame.event.seq；验证已有 13 条事件时下一条是 13。</li>
+      <li><strong>检查打包：</strong>连续三条同 block 的 text-delta 用 packChunkRuns 打包，再 decode；核对 seq、time、text 均还原。不要比较文件行号。</li>
+      <li><strong>检查 Harness Skill：</strong>加载正文 A，修改文件为 B，再加载；前次结果保留 A，后次读到 B。仅改正文时目录条目可不变；检查结果没有自动带 metadata.version。</li>
+      <li><strong>检查 OpenHands 版本：</strong>用固定 commit 安装 Skill，读取 .installed.json 的 requested_ref / resolved_ref；再检查 InvokeSkillObservation，没有自动带该 commit。文件 frontmatter 的版本要与解析后 Skill.version 分开核对。</li>
+      <li><strong>检查“改进”边界：</strong>评审学习 Skill 是公开指令；Harness 维护手册指向私有工具，Note 仍 proposed。两者都不能仅凭一次文件修改证明新版本更好。</li>
+    </ol>
+    <details><summary>完整源码快照与版本范围</summary><ul class="source-list">
+      <li>Harness 事件结构：<a href="https://github.com/deepseek-ai/deepseek-harness/tree/99f6f02fecdb7dff40c3fbc9470f5907c29f74ca"><code>99f6f02fecdb7dff40c3fbc9470f5907c29f74ca</code></a>，与当前课程子模块一致。</li>
+      <li>Harness Skill / 维护文档：<a href="https://github.com/deepseek-ai/deepseek-harness/tree/86a402200d95fecef4529d969836f1fe13c6cb0d"><code>86a402200d95fecef4529d969836f1fe13c6cb0d</code></a>，另核对的上游快照；没有更新课程子模块。</li>
+      <li>OpenHands SDK：<a href="https://github.com/OpenHands/software-agent-sdk/tree/12e967664c2353f4cb85dd27da04ade035ff078c"><code>12e967664c2353f4cb85dd27da04ade035ff078c</code></a>。</li>
+      <li>OpenHands extensions：<a href="https://github.com/OpenHands/extensions/tree/7cec6d351ac54aee5af6c358bd2c0d4da840a5e4"><code>7cec6d351ac54aee5af6c358bd2c0d4da840a5e4</code></a>。官方在线文档会继续演进，结论以所列源码路径为准。</li>
+    </ul></details>
+  </section>
+  <p><a href="eventlog-projections-and-types.html">Event Log 的其他投影 →</a> · <a href="openhands-acp-directions-and-eventlog.html">ACP 映射与恢复对照 →</a> · <a href="deepseek-harness-build-roadmap.html">课程首页 →</a></p>
+</main>
+<script>
+// 教学分片：所有出口共用这条样例，不访问模型、网络或本地文件。
+const sampleChunk = { type: 'assistant/chunk', seq: 5, time: 1792108800005, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: '检查' } } };
+// 示例视图：对象是静态教学数据；title / location / detail / limit 解释字段与边界。
+const sequenceViews = {
+  event: { title: '原始事件：seq 与 data 平级', location: 'event.seq = 5', value: sampleChunk, detail: 'seq 是 SessionEvent 的公共外层字段。data 内的 turn、step、chunk.index 各有用途，里面不会再自动分配一份日志 seq。', limit: '只有成功接受的追加才进入日志。多层 type 并不意味着每层都要有自己的 seq。' },
+  wire: { title: 'UI 帧：事件再被包一层', location: 'frame.event.seq = 5', value: { type: 'session/event', sessionId: 'session-demo', event: sampleChunk }, detail: '外层 type 表示传输帧类别；里层 event.type 表示领域事实。sessionId 由帧提供，事件 seq 仍然是 5。', limit: '不能统一读取 frame.seq：session/event 帧的序号在 event 中，其他控制帧还可能完全没有 seq。' },
+  packed: { title: '打包行：seq0 锚定第一条成员', location: '第 k 条成员的 seq = seq0 + k', value: { type: 'text-chunks', seq0: 5, time0: 1792108800005, data: { turn: 1, step: 1, index: 0, dt: [1, 1], texts: ['检查', '权限', '边界'] } }, detail: '这一个存储行还原 seq=5、6、7 三条原始事件。dt 记录相邻时间差；文本保持各条边界，没有合成一个新 SessionEvent。', limit: '教学假定这三条 delta 连续且形状符合编码白名单。只有编码层打包，Session.events 仍保留三条事件。' },
+  message: { title: '完整消息：自己的位置 + 来源位置', location: 'event.seq = 10；event.sourceEventSeqs 引用 4…9', value: { type: 'assistant/message', seq: 10, time: 1792108800010, data: { turn: 1, step: 1, message: { role: 'assistant', content: [{ type: 'text', text: '检查权限边界' }] } }, sourceEventSeqs: [4, 5, 6, 7, 8, 9], surfaceOp: 'append' }, detail: '来源涵盖此例中的 block-start、三个 delta、block-end 和 finish。最终消息是新事实，seq=10；引用不会把自己的 seq 改成来源序号。', limit: '这个消息对象是教学简化形态。sourceEventSeqs 是已有事件关联，不是 Skill 版本身份，也不是收到通知的确认。' },
+  projection: { title: '投影帧：顶层 seq 是水位', location: 'frame.seq = 10', value: { type: 'session/projection', sessionId: 'session-demo', key: 'demo.summary', value: { text: '检查权限边界' }, seq: 10 }, detail: '此例表示教学投影在事件 10 导致值变化时发出更新。它引用会话事件进度，不会因为网络发送了一次就额外给 canonical log 加一。', limit: 'demo.summary 是教学 key，不是现有内置投影。下一次值变化可能发生在 seq=20；中间无推送不说明漏了 9 个网络包。' },
+  otel: { title: '遥测记录：先筛选，再映射序号', location: 'seq=5 被省略；首条 chunk → attributes["event.seq"] = 4', value: { channel: 'ledger', time: 1792108800004, severity: 'info', attributes: { 'session.id': 'session-demo', 'event.type': 'assistant/chunk', 'event.seq': 4 }, body: { turn: 1, step: 1, chunk: { type: 'block-start', index: 0, blockType: 'text' } } }, detail: '这段序列的首条 chunk 是 seq=4 的 block-start。默认捕获策略保留它，省略同一 (turn, step) 的后续 delta；所以原样例 seq=5 没有对应的导出记录。', limit: 'JSON 展示首条 chunk 在逻辑遥测记录中的形态，上传仍受 mode 与脱敏策略控制；后端再映射到 OTel LogRecord。筛选不会给原日志重新编号。' },
+};
+// 结构切换：只更新文本与按钮状态，避免把样例内容解释为 HTML。
+function showSequenceView(viewKey) {
+  const selectedView = sequenceViews[viewKey];
+  if (!selectedView) return;
+  document.querySelectorAll('[data-seq-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.seqView === viewKey)));
+  document.getElementById('seq-json').textContent = JSON.stringify(selectedView.value, null, 2);
+  document.getElementById('seq-title').textContent = selectedView.title;
+  document.getElementById('seq-location').textContent = '读取路径：' + selectedView.location;
+  document.getElementById('seq-detail').textContent = selectedView.detail;
+  document.getElementById('seq-limit').textContent = selectedView.limit;
+}
+// 点击绑定：使用原生按钮，键盘 Enter / Space 与鼠标共享行为。
+document.querySelectorAll('[data-seq-view]').forEach(button => button.addEventListener('click', () => showSequenceView(button.dataset.seqView)));
+showSequenceView('event');
+</script>
+</body></html>
