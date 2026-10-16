@@ -1,0 +1,14 @@
+flowchart TB
+    C[现有 SessionEvent / StreamChunk] --> P[建议新增纯投影器：live / replay / hydrate]
+    P --> Q[每会话有界输出队列]
+    Q --> A[交互 ACP：增量正文 / 历史消息]
+    C --> OLD[原自动化 ACP：已提交正文 / 图片]
+    L[session/load] --> R[授权与身份校验 / 单写者保留]
+    R --> F[agents.resume + SessionPersistence.prepare]
+    F --> B[注册精确拥有的 handle / 捕获实时事件]
+    B --> S[确定回放切面 S]
+    S --> H[重放已提交的人类历史 ≤ S]
+    H --> T[按序交付缓冲实时尾部 > S]
+    T --> OK[load 响应完成，进入 live]
+    B --> G[若恢复会自动运行：需要明确启动闸门]
+    G --> S

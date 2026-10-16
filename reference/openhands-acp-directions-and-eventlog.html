@@ -20,7 +20,7 @@
     <div class="fact"><strong>3 层恢复问题</strong><span>核心会话、ACP 历史、外部 Agent 原生状态</span></div>
   </div>
   <p class="subtle">核对日期：2026-10-16。DeepSeek Harness 固定到子模块提交 <code>99f6f02fecdb7dff40c3fbc9470f5907c29f74ca</code>；OpenHands CLI 固定到 <code>0403f1a79a9fc62a6c7be21c17d7b51f64245ad2</code>，SDK 固定到 <code>12e967664c2353f4cb85dd27da04ade035ff078c</code>。分别核对各实现，不表示已验证这些快照互连或混装。示例是简化教学数据，未调用真实模型或执行真实工具。原页面地址和 OpenHands 章节锚点保留。</p>
-  <nav aria-label="专题阅读导航"><a href="#comparison">两家总览</a><a href="#dsh-mapping">Harness 映射</a><a href="#stream-comparison">流式对照</a><a href="#compare-explorer">同场景对照</a><a href="#recovery-comparison">恢复对照</a><a href="#client-comparison">外部 Agent 接入</a><a href="#directions">OpenHands 两个方向</a><a href="#mapping">OpenHands 映射细节</a><a href="#explorer">ACP JSON 示例</a><a href="#verify">核验路径</a></nav>
+  <nav aria-label="专题阅读导航"><a href="#comparison">两家总览</a><a href="#dsh-mapping">Harness 映射</a><a href="#stream-comparison">流式对照</a><a href="#compare-explorer">同场景对照</a><a href="#recovery-comparison">恢复对照</a><a href="#client-comparison">外部 Agent 接入</a><a href="#dsh-evolution">Harness 改造建议</a><a href="#directions">OpenHands 两个方向</a><a href="#mapping">OpenHands 映射细节</a><a href="#explorer">ACP JSON 示例</a><a href="#verify">核验路径</a></nav>
 
   <section id="comparison"><h2>两家对照：相同的 ACP 标签，不保证相同的输出粒度</h2>
     <figure class="course-diagram"><figcaption>对比的是当前 ACP 适配器的实际行为，不是两个框架全部 UI 与存储能力</figcaption><img src="../assets/diagrams/acp-framework-comparison.svg" alt="Harness 只输出已提交消息的文本图片；OpenHands 既投影事件也可发送实时 token；两家 ACP 历史加载支持不同"><p><a href="../assets/diagrams/acp-framework-comparison.mmd">Mermaid 对照图源</a></p></figure>
@@ -133,6 +133,12 @@ OpenHands：Conversation → ACPAgent → 外部 ACP 子进程
       <li>让外部假 ACP Server 先发正文再取消：核对 DSH subagent-acp 仍可返回累积文本，证明客户端不替外部 Server 校验提交边界。</li>
     </ol>
     <p class="subtle">以上是核验方案与已有源码测试的阅读依据；本次只修改文档页面，未运行两家 Agent 的真实模型会话或恢复集成测试。</p>
+  </section>
+
+  <section id="dsh-evolution"><h2>如果要让 Harness ACP 支持实时输出和 session/load</h2>
+    <div class="callout"><strong>以下是建议，尚未实现。</strong>主要补六处：产品与协议入口、事件到 ACP 的纯投影、持久恢复与正确装配、连接状态机、消费方、测试与示例。复用已有 chunks 和 agents.resume，但不能只加两个 handler。</div>
+    <p>推荐保留当前自动化入口，另建交互入口。实时输出必须处理失败半句、重试与完整消息重复；load 必须解决恢复后的启动闸门、历史切面和实时尾部交接。回放使用人类历史，不盲播失败 chunks，也不把压缩后的模型 Surface 当作完整聊天记录。</p>
+    <p><a href="deepseek-acp-streaming-load-design.html">详细设计：六层改动表、加载状态机、交付顺序与稳定验收矩阵 →</a></p>
   </section>
 
   <section id="directions"><h2>OpenHands 展开：对外服务与接入外部 Agent</h2>
