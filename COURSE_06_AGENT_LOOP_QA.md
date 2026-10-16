@@ -316,3 +316,104 @@ bun run demo:agent
 6. `finally` 中恢复 `idle` 状态的位置。
 
 重点观察：`claimed` 是本轮固定输入，而运行期间新消息仍停留在 `#inbox` 中。只要能清楚解释这条边界，就抓住了 Inbox 驱动的核心。
+
+## Q21：DeepSeek Harness、OpenHands 和 Codex 的 Agent Loop 分别运行在哪端？
+
+模型、Loop、工具是三个可以分别部署的部分。模型生成下一步动作；Loop 组装上下文、请求模型、调度工具并决定是否继续；工具执行器实际访问文件、进程和其他服务。调用云端模型不等于 Loop 在云端，看到本地工具执行也不能据此断定 Loop 在本地。
+
+| 产品与模式 | Loop 所在位置 | 界面与执行的边界 |
+|---|---|---|
+| DeepSeek Harness，本地启动 `dsh` | 本机 Node.js 宿主进程 | Web 浏览器负责交互，headless 不需要 HTTP 服务 |
+| DeepSeek Harness，宿主部署到服务器 | 服务器上的 Node.js 宿主进程 | 浏览器在哪打开，不决定 Loop 在哪运行 |
+| OpenHands SDK，`LocalConversation` | 调用 SDK 的 Python 进程内 | 由 Conversation 编排 Agent 的步骤 |
+| OpenHands SDK，`RemoteConversation` | 远端 Agent Server 进程，通常在容器或服务器内 | 客户端通过 HTTP / WebSocket 委托执行 |
+| Codex CLI、本地模式的桌面端 / IDE | 本机 Codex Agent 运行时 | 富客户端可以通过 app-server 接入；远程连接模式下应看 app-server 所在主机 |
+| Codex Cloud | OpenAI 托管的云端环境 | 本地界面用于提交、查看和继续任务 |
+
+本表核对于 2026-10-16。DeepSeek Harness 依据子模块 `99f6f02fecdb7dff40c3fbc9470f5907c29f74ca`，不是将 harness-lab 的教学 `run()` 语义套到上游；OpenHands 对比当前 Software Agent SDK，不混用旧 V0。Codex 按执行模式区分，不能仅凭桌面、网页或 CLI 入口判断位置。
+
+依据：[Harness 架构](deepseek-harness/docs/architecture.md)、[具体 Loop](deepseek-harness/packages/core/agent-loop/src/agent.ts)、[OpenHands Conversation](https://docs.openhands.dev/sdk/arch/conversation)、[Codex CLI](https://developers.openai.com/codex/cli)、[Codex App Server](https://developers.openai.com/codex/app-server)、[Codex Cloud](https://developers.openai.com/codex/cloud)。
+
+## Q22：Loop 放本地和云端，各有什么取舍？
+
+| 维度 | 本地 Loop | 云端 Loop |
+|---|---|---|
+| 使用个人环境 | 直接使用本地代码、依赖、内网和已授权登录态 | 需要在云端重建环境，或连接本地执行器 |
+| 持续运行 | 受电脑休眠、进程退出影响 | 适合后台调度，但可靠恢复仍依赖持久化、队列和所有权设计 |
+| 跨设备 | 需要同步或远程连接 | 多个界面可以接入同一会话，仍需身份和并发控制 |
+| 工具延迟 | 本地调用没有跨网往返 | 远程调用本地工具会增加往返；频繁小调用更明显 |
+| 运维与成本 | 客户端兼容、升级和本机资源占用 | 集中升级方便，额外承担服务、存储、带宽和隔离成本 |
+| 数据边界 | 日志可以留本地；发给云端模型的内容仍会上传 | 上下文和工具结果通常经过云端，上传范围需要明确 |
+
+Loop 通常主要承担编排和 I/O，而模型推理由模型服务承担。把 Loop 搬到云端，不直接等于模型变快或更聪明。
+
+例如手机发起任务、云端负责规划、Mac 负责改代码：Mac 休眠后，云端只能保存进度或做不依赖 Mac 的步骤，不能继续调用已离线的本地工具。全云端与“云端 Loop＋本地工具”的持续运行能力必须分别判断。
+
+## Q23：云端 Loop、本地工具，怎样实现？
+
+建议让本地执行器主动建立加密长连接，云端通过连接下发工具调用。这样不需要给每台电脑开放公网入口。以下为通用设计，不表示仓库已有完整设备网关。
+
+```mermaid
+flowchart LR
+    UI[网页或手机] --> Loop[云端 Loop 与会话日志]
+    Loop <-->|请求与响应| Model[模型服务]
+    Loop --> Proxy[云端工具代理与设备路由]
+    Executor[本地执行器] -->|主动建立加密连接| Proxy
+    Proxy -->|下发调用| Executor
+    Executor -->|结果与执行记录| Proxy
+    Executor --> Tools[本地文件与 Shell 等工具]
+```
+
+一次“修改代码并运行测试”的时序如下。图中记录状态不代表执行动作和写日志可以跨系统原子提交。
+
+```mermaid
+sequenceDiagram
+    participant L as 云端 Loop
+    participant M as 模型服务
+    participant P as 设备网关
+    participant E as 本地执行器
+    participant T as 本地工具
+    E->>P: 连接、认证、登记设备与工作区能力
+    L->>M: 上下文与可用工具
+    M-->>L: 工具名称与参数
+    L->>L: 持久记录调用意图
+    L->>P: 指定设备、工作区和调用 ID
+    P->>E: 下发调用
+    E->>E: 校验本地权限，记录执行状态
+    E->>T: 执行工具
+    T-->>E: 输出、退出码与产物
+    E->>E: 保存结果以便重连对账
+    E-->>P: 回传结果
+    P-->>L: 关联到原工具调用
+    L->>L: 保存模型可见结果
+    L->>M: 加入工具结果后继续决策
+```
+
+本地执行器不必保存完整对话或再次跑模型循环；它负责工具能力、本地权限、执行进程与执行记录。协议至少区分稳定的逻辑调用 ID 和每次投递的尝试 ID，并携带会话、设备、工作区、工具、参数、截止时间与权限上下文。多租户身份必须由认证和授权决定，不能相信消息中自报的用户或设备 ID。
+
+## Q24：断线、重试和取消，哪些地方最容易出问题？
+
+| 发生位置 | 能确定什么 | 处理原则 |
+|---|---|---|
+| 本地离线，还没派发 | 未执行 | 等待上线或明确失败；过期调用不再执行 |
+| 已发送，没收到确认 | 不知道本地是否接收或执行 | 重连先按调用 ID 对账，不把超时当作未执行 |
+| 本地完成，但结果未送达 | 本地若有持久结果，可以补传 | 返回原结果，不重复执行同一逻辑调用 |
+| 副作用发生后、本地结果落盘前崩溃 | 可能执行过，结果未知 | 先查外部状态；写操作不能盲目重试 |
+| 用户取消或调用超时 | 取消意图已产生，不代表进程停止 | 传递取消、处理子进程并确认终态；已发生副作用不自动回滚 |
+| 旧连接或旧执行者重新上线 | 可能带回迟到结果 | 用所有权代次、租约围栏和调用状态校验，禁止旧尝试覆盖新状态 |
+
+稳定复现“命令完成却被当成失败”的路径：让测试命令正常退出，在本地结果已保存、回传之前断开连接，再恢复连接。应查到同一调用已完成并补传原结果；不能重新跑命令。进一步在副作用完成、执行记录持久化之前终止执行器，应暴露“结果未知”，而不是伪造未执行或成功。
+
+去重可以减少重复投递导致的重复执行，但不能保证任意 Shell 命令恰好执行一次。外部写操作若有业务幂等键或事务查询接口，应结合它们恢复；缺少证据时保留未知。
+
+权限在本地执行器再次落实：限定工作区、工具、路径和命令范围；审批绑定具体调用与参数，不能只凭请求来自云端就放行。工具输出按不可信数据处理，本地凭证也不应因调试日志被带回云端。
+
+## Q25：在 DeepSeek Harness 中，应该在哪层接入？
+
+第一版可以新增工具级代理插件：在云端 `ctx.tools` 注册工具 schema，执行器通过网关调用本地能力，复用既有工具管线与模型循环。需要复用上层文件、Shell 和终端工具时，也可以实现远程 `ctx.fs` / `ctx.subprocess` 提供方，但必须覆盖持久进程、PTY、取消、附件和临时文件等实际消费边界。
+
+依据：[工具注册与执行管线](deepseek-harness/packages/core/tools/README.zh.md)、[E2B 执行环境适配](deepseek-harness/packages/e2b/README.zh.md)。E2B POC 展示了执行环境与 Loop 的分离，不是已有的本地设备反向连接实现。
+
+MCP 可以复用工具发现与调用协议，但不会自动解决电脑可达性、设备路由、断线恢复和副作用对账。本仓库的 [MCP Client](deepseek-harness/packages/mcp/mcp-client/README.zh.md) 支持 stdio 和 Streamable HTTP；云端不能直接访问另一台电脑的 localhost，也不能把该电脑的 stdio 当作云端子进程。[MCP 官方传输说明](https://blog.modelcontextprotocol.io/posts/2025-12-19-mcp-transport-future/#official-and-custom-transports)
+
+对会话评估的影响见[长对话效果评估 QA：Q11](LONG_CONVERSATION_EFFECT_EVALUATION_QA.md#q11agent-loop-放本地云端或采用混合架构对会话评估有什么影响)。完整图文入口见[部署与评估专题](reference/agent-loop-deployment-and-evaluation.html)。

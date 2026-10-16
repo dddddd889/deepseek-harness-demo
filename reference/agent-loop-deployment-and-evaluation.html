@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="对比 DeepSeek Harness、OpenHands、Codex 的 Agent Loop 部署位置，解释云端循环调用本地工具的连接、权限、断线恢复，以及对会话评估和复现的影响。">
+  <title>Agent Loop 放在哪：部署、远程工具与会话评估</title>
+  <link rel="stylesheet" href="../assets/course.css">
+  <link rel="stylesheet" href="../assets/eventlog-projections.css">
+</head>
+<body><main class="eventlog-page">
+  <p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="../lessons/0006-agent-loop.html">第 6 课</a> · <a href="../LONG_CONVERSATION_EFFECT_EVALUATION_QA.md">长对话评估 QA</a></p>
+  <p class="eyebrow">AGENT LOOP · DEPLOYMENT &amp; EVALUATION</p>
+  <h1>Loop 放在哪，<br>怎样执行、恢复和评估？</h1>
+  <p class="lead">本地 Loop 便于使用个人环境，云端 Loop 便于持续调度和跨设备协作。两者都能评估，关键是保留实际模型输入、执行事实和结果证据；混合架构还要把两端记录接起来。</p>
+  <div class="callout"><strong>先拆开三个位置：</strong>模型生成下一步动作；Loop 负责上下文、请求、调度和停止；工具执行器实际访问文件、进程与服务。云端模型不代表云端 Loop，本地工具也不证明 Loop 在本机。</div>
+  <p class="subtle">核对日期：2026-10-16。Harness 依据本地子模块 99f6f02fecdb7dff40c3fbc9470f5907c29f74ca；OpenHands 指当前 Software Agent SDK，排除旧 V0；Codex 按执行模式区分。下方设备网关、远程调用状态和评估证据清单均为设计建议，本次没有实现远程执行协议，也没有运行生产会话评测。</p>
+  <nav aria-label="专题阅读导航"><a href="#location">三家运行位置</a><a href="#tradeoffs">本地与云端取舍</a><a href="#hybrid">混合架构</a><a href="#failures">断线与权限</a><a href="#evaluation">会话评估</a><a href="#replay">回放与重跑</a><a href="#integration">Harness 接入位置</a><a href="#sources">来源与详解</a></nav>
+
+  <section id="location"><h2>三家 Loop 分别在哪里运行？</h2>
+    <div class="table-scroll"><table><thead><tr><th>产品与模式</th><th>Loop 所在位置</th><th>边界</th></tr></thead><tbody>
+      <tr><td>DeepSeek Harness，本地启动 dsh</td><td>本机 Node.js 宿主进程</td><td>Web 浏览器负责交互；headless 可以没有 HTTP 服务。</td></tr>
+      <tr><td>DeepSeek Harness，宿主部署到服务器</td><td>服务器 Node.js 宿主进程</td><td>浏览器所在机器不决定 Loop 位置。</td></tr>
+      <tr><td>OpenHands，LocalConversation</td><td>调用 SDK 的 Python 进程内</td><td>Conversation 编排 Agent 步骤。</td></tr>
+      <tr><td>OpenHands，RemoteConversation</td><td>远端 Agent Server 进程</td><td>通常运行在服务器或容器；客户端经 HTTP / WebSocket 委托。</td></tr>
+      <tr><td>Codex CLI、本地桌面 / IDE 模式</td><td>本机 Codex Agent 运行时</td><td>富客户端可通过 app-server 接入；远程连接时看 app-server 实际主机。</td></tr>
+      <tr><td>Codex Cloud</td><td>OpenAI 托管的云端环境</td><td>通过不同设备提交、查看或继续云端任务。</td></tr>
+    </tbody></table></div>
+    <p>不要把界面、编排与执行强行绑定。判断一次任务时，要看谁持有会话、发起下一次模型请求和调度工具，不能只看窗口在哪打开。</p>
+  </section>
+
+  <section id="tradeoffs"><h2>本地与云端：主要改变运行方式</h2>
+    <div class="table-scroll"><table><thead><tr><th>维度</th><th>本地 Loop</th><th>云端 Loop</th></tr></thead><tbody>
+      <tr><td>个人环境</td><td>直接使用本地代码、依赖、内网和已授权登录态。</td><td>重建云端环境，或连接本地执行器。</td></tr>
+      <tr><td>持续运行与多设备</td><td>受电脑休眠和进程退出影响；跨设备需要连接或同步。</td><td>便于后台调度与共享会话，但需要持久化、身份和并发控制。</td></tr>
+      <tr><td>工具延迟</td><td>本地调用无需跨网往返。</td><td>调用本地工具要经过网络；频繁小调用尤其明显。</td></tr>
+      <tr><td>运维与成本</td><td>维护客户端版本、兼容性，使用个人电脑资源。</td><td>集中升级，同时承担服务、存储、带宽与租户隔离。</td></tr>
+      <tr><td>数据边界</td><td>日志可留本地，但云端模型仍会收到请求中的上下文。</td><td>上下文与工具结果通常经过云端，需要限定上传范围。</td></tr>
+    </tbody></table></div>
+    <p>Loop 通常主要做编排和 I/O，GPU 推理由模型服务承担。把 Loop 搬到云端，不直接让模型变快或更聪明。云端的故障恢复也不是自动获得的能力。</p>
+    <p class="callout"><strong>Mac 休眠的例子：</strong>云端 Loop 可以保留进度、做不依赖 Mac 的步骤，但本地工具离线后，仍然不能继续修改 Mac 上的项目。“云端 Loop＋本地工具”不具备全云端执行的持续可用性。</p>
+  </section>
+
+  <section id="hybrid"><h2>混合架构：本地主动连接，云端下发调用</h2>
+    <figure class="course-diagram"><figcaption>建议架构；箭头分别表示连接发起方向与业务消息方向</figcaption>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 410" role="img" aria-labelledby="hybrid-title hybrid-desc">
+        <title id="hybrid-title">云端 Loop 调用本地工具，并关联两端证据</title>
+        <desc id="hybrid-desc">云端 Loop 与模型服务通信，经工具代理向本地执行器下发调用。本地执行器主动建立加密连接，检查权限后运行工具，保存执行记录并回传结果。会话与执行记录关联后用于独立评估。</desc>
+        <defs><marker id="hybrid-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#4c6477"/></marker></defs>
+        <rect x="15" y="15" width="930" height="165" rx="16" fill="#edf4fa" stroke="#c1d3e3"/>
+        <rect x="15" y="210" width="930" height="150" rx="16" fill="#f8f2e6" stroke="#ddcbb0"/>
+        <g font-family="system-ui, sans-serif" font-size="17" fill="#20364b" text-anchor="middle">
+          <text x="75" y="45">云端</text><text x="75" y="240">本地</text>
+          <rect x="80" y="75" width="190" height="65" rx="9" fill="white" stroke="#7f9db7"/><text x="175" y="114">模型服务</text>
+          <rect x="380" y="75" width="220" height="65" rx="9" fill="white" stroke="#7f9db7"/><text x="490" y="103">Agent Loop</text><text x="490" y="127" font-size="14">会话日志与工具调度</text>
+          <rect x="710" y="75" width="190" height="65" rx="9" fill="white" stroke="#7f9db7"/><text x="805" y="103">工具代理 / 网关</text><text x="805" y="127" font-size="14">认证与设备路由</text>
+          <rect x="380" y="260" width="220" height="65" rx="9" fill="white" stroke="#b59c70"/><text x="490" y="288">本地工具与执行记录</text><text x="490" y="312" font-size="14">文件 / Shell / MCP</text>
+          <rect x="710" y="260" width="190" height="65" rx="9" fill="white" stroke="#b59c70"/><text x="805" y="288">本地执行器</text><text x="805" y="312" font-size="14">权限、进程与结果</text>
+          <text x="325" y="94" font-size="13">请求 / 响应</text><text x="655" y="94" font-size="13">工具调用</text>
+          <text x="655" y="280" font-size="13">执行 / 结果</text>
+          <text x="670" y="193" font-size="13">主动连接 ↑</text><text x="860" y="193" font-size="13">调用 ↓ / 结果 ↑</text>
+          <text x="480" y="392" font-size="16">独立评估：按调用 ID 关联云端决策、本地执行与实际产物</text>
+        </g>
+        <g fill="none" stroke="#4c6477" stroke-width="2" marker-end="url(#hybrid-arrow)">
+          <path d="M380 110H270" marker-start="url(#hybrid-arrow)"/><path d="M600 110H710"/>
+          <path d="M710 295H600" marker-start="url(#hybrid-arrow)"/>
+          <path d="M760 260V140" stroke-dasharray="6 5"/>
+          <path d="M820 140V260" marker-start="url(#hybrid-arrow)"/>
+        </g>
+      </svg>
+      <p><a href="../COURSE_06_AGENT_LOOP_QA.md#q23云端-loop本地工具怎样实现">Mermaid 架构与调用时序</a></p>
+    </figure>
+    <ol>
+      <li>本地常驻执行器认证后主动连接云端，登记设备、工作区和允许使用的能力。</li>
+      <li>云端 Loop 请求模型，将返回的工具名称与参数写入调用记录，通过网关派发。</li>
+      <li>本地再次校验权限，记录状态、执行工具，保存输出与终态，再回传结果。</li>
+      <li>云端关联原调用并持久记录模型可见结果，然后继续请求模型。</li>
+    </ol>
+    <p>协议至少区分稳定的逻辑调用 ID 与每次投递的尝试 ID，携带会话、设备、工作区、截止时间与权限上下文。路由身份必须经过认证和授权。本地执行器不必自己再跑一套模型循环。</p>
+  </section>
+
+  <section id="failures"><h2>断线、取消和权限：超时不等于没执行</h2>
+    <div class="table-scroll"><table><thead><tr><th>场景</th><th>判断</th><th>处理</th></tr></thead><tbody>
+      <tr><td>设备离线，尚未派发</td><td>未执行</td><td>等待、超时或拒绝；过期请求不能在上线后突然执行。</td></tr>
+      <tr><td>已发送，没有确认</td><td>接收与执行情况未知</td><td>按调用 ID 查询和对账，不直接重跑。</td></tr>
+      <tr><td>执行完成，结果回传失败</td><td>本地若已保存结果，可恢复证据</td><td>补传原结果，去重结算。</td></tr>
+      <tr><td>副作用发生、结果落盘前崩溃</td><td>结果未知</td><td>查询外部状态；使用业务幂等键，不能盲目重试写操作。</td></tr>
+      <tr><td>取消、超时、旧执行者重连</td><td>意图和实际终态需要分开</td><td>处理子进程、确认终态、检查所有权代次；迟到结果不能覆盖新尝试。</td></tr>
+    </tbody></table></div>
+    <p>仅靠重试和调用去重，不能承诺任意 Shell 命令恰好执行一次。网络断开不证明进程停止，取消也不自动回滚已经完成的写操作。</p>
+    <p><strong>可控复现：</strong>在本地测试正常退出且结果已保存、尚未回传时断网；重连应补传同一调用的原结果。再在副作用完成、执行记录持久化之前终止执行器，应出现“结果未知”，而不是伪造成功或未执行。</p>
+    <p>本地限定目录、命令和能力；审批绑定具体调用与参数。来自云端的请求仍需校验，工具输出按不可信数据处理。凭证留在本机使用，也要避免通过日志与输出泄漏。</p>
+  </section>
+
+  <section id="evaluation"><h2>会话评估：把决策、执行、传输与交付接起来</h2>
+    <p>本地 Loop 需要持久记录和可靠补传；云端 Loop 易集中收集，但不会自动知道本机的真实执行结果。评估器可以独立部署，部署位置不决定判断能力。</p>
+    <pre><code>模型正确选择测试命令 → 本地测试通过 → 回传断线 → 云端超时
+
+模型决策：可以正确
+本地执行：拿到可验证证据后，才能确认通过
+用户交付：超时、未收到结果，仍然未完成或失败
+结果声明：缺少证据却声称通过，需要另外检查</code></pre>
+    <p>不要把网络失败直接当成模型选错工具，也不要从端到端产品统计中删除这次失败。权限拒绝、设备离线、取消与命令错误应记录各自原因。</p>
+    <div class="table-scroll"><table><thead><tr><th>证据层</th><th>需要保存</th><th>为什么</th></tr></thead><tbody>
+      <tr><td>关联身份</td><td>会话、Turn、Step、Trace、调用、尝试、设备、工作区与所有权代次。</td><td>连接两端证据，识别重投与迟到结果。</td></tr>
+      <tr><td>模型输入</td><td>实际上下文或可重建引用、工具 schema、模型配置、Prompt 与 Harness 版本。</td><td>判断当时信息条件下的决策；保留压缩前日志和压缩后输入。</td></tr>
+      <tr><td>执行与产物</td><td>本地状态、退出码、输出、权限决定、文件 diff、测试报告、外部回执。</td><td>区分“调用返回成功”和“用户目标实际达成”。</td></tr>
+      <tr><td>环境与评估快照</td><td>初始文件、未提交改动、依赖、各流游标、缺失项、脱敏 / 截断策略、评估版本。</td><td>使实验可比较，结论可以追溯到固定证据。</td></tr>
+    </tbody></table></div>
+    <p>跨端按因果关系、调用 ID 和每流序号关联，不按上传到达顺序排序，也不假设时钟一致。迟到证据生成新的评估修订，保留旧报告与原先等待超时的事实；缺失证据标记不可核验，不靠 Judge 猜。</p>
+    <p>OTel / Langfuse 是观测和评估副本，不能替代 canonical Session 日志和本地执行记录。Session ID 分组不会自动把所有执行数据交给评估器，应用需要显式提供所需证据。</p>
+    <p>耗时分别看模型请求、网络、本地排队与执行、审批和重连；并发时不能直接累加子调用耗时。各端内部用单调时钟计时，端到端时间从统一观察点测量。模型比较控制环境和预算，产品比较保留真实等待与交付失败。</p>
+  </section>
+
+  <section id="replay"><h2>历史回放、决策评估与行为重跑</h2>
+    <div class="table-scroll"><table><thead><tr><th>目的</th><th>所需输入</th><th>边界</th></tr></thead><tbody>
+      <tr><td>历史回放</td><td>原始事件、模型输出、工具调用与结果。</td><td>还原已记录的事实；日志不能单独证明外部状态。</td></tr>
+      <tr><td>评估当时决策</td><td>模型当时实际看见的上下文、工具与权限。</td><td>不把未来信息倒灌给当时的模型。</td></tr>
+      <tr><td>换模型 / Prompt 重跑</td><td>初始工作区、依赖、权限、可控外部服务和相同预算。</td><td>新行为可能走新路径；不能机械复用旧工具结果，也不能重放生产写操作。</td></tr>
+    </tbody></table></div>
+    <p>固定工具结果回放适合检查原路径上的局部行为。完整行为比较需要可交互环境，或能覆盖新调用的模拟器。文件已被修改、未提交改动丢失、附件仅留哈希，都会破坏复现条件。</p>
+    <p>先人工检查真实会话中的失败与证据缺口，再确定自动评估范围。退出码、超时等已有确定事实可以直接统计；是否满足用户要求，需要匹配的结果证据与验收标准。</p>
+  </section>
+
+  <section id="integration"><h2>Harness：复用 Loop，在能力边界接入</h2>
+    <p>第一版建议在云端 <code>ctx.tools</code> 注册工具代理，经网关调用本地执行器；需要复用上层文件、Shell 和终端工具时，再实现远程 <code>ctx.fs</code> / <code>ctx.subprocess</code> 提供方，并覆盖 PTY、取消、临时文件与附件等边界。</p>
+    <p>仓库 E2B POC 展示了执行环境与 Loop 可分离，不是已有本地设备连接方案。MCP 可复用工具发现与调用，但设备可达性、认证、路由、补传和副作用对账仍由宿主解决。云端不能直接访问另一台电脑的 localhost 或 stdio。</p>
+    <p><a href="../deepseek-harness/packages/core/tools/README.zh.md">工具管线</a> · <a href="../deepseek-harness/packages/e2b/README.zh.md">E2B 边界</a> · <a href="../deepseek-harness/packages/mcp/mcp-client/README.zh.md">MCP Client</a> · <a href="../deepseek-harness/packages/core/session/README.zh.md">Session 日志与请求重建</a> · <a href="../VERIFICATION.md#恢复与观测判据">恢复与观测判据</a></p>
+  </section>
+
+  <section id="sources"><h2>来源与详细问答</h2>
+    <ul>
+      <li><a href="../COURSE_06_AGENT_LOOP_QA.md#q21deepseek-harnessopenhands-和-codex-的-agent-loop-分别运行在哪端">第 6 课 QA：Q21–Q25，位置、取舍、Mermaid 时序、失败分支与接入位置</a></li>
+      <li><a href="../LONG_CONVERSATION_EFFECT_EVALUATION_QA.md#q11agent-loop-放本地云端或采用混合架构对会话评估有什么影响">长对话评估 QA：Q11，证据清单、失败归因与实验口径</a></li>
+      <li><a href="../deepseek-harness/docs/architecture.md">Harness 架构</a> · <a href="../deepseek-harness/packages/core/agent-loop/src/agent.ts">具体 Loop</a> · <a href="https://docs.openhands.dev/sdk/arch/conversation">OpenHands Conversation：本地与远程执行</a></li>
+      <li><a href="https://developers.openai.com/codex/cli">Codex CLI</a> · <a href="https://developers.openai.com/codex/app-server">Codex App Server 与远程连接</a> · <a href="https://developers.openai.com/codex/cloud">Codex Cloud</a></li>
+      <li><a href="https://blog.modelcontextprotocol.io/posts/2025-12-19-mcp-transport-future/#official-and-custom-transports">MCP 官方传输说明</a> · <a href="https://langfuse.com/docs/observability/data-model">Langfuse 数据模型</a> · <a href="https://langfuse.com/academy/evaluate">评估方式</a> · <a href="https://langfuse.com/academy/evaluate/choosing-what-to-evaluate">选择评估内容</a></li>
+    </ul>
+  </section>
+</main></body>
+</html>
