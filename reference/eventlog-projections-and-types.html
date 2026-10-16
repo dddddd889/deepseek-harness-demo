@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="对照 DeepSeek Harness 固定源码，解释 Event Log 如何映射到 UI、LLM messages、JSONL 与 OTel，以及八类类型、嵌套 type 和事件标签的区别。">
+  <title>Event Log：UI、LLM、JSONL、OTel 与类型层次</title>
+  <link rel="stylesheet" href="../assets/course.css">
+  <link rel="stylesheet" href="../assets/eventlog-projections.css">
+</head>
+<body><main class="eventlog-page">
+  <p><a href="deepseek-harness-build-roadmap.html">← 课程首页</a> · <a href="qa-eventlog-ui-recovery.html">QA 专题</a> · <a href="plan-eventlog-ui-recovery.html">Plan 专题</a></p>
+  <p class="eyebrow">DEEPSEEK HARNESS · EVENT LOG</p>
+  <h1>同一份事件，怎样成为<br>UI、模型消息、磁盘日志和观测数据？</h1>
+  <p class="lead">事件记录“发生了什么”；每个消费者再选择、归并或编码这些事实。读懂映射规则，也就能分清：什么可以恢复、模型实际读到了什么、界面为何这样显示。</p>
+  <div class="callout"><strong>有多少层 type？</strong>按职责可以整理成 <strong>8 类类型</strong>，但它们分支转换，不是依次经过八层。单条事件内又可能嵌套多个 <code>type</code>。如果问事件标签数量，当前版本是 <strong>13 个核心标签、44 个仓库已知标签</strong>，这是另一种计数。</div>
+  <div class="facts">
+    <div class="fact"><strong>1 份事实来源</strong><span>Session Header + 仅追加的 Event Log</span></div>
+    <div class="fact"><strong>5 条消费分支</strong><span>模型、聊天 UI、领域状态、持久化、遥测</span></div>
+    <div class="fact"><strong>8 类类型</strong><span>本文按用途归纳，不是官方的八层架构</span></div>
+  </div>
+  <p class="subtle">核对日期：2026-10-16。源码固定到本仓库子模块提交 <code>99f6f02fecdb7dff40c3fbc9470f5907c29f74ca</code>。示例均为解释用的简化数据，不是实际会话采样。</p>
+  <nav aria-label="专题阅读导航"><a href="#map">总链路</a><a href="#types">8 类类型</a><a href="#nested">嵌套 type</a><a href="#explorer">点击看映射</a><a href="#llm">LLM</a><a href="#ui">UI</a><a href="#storage">JSONL</a><a href="#otel">OTel</a><a href="#more">其他用途</a><a href="#verify">核验路径</a></nav>
+
+  <section id="map"><h2>先看全貌：一次追加，多个消费者</h2>
+    <figure class="course-diagram"><figcaption>箭头表示数据转换与消费关系；持久化和遥测各走自己的分支</figcaption><img src="../assets/diagrams/eventlog-projections.svg" alt="SessionEvent 分支生成模型消息、聊天 UI、领域状态、持久化记录和 OTel 日志"><p><a href="../assets/diagrams/eventlog-projections.mmd">查看 Mermaid 图源</a></p></figure>
+    <p><code>session.append()</code> 复制并冻结数据，分配 Session 内连续的 <code>seq</code>，记录时间，再追加到内存日志。提交后通过 Cordis 的 <code>session/event</code> 通知消费者。观察者失败不会撤销已提交事件。</p>
+    <p><strong>内存追加成功还不等于落盘。</strong>持久化消费者会缓冲并批量写入，<code>session/flush</code> 是等待持久化消费者排空的检查点。遥测入队也不等于 Collector 已保存。</p>
+    <pre><code>用户：“读一下 config.json，解释里面的配置。”
+  turn/start → step/start → user/message → request/header
+  → assistant/chunk × N → assistant/message（含 tool-call 块）
+  → tool/call → tool/result → step/end
+  → step/start → assistant/chunk × N → assistant/message（解释正文）
+  → step/end → turn/end
+
+这是典型成功路径；零步结束、重试、取消、压缩会产生其他分支。</code></pre>
+    <p><a href="../deepseek-harness/packages/core/session/src/index.ts">Session.append 与 deriveMessages</a> · <a href="../deepseek-harness/packages/core/agent-loop/src/agent.ts">Agent Loop 的事件生产位置</a></p>
+  </section>
+
+  <section id="types"><h2>“有多少层 type”：按职责分成 8 类</h2>
+    <p>这些是帮助阅读源码的<strong>类型家族</strong>。同一个 Message 对象可以嵌在事件中，投影值也可以直接跨传输和客户端复用；不需要每过一层都重新造一套业务字段。</p>
+    <div class="table-scroll"><table><thead><tr><th>类别</th><th>实际类型 / 标签</th><th>负责什么</th><th>与下一步的关系</th></tr></thead><tbody>
+      <tr><td>① 会话事件</td><td><code>SessionEventMap</code>、<code>SessionEvent&lt;T&gt;</code>、<code>SessionHeader</code></td><td>记录顺序、时间、事实、Surface 操作和来源。</td><td>各分支共同的输入；Header 保存会话级元数据。</td></tr>
+      <tr><td>② 模型中立消息</td><td><code>Message</code>、<code>ContentBlock</code>；流式阶段用 <code>StreamChunk</code></td><td>表达用户、助手、工具结果，以及文本、思考、工具调用等内容。</td><td>Surface 选出消息事件，<code>deriveMessages()</code> 取出消息。</td></tr>
+      <tr><td>③ 模型厂商协议</td><td>DeepSeek <code>WireMessage</code>、<code>WireToolCall</code></td><td>符合模型 API 的字段与 role 规则。</td><td>适配器序列化模型中立消息；不是直接把 Event 发给模型。</td></tr>
+      <tr><td>④ UI 传输协议</td><td><code>MuxFrame</code>、<code>ToolEventView</code>；<code>session/event</code>、<code>session/projection</code></td><td>把事件或完成的投影值传到客户端。</td><td>传输帧可以包裹事件，帧 type 和事件 type 各司其职。</td></tr>
+      <tr><td>⑤ UI 读模型</td><td><code>ConversationViewNode</code>、<code>SessionProjectionMap</code>、具体气泡/工具卡片节点</td><td>描述当前要显示什么。</td><td>聊天轨迹在客户端组装；领域状态在服务端折叠后推送。</td></tr>
+      <tr><td>⑥ 存储记录</td><td><code>StorageRecord = SessionEvent | ChunkRow</code>；另有 header 行</td><td>无损保存事件，支持连续 chunks 打包和压缩。</td><td>读取并解码后还原 SessionEvent；SQLite 使用自己的后端格式。</td></tr>
+      <tr><td>⑦ 逻辑遥测记录</td><td><code>SessionTelemetryRecord</code></td><td>按观测策略筛选，携带 channel、severity、attributes、body。</td><td>经过复制、部署方脱敏，再交给遥测后端。</td></tr>
+      <tr><td>⑧ OTel 标准记录</td><td>OTel <code>LogRecord</code> / OTLP Logs</td><td>使用标准日志字段，交给 SDK 批处理和导出。</td><td>进入 Collector 或日志平台；不负责 Session 恢复。</td></tr>
+    </tbody></table></div>
+    <pre><code>模型分支：SessionEvent → Surface → Message → WireMessage
+聊天分支：SessionEvent → MuxFrame → ConversationViewNode → 组件
+状态分支：SessionEvent → 领域投影值 → session/projection 帧 → Store → 组件
+存储分支：SessionEvent ↔ StorageRecord ↔ JSONL / Zstd
+遥测分支：SessionEvent → SessionTelemetryRecord → OTel LogRecord</code></pre>
+    <p>上面的 Surface、Store、组件分别是选择结果、客户端状态容器和渲染单元，不额外凑成“第九、第十层 type”。划分的依据是数据的职责，不是所有 TypeScript 声明的总数。</p>
+  </section>
+
+  <section id="nested"><h2>一个 JSON 内为什么会出现好几个 type？</h2>
+    <p>看这条通过 UI 通道发送的流式事件。三个 <code>type</code> 分别回答“传什么”“发生什么”“分片怎么更新”。</p>
+    <pre><code>{
+  "type": "session/event",           // 传输帧：里面是一条会话事件
+  "sessionId": "session-demo",
+  "event": {
+    "type": "assistant/chunk",       // 事件：模型输出了一个流式分片
+    "seq": 7,
+    "time": 1792108800000,
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "chunk": {
+        "type": "text-delta",        // 分片：追加文本
+        "index": 0,
+        "text": "我先读取配置。"
+      }
+    }
+  }
+}
+// JSONC 示意；真实 JSON 不包含这些中文注释。</code></pre>
+    <div class="table-scroll"><table><thead><tr><th>判别字段</th><th>例子</th><th>不要混淆</th></tr></thead><tbody>
+      <tr><td>帧 <code>type</code></td><td><code>session/event</code>、<code>session/projection</code></td><td>网络消息类别，不是领域事件总表。</td></tr>
+      <tr><td>事件 <code>type</code></td><td><code>assistant/chunk</code>、<code>tool/result</code></td><td>对应 <code>SessionEventMap</code> 的键。</td></tr>
+      <tr><td>分片 <code>chunk.type</code></td><td><code>text-delta</code>、<code>tool-call-delta</code></td><td>描述流式过程，不是最终消息块。</td></tr>
+      <tr><td>内容块 <code>content[i].type</code></td><td><code>text</code>、<code>reasoning</code>、<code>tool-call</code>、<code>tool-result</code>、<code>image</code></td><td>描述完整消息的内容组成；不同分支未必都包含 chunk。</td></tr>
+      <tr><td>其他判别字段</td><td><code>role</code>、<code>source.kind</code>、<code>surfaceOp.op</code>、<code>channel</code></td><td>分别表示消息角色、来源、Surface 操作与遥测通道。</td></tr>
+    </tbody></table></div>
+    <p><strong>不是所有字段都逐层嵌套，也没有固定的 JSON 深度。</strong>例如工具结果块内部还可以包含内容块；打包存储行有自己的 <code>type: "text-chunks"</code>，但它不是 Session Event。</p>
+    <h3>如果问的是“总共有多少种事件 type”</h3>
+    <p>当前 <code>SessionEventMap</code> 本体声明 <strong>13</strong> 个核心标签；插件通过 declaration merging 扩展。固定版本生成的 <code>KNOWN_SESSION_EVENT_TYPES</code> 有 <strong>44</strong> 个已知标签，包含核心 13 个。它表示该版本识别的事件词汇，不代表每个 preset 都会产出这 44 种，也不包含所有传输帧、内容块或存储行标签。</p>
+    <details><summary>查看当前 13 个核心事件标签</summary><p><code>turn/start</code>、<code>turn/end</code>、<code>step/start</code>、<code>step/end</code>、<code>user/message</code>、<code>assistant/chunk</code>、<code>assistant/message</code>、<code>tool/call</code>、<code>tool/result</code>、<code>todo/write</code>、<code>request/header</code>、<code>request/context</code>、<code>session/end-seed</code>。</p></details>
+    <p><a href="../deepseek-harness/packages/core/session/src/types.ts">事件与 Surface 类型</a> · <a href="../deepseek-harness/packages/core/session/src/known-event-types.ts">44 个已知标签</a> · <a href="../deepseek-harness/packages/llm/llm/src/types.ts">分片与内容块类型</a> · <a href="../deepseek-harness/packages/host/apiproxy/src/api/events.ts">传输帧类型</a></p>
+  </section>
+
+  <section id="explorer"><h2>选一条事件，看四个出口各得到什么</h2>
+    <p>下面是依据源码规则制作的说明器，不调用模型、不发送数据。关闭 JavaScript 后仍可阅读后面的完整对照表。</p>
+    <div class="event-buttons" role="group" aria-label="选择要解释的事件">
+      <button type="button" data-event="chunk" aria-pressed="true">assistant/chunk</button>
+      <button type="button" data-event="assistant" aria-pressed="false">assistant/message</button>
+      <button type="button" data-event="call" aria-pressed="false">tool/call</button>
+      <button type="button" data-event="result" aria-pressed="false">tool/result</button>
+      <button type="button" data-event="todo" aria-pressed="false">todo/write</button>
+      <button type="button" data-event="header" aria-pressed="false">request/header</button>
+    </div>
+    <div id="event-results" class="result-grid" aria-live="polite" aria-atomic="true">
+      <article class="result-card"><h3>UI</h3><p>增量更新当前助手气泡；多个分片归入同一个 Step 的展示。</p></article>
+      <article class="result-card"><h3>LLM messages / 请求</h3><p>不独立派生消息。完整输出稍后由 assistant/message 进入历史，避免重复。</p></article>
+      <article class="result-card"><h3>JSONL</h3><p>无损保存；符合条件的连续 delta 可以打包，读取时还原原始事件。</p></article>
+      <article class="result-card"><h3>OTel Logs</h3><p>固定投影只保留每个 (turn, step) 的第一条 assistant/chunk；再受模式与脱敏策略控制。</p></article>
+    </div>
+    <noscript><p>事件切换需要 JavaScript；下面各节已包含全部映射说明。</p></noscript>
+  </section>
+
+  <section id="llm"><h2>① LLM：先选 Surface，再派生 messages，最后适配厂商协议</h2>
+    <div class="table-scroll"><table><thead><tr><th>事件</th><th>是否贡献 messages</th><th>具体规则</th></tr></thead><tbody>
+      <tr><td><code>user/message</code></td><td>是</td><td>传递内部 UserMessage；用户文本与插件注入的上下文用 source 区分。</td></tr>
+      <tr><td><code>assistant/message</code></td><td>是，空内容除外</td><td>完整 AssistantMessage，包含文本、思考或工具调用块；仅承载 usage 的空内容消息跳过。</td></tr>
+      <tr><td><code>tool/result</code></td><td>是</td><td>取内部 ToolResultMessage，保留调用关联。</td></tr>
+      <tr><td><code>assistant/chunk</code></td><td>否</td><td>保留流式过程，不再重复派生消息。</td></tr>
+      <tr><td><code>tool/call</code></td><td>否</td><td>模型的调用块已在 assistant/message 中；执行事件不再生成一份调用消息。</td></tr>
+      <tr><td><code>todo/write</code>、Turn / Step 边界</td><td>否</td><td>供状态和过程投影；Todo 内容可经工具调用参数与工具结果让模型知道。</td></tr>
+      <tr><td><code>request/header</code></td><td>不贡献 messages</td><td>另行记录 system、tools、模型配置，和 messages 一起重建请求。</td></tr>
+    </tbody></table></div>
+    <p><strong>Surface 不是把日志过滤一次就结束。</strong><code>surfaceOp: "append"</code> 让消息进入尾部；<code>replace</code> 会用新消息遮蔽一段旧 Surface 节点。压缩后，模型可以读摘要，日志仍保留原对话与替换记录。只有 user/message、assistant/message、tool/result 三类事件可进入 Surface。</p>
+    <pre><code>// 内部工具结果消息：示意，不是完整构造参数。
+{ role: "user", content: [{ type: "tool-result", toolCallId: "call-1", content: [...] }] }
+                           ↓ DeepSeek serializeMessages
+{ role: "tool", tool_call_id: "call-1", content: "文件内容……" }
+
+// 完整请求还包括请求头，messages 只是其中一部分。
+{ ...模型配置, messages: deriveMessages(), system: 当前提示词, tools: 当前工具定义 }</code></pre>
+    <p>内部 Message、Provider WireMessage 与 Event 不是同一种对象。新增模型可见输入，需要留下可重建的事件事实；但“已入日志”不代表“自动进入模型”。</p>
+    <p><a href="../deepseek-harness/packages/core/session/src/surface.ts">Surface 与 deriveEventMessage</a> · <a href="../deepseek-harness/packages/llm/llm/src/message.ts">共享 Message 与 ToolResultMessage</a> · <a href="../deepseek-harness/packages/llm/llm-deepseek/src/serialize.ts">DeepSeek 序列化</a> · <a href="../deepseek-harness/packages/core/agent-loop/src/agent.ts">buildRequest</a></p>
+  </section>
+
+  <section id="ui"><h2>② UI：聊天轨迹与领域状态有两种计算路径</h2>
+    <h3>聊天轨迹：客户端归并事件</h3>
+    <pre><code>历史读取 / session/event 帧
+  → ConversationEventInput（event + 可选工具展示数据）
+  → ConversationNodeAssembler（匹配规则、位置、业务上下文）
+  → ConversationViewNode / ViewSnapshot
+  → 聊天气泡、工具卡片、执行轨迹</code></pre>
+    <p><code>assistant/chunk</code> 持续更新气泡，完整消息到来后形成最终内容；工具调用与结果按 callId 关联成卡片；Turn / Step 边界提供位置与完成状态。因此，一张卡片可以消费多条事件，一条事件也可能影响多个展示结果。</p>
+    <p>人类聊天历史不能直接复用压缩后的模型 Surface，否则压缩会让用户之前看过的内容消失。原始追加消息是人类历史的材料，替换副本主要服务模型上下文。界面还可能有独立的实时交互状态；不能假设页面上的一切都能由 Session Log 恢复。</p>
+    <h3>领域状态：服务端折叠，客户端接收完整值</h3>
+    <pre><code>ProjectionDefinition = { key, schema, init, apply, view, stateVersion }
+  init() → apply(状态, 每条已提交事件) → view(状态)
+  → 历史尾页快照 { asOfSeq, values }
+  → 实时 session/projection { key, value, seq }
+  → 客户端 ProjectionValueStore：较大的 seq 获胜
+  → Todo / Plan / Goal / 标题 / 全会话统计</code></pre>
+    <p>领域注册计算规则，框架统一驱动；与当前领域无关的事件返回同一状态引用，可避免下游更新。客户端不重复实现领域折叠。重启后可以从日志重建，挂载投影缓存时也可从有效缓存接着计算。</p>
+    <p>投影遵守各领域自己的规则，不是一律“取最后一条”。例如当前 Todo UI 投影在下一次 turn/start 清空；历史 todo/write 仍保留。Plan UI 的 pending 展示也不等于恢复了执行端等待中的 Promise 或切换意图。</p>
+    <p><a href="../deepseek-harness/packages/client/runtime/src/client/sessions/conversation-assembler.ts">客户端组装器</a> · <a href="../deepseek-harness/packages/client/ui-trajectory/src/client/trajectory-tool-definition.ts">工具卡片关联</a> · <a href="../deepseek-harness/packages/session/session-projection/README.zh.md">服务端投影</a> · <a href="../deepseek-harness/packages/client/runtime/src/client/sessions/projection-store.ts">客户端 seq 规则</a> · <a href="plan-eventlog-ui-recovery.html">Plan / Todo 的边界</a></p>
+  </section>
+
+  <section id="storage"><h2>③ JSONL：无损编码与持久化，不是内容筛选</h2>
+    <pre><code>SessionHeader → 首行 type: "session"
+SessionEvent[] → StorageRecord[] → JSONL 逻辑行 → 可选 Zstd → 文件
+                ├─ 原样 SessionEvent
+                └─ ChunkRow：text-chunks / reasoning-chunks / tool-call-chunks
+
+读取：文件 → 解压 → 解码存储行 → 连续 seq 的 SessionEvent[] → 重建 Session</code></pre>
+    <p>默认 <code>packChunks: true</code>、<code>compression: "zstd"</code>。符合条件的至少三条连续同 block delta 可以合并成一个存储行，但成员序号、时间与分片边界都能还原。它没有像遥测那样丢弃中间 chunks。</p>
+    <p><strong>三个对象要分开：</strong>SessionEvent 是逻辑事件，StorageRecord 是存储行值，JSONL / Zstd 是文本与字节编码。打包行不会进入 Session.events，也不是新的领域事件。SQLite 是持久化 seam 的另一个后端，并非必须先写 JSONL 再导入 SQLite。</p>
+    <p>恢复读取已持久化的前缀，修复中断的工具、Step、Turn 生命周期，再组装可接受新 Turn 的 Agent。只有调用无结果时，不能据此推断外部副作用没发生；恢复后的处理需区分未启动和结果未知。恢复不会复活旧网络流、工具进程或调用栈。</p>
+    <p><a href="../deepseek-harness/packages/core/session/src/chunk-rows.ts">StorageRecord / ChunkRow 与无损 codec</a> · <a href="../deepseek-harness/packages/session/session-persistence-jsonl/README.zh.md">JSONL 编码与耐久语义</a> · <a href="../deepseek-harness/packages/core/session/src/repair.ts">中断修复</a> · <a href="session-event-log-recovery-and-otel.md">恢复与 OTel 拓展阅读</a></p>
+  </section>
+
+  <section id="otel"><h2>④ OTel：观测投影，加上独立的运行信号</h2>
+    <pre><code>SessionEvent → 固定 chunk 投影 → 复制 data → 部署方脱敏规则
+             → SessionTelemetryRecord → logger.emit(LogRecord)
+             → BatchLogRecordProcessor → OTLPLogExporter → Collector
+
+agent/error / shutdown → ops 记录 ────────┘
+Session 事件副本        → ledger 记录 ─────┘</code></pre>
+    <div class="table-scroll"><table><thead><tr><th>来源</th><th>逻辑遥测字段</th><th>OTel 字段</th></tr></thead><tbody>
+      <tr><td>事件发生时间</td><td><code>time</code></td><td><code>timestamp</code> / <code>observedTimestamp</code></td></tr>
+      <tr><td>事件 data 的深拷贝</td><td><code>body</code></td><td><code>body</code>，经部署策略处理后导出</td></tr>
+      <tr><td>会话身份、类型、序号</td><td><code>attributes</code></td><td><code>session.id</code> / <code>event.type</code> / <code>event.seq</code> 等</td></tr>
+      <tr><td>事件结果与策略</td><td><code>severity</code></td><td>INFO / WARN / ERROR 的标准编号与文本</td></tr>
+      <tr><td>会话事件 / 运行信号</td><td><code>channel: ledger | ops</code></td><td>选择不同 instrumentation logger scope</td></tr>
+      <tr><td>部署产品与版本</td><td>后端配置的 Resource</td><td><code>service.name</code> / <code>service.version</code> 等</td></tr>
+    </tbody></table></div>
+    <p>固定 chunk 投影仅保留每个 <code>(turn, step)</code> 的第一条 assistant/chunk，因此 seq 有缺口是正常情况。其他事件在固定投影层透传，之后仍受共享模式与部署方脱敏规则约束。工具错误结果和错误 turn/end 等会映射为 ERROR。</p>
+    <p><code>FULL</code> 实时交接，<code>FEEDBACK_ONLY</code> 在反馈事件触发时释放相应日志前缀，<code>DISABLED</code> 不交接。当前默认禁用；脱敏扩展点不自带部署方的脱敏规则，不能把“有扩展点”理解成“已自动清理敏感数据”。</p>
+    <p><strong>这是 OTel Logs 实现。</strong>不能据此认定已有 Traces、Metrics 或账单级投递保证。SDK 队列可能丢失或重复交付，恢复也不保证补发上一进程遗漏的记录。OTel 不参与 agents.resume()，更不能替代权威日志。</p>
+    <p><a href="../deepseek-harness/packages/session/session-telemetry/src/index.ts">SessionTelemetryRecord</a> · <a href="../deepseek-harness/packages/session/session-telemetry/src/coordinator.ts">筛选、复制、严重级别与身份映射</a> · <a href="../deepseek-harness/packages/session/session-telemetry-otel/src/index.ts">logger.emit 与 OTLP 导出</a> · <a href="../deepseek-harness/packages/session/session-telemetry-otel/README.zh.md">模式与交付限制</a></p>
+  </section>
+
+  <section id="more"><h2>还有哪些结果可以从事件得到？</h2>
+    <div class="table-scroll"><table><thead><tr><th>用途</th><th>当前依赖</th><th>实际边界</th></tr></thead><tbody>
+      <tr><td>Session 冷恢复与新一轮继续</td><td>耐久 Header、事件、修复逻辑、Agent 重新组装。</td><td>恢复逻辑会话，不恢复旧执行现场。</td></tr>
+      <tr><td>统计读模型</td><td>Turn / Step 边界、首 chunk、调用与结果、assistant usage。</td><td>轮数、步数、LLM / 工具耗时、首 token 延迟等；缺少输入的指标不能凭空补全。</td></tr>
+      <tr><td>领域状态</td><td>Plan、Todo、Goal、权限等各自的事件与折叠规则。</td><td>按领域决定当前值，不等于所有运行时状态都已耐久化。</td></tr>
+      <tr><td>请求检查与内容来源</td><td>请求 header、指定日志前缀的 Surface、sourceEventSeqs。</td><td>解释请求从哪些事实组装而来，不等于模型输出可确定性重现。</td></tr>
+      <tr><td>Fork 与父子会话谱系</td><td>Header 的 parentSession、seedLength；子会话自身的日志与 descriptor。</td><td>父工具调用历史不能代替子会话完整记录。</td></tr>
+    </tbody></table></div>
+    <p><a href="../deepseek-harness/packages/session/session-stats/README.zh.md">统计投影口径</a> · <a href="../deepseek-harness/packages/core/session/src/types.ts">Header 与来源类型</a> · <a href="../deepseek-harness/packages/subagent/subagent/src/descriptor.ts">子会话 descriptor</a></p>
+    <div class="callout"><strong>新增功能时可以这样判断：</strong>“重启以后必须记住哪件已发生的事？”先给这件事实定义事件和恢复语义，再分别决定模型怎样读、UI 怎样显示、磁盘怎样存、遥测怎样导出。一次文件写入的工具结果可以进入日志，但日志本身不是整个工作区的文件快照。</div>
+  </section>
+
+  <section id="verify"><h2>稳定核验路径：避免只看名字就推断能力</h2>
+    <p>这些是可控的核验方法，不是声称本页已运行真实模型、崩溃注入或外部 Collector 测试。</p>
+    <ol>
+      <li><strong>固定模型输出：</strong>用可控流依次产生文本、工具调用和结果，记录全部事件。对照 deriveMessages，确认 chunks 与 tool/call 没有额外产生重复消息。</li>
+      <li><strong>检查两层消息：</strong>比较内部 ToolResultMessage 与 DeepSeek serializeMessages 的输出，确认 user + tool-result 转成 wire role=tool。</li>
+      <li><strong>触发一次压缩：</strong>比较原日志、Surface.nodes 与 UI 历史。原事件仍在，模型输入可被摘要替代，人类历史不能因此被抹去。</li>
+      <li><strong>检查持久化往返：</strong>同一事件序列分别在 packChunks 开/关时写入；解码后逐字段比较 seq、time、data 与 Surface 元数据。</li>
+      <li><strong>检查领域状态：</strong>固定 todo/write 后再追加 turn/start，比较 UI 投影和原日志，证明 UI 清单清空不等于删除历史事件。</li>
+      <li><strong>检查遥测筛选：</strong>同一步发送多条 chunk，验证只导出第一条；再分别测试 FULL、FEEDBACK_ONLY、DISABLED 与脱敏规则。</li>
+      <li><strong>检查重启：</strong>先 flush 再退出，从耐久日志恢复。查看修复事件与新 Turn，不能把恢复后的消息历史当成旧工具仍在运行的证明。</li>
+    </ol>
+    <details><summary>最常见的五个误判</summary><ul><li>“所有事件都能直接变成模型消息。”——只有指定 Surface 事件派生消息，请求头另走一条路径。</li><li>“UI 就是 messages 数组。”——UI 还需要分片、边界、工具展示与领域状态。</li><li>“JSONL 永远是一事件一物理行。”——当前支持无损分片打包与 Zstd。</li><li>“出现相同 type 字段，就属于同一个类型系统。”——帧、事件、chunk、block、存储行有各自词汇。</li><li>“OTel 收到数据就能恢复会话。”——遥测是可能经过筛选与脱敏的观测副本。</li></ul></details>
+  </section>
+  <p><a href="deepseek-harness-build-roadmap.html">返回课程首页 →</a> · <a href="qa-eventlog-ui-recovery.html">继续阅读 QA 专题 →</a> · <a href="workflow-eventlog-ui-recovery.html">Workflow 专题 →</a></p>
+</main>
+<script>
+// 演示数据只解释固定源码中的映射规则，不模拟真实模型或遥测发送。
+const eventExplanations = {
+  chunk: [
+    '增量更新当前助手气泡；多个分片归入同一个 Step 的展示。',
+    '不独立派生消息。完整输出稍后由 assistant/message 进入历史，避免重复。',
+    '无损保存；符合条件的连续 delta 可以打包，读取时还原原始事件。',
+    '固定投影只保留每个 (turn, step) 的第一条 assistant/chunk；再受模式与脱敏策略控制。',
+  ],
+  assistant: [
+    '提交完整助手内容，和此前流式分片关联，形成最终的助手展示。',
+    '位于当前 Surface 且内容非空时，取出 AssistantMessage；其中可以包含文本、思考与工具调用块。',
+    '按完整事件保存，保留 message、可选 usage、Surface 操作及来源序号。',
+    '固定投影保留该事件；data 作为 body 副本，之后受模式与脱敏策略控制。',
+  ],
+  call: [
+    '创建运行中的工具卡片，记录名称与参数；后续按 callId 关联结果。',
+    '不额外派生消息。模型调用块已经在 assistant/message 里，避免重复生成工具调用。',
+    '保存调用事实与原始参数字符串；只有调用记录不能证明工具已执行成功。',
+    '固定投影保留调用数据副本；通常是 INFO，之后受模式与脱敏策略控制。',
+  ],
+  result: [
+    '关联工具卡片，显示完成或错误；可利用工具私有 meta 生成结果展示。',
+    '取 ToolResultMessage。内部 role=user、内容为 tool-result 块；DeepSeek 适配器再转换成 wire role=tool。',
+    '保存模型可见结果、可选 error 与展示 meta；meta 必须可无损 JSON 序列化。',
+    '固定投影保留数据副本；结果块 isError=true 时映射为 ERROR，之后受模式与脱敏策略控制。',
+  ],
+  todo: [
+    '服务端 todos 投影接收完整清单，通过 session/projection 发送；当前实现下一次 turn/start 会清空 UI 投影。',
+    '不独立派生消息。模型通过工具调用参数与工具结果获知相应清单信息。',
+    '完整保存 todo/write 快照；UI 后来清空清单不删除这条历史事件。',
+    '固定投影保留 todo/write 副本，之后受模式与脱敏策略控制。',
+  ],
+  header: [
+    '可用于请求检查和配置轨迹；不是普通聊天气泡。',
+    '不进入 messages 数组。system、tools 与模型配置另行参与完整请求组装。',
+    '保留完整请求头快照；当前 Surface 消息与请求头共同说明请求内容。',
+    '固定投影保留完整 data 副本，之后受模式与脱敏策略控制；脱敏扩展点不自带部署方规则。',
+  ],
+};
+
+// 缓存页面节点；每次只更新四段文字，按钮焦点保持在用户选中的位置。
+const eventButtons = document.querySelectorAll('[data-event]');
+const resultParagraphs = document.querySelectorAll('#event-results .result-card p');
+
+// 根据所选事件切换说明；只写 textContent，说明数据不会作为 HTML 执行。
+function selectEvent(eventKey) {
+  const explanations = eventExplanations[eventKey];
+  if (!explanations) return;
+  eventButtons.forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.event === eventKey));
+  });
+  resultParagraphs.forEach((paragraph, index) => {
+    paragraph.textContent = explanations[index];
+  });
+}
+
+// 原生按钮保留键盘 Enter / Space 支持，点击行为只发生在浏览器本地。
+eventButtons.forEach(button => {
+  button.addEventListener('click', () => selectEvent(button.dataset.event));
+});
+</script>
+</body></html>

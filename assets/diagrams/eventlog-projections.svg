@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 830" role="img" aria-labelledby="title desc">
+<title id="title">Session Event Log 的五条消费分支</title>
+<desc id="desc">事件分别投影到模型消息、聊天 UI、领域状态、持久化与恢复、遥测。分支之间不是八层串行调用。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#657799"/></marker></defs>
+<rect width="1040" height="830" rx="16" fill="#fbfcfe"/>
+<g font-family="PingFang SC,Microsoft YaHei,sans-serif" text-anchor="middle" fill="#172033">
+<g fill="none" stroke="#657799" stroke-width="2" marker-end="url(#arrow)">
+<path d="M520 94V140"/><path d="M520 214V250H170V295"/><path d="M520 214V295"/><path d="M520 214V250H870V295"/>
+<path d="M170 363V398"/><path d="M520 363V398"/><path d="M870 363V398"/>
+<path d="M170 466V500"/><path d="M520 466V500"/><path d="M870 466V500"/>
+<path d="M520 214H1010V610H280V655"/><path d="M1010 610H760V655"/>
+<path d="M280 723V755"/><path d="M760 723V755"/>
+</g>
+<g stroke="#b8c5e0" stroke-width="1.5">
+<rect x="360" y="26" width="320" height="68" rx="12" fill="#edf2ff"/>
+<rect x="320" y="140" width="400" height="74" rx="12" fill="#dce7ff"/>
+<rect x="25" y="295" width="290" height="68" rx="10" fill="#edf2ff"/>
+<rect x="375" y="295" width="290" height="68" rx="10" fill="#edf2ff"/>
+<rect x="725" y="295" width="290" height="68" rx="10" fill="#edf2ff"/>
+<rect x="25" y="398" width="290" height="68" rx="10" fill="white"/>
+<rect x="375" y="398" width="290" height="68" rx="10" fill="white"/>
+<rect x="725" y="398" width="290" height="68" rx="10" fill="white"/>
+<rect x="25" y="500" width="290" height="68" rx="10" fill="#eaf5ef"/>
+<rect x="375" y="500" width="290" height="68" rx="10" fill="#eaf5ef"/>
+<rect x="725" y="500" width="290" height="68" rx="10" fill="#eaf5ef"/>
+<rect x="85" y="655" width="390" height="68" rx="10" fill="#fff3db"/>
+<rect x="565" y="655" width="390" height="68" rx="10" fill="#fff3db"/>
+</g>
+<g font-size="18">
+<text x="520" y="67">Agent Loop / 领域插件</text>
+<text x="520" y="121" font-size="14" fill="#667085">session.append：顺序编号、冻结、追加</text>
+<text x="520" y="172" font-weight="700">SessionEvent</text><text x="520" y="197" font-size="15">type + seq + time + data；已提交的会话事实</text>
+<text x="170" y="324">Surface</text><text x="170" y="348" font-size="14">当前模型可见历史：append / replace</text>
+<text x="520" y="324">MuxFrame</text><text x="520" y="348" font-size="14">历史读取 / 实时事件传输</text>
+<text x="870" y="324">SessionProjectionMap</text><text x="870" y="348" font-size="14">服务端 init → apply → view</text>
+<text x="170" y="428">Message / ContentBlock</text><text x="170" y="452" font-size="14">只派生消息，不重复拼接 chunks</text>
+<text x="520" y="428">ConversationNodeAssembler</text><text x="520" y="452" font-size="14">客户端匹配、归组、增量组装</text>
+<text x="870" y="428">session/projection</text><text x="870" y="452" font-size="14">完整值 + seq → 客户端 Store</text>
+<text x="170" y="529">Provider WireMessage</text><text x="170" y="553" font-size="14">适配器 → 模型 API</text>
+<text x="520" y="529">聊天气泡 / 工具卡片 / 轨迹</text><text x="520" y="553" font-size="14">保留用户看过的历史</text>
+<text x="870" y="529">Todo / Plan / Goal / 统计</text><text x="870" y="553" font-size="14">按 key 保存最新投影值</text>
+<text x="280" y="684">StorageRecord：无损保存</text><text x="280" y="708" font-size="14">SessionEvent 或 ChunkRow → JSONL / Zstd</text>
+<text x="760" y="684">SessionTelemetryRecord</text><text x="760" y="708" font-size="14">固定分片筛选 → 复制 → 部署方脱敏</text>
+<text x="280" y="783">恢复 Session，再开始新一轮</text><text x="280" y="809" font-size="14" fill="#667085">SQLite 是另一个持久化后端</text>
+<text x="760" y="783">OTel LogRecord → OTLP/HTTP</text><text x="760" y="809" font-size="14" fill="#667085">观测副本；当前已证实为 Logs</text>
+</g></g></svg>

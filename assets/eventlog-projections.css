@@ -1,0 +1,29 @@
+/* 专题沿用课程配色；宽表可滚动，手机端卡片按单列排列。 */
+.eventlog-page { max-width: 1120px; }
+.eventlog-page h1 { line-height: 1.25; }
+.eventlog-page nav { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 16px; background: var(--soft); border-radius: 12px; }
+.eventlog-page section { scroll-margin-top: 20px; }
+.eventlog-page .eyebrow { color: var(--accent); font-size: .85rem; font-weight: 700; letter-spacing: .08em; }
+.eventlog-page .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0; }
+.eventlog-page .fact { padding: 18px; background: white; border: 1px solid var(--line); border-radius: 12px; }
+.eventlog-page .fact strong { display: block; font-size: 1.6rem; color: var(--accent); }
+.eventlog-page .fact span { color: var(--muted); font-size: .92rem; }
+.eventlog-page .table-scroll { overflow-x: auto; margin: 18px 0; }
+.eventlog-page table { min-width: 720px; }
+.eventlog-page td code { overflow-wrap: anywhere; }
+.eventlog-page .event-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.eventlog-page button { padding: 10px 14px; font: inherit; cursor: pointer; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 8px; }
+.eventlog-page button[aria-pressed="true"] { color: white; background: var(--accent); border-color: var(--accent); }
+.eventlog-page button:focus-visible { outline: 3px solid #b38b1e; outline-offset: 3px; }
+.eventlog-page .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.eventlog-page .result-card { background: white; border: 1px solid var(--line); padding: 16px; border-radius: 10px; }
+.eventlog-page .result-card h3 { margin: 0 0 8px; color: var(--accent); font-size: 1rem; }
+.eventlog-page .result-card p { margin: 0; }
+.eventlog-page .subtle { color: var(--muted); font-size: .9rem; }
+.eventlog-page details { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.eventlog-page summary { cursor: pointer; font-weight: 650; }
+@media (max-width: 650px) {
+  .eventlog-page { padding: 28px 18px 64px; }
+  .eventlog-page h1 { font-size: 1.9rem; }
+  .eventlog-page .facts, .eventlog-page .result-grid { grid-template-columns: 1fr; }
+}
