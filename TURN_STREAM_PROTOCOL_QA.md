@@ -2,6 +2,8 @@
 
 本文是 [Turn、Step、Stream 与 Tool 生命周期](./TURN_STREAM_PROTOCOL.md) 的补充问答，重点覆盖实现、异常处理、恢复、并发和上下文构造中的边界情况。
 
+模型接口对照见主文 [第 10 节：Chat Completions API 与 Responses API](./TURN_STREAM_PROTOCOL.md#model-api-protocols)。本 QA 的 DeepSeek 请求示例采用 Chat Completions 风格；Responses 的 input/output Items、工具结果回传和 SSE 事件映射在该节展开。
+
 ## 一、模型流与消息组装
 
 ### Q1：一个 Step 能产生多个 `assistant/message` 吗？

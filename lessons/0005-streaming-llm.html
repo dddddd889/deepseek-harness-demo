@@ -10,6 +10,179 @@
   <nav aria-label="全站架构导航"><a href="../reference/deepseek-harness-build-roadmap.html#architecture-domains">全站总体架构：前端 · 后端 · 数据库 · OTel</a></nav>
   <h1>第 5 课：可控流式 LLM 与 DeepSeek Adapter</h1>
   <p class="lead">核心只依赖 StreamChunk 协议。Fake Provider 与真实 DeepSeek Provider 共享同一 Runtime、Assembler 和 Session 落账路径。</p>
+  <p><a href="#model-api-worked-example">先看具体例子：两种 API 各自完成一次读文件任务</a> · 接口协议补充：<a href="../TURN_STREAM_PROTOCOL.md#model-api-protocols">Chat Completions API 与 Responses API：报文、工具闭环、SSE 与 StreamChunk 映射</a>。本课 harness-lab 已实现 DeepSeek Chat 适配器；Responses 部分说明扩展边界与上游支持范围。</p>
+
+<section id="model-api-worked-example">
+<h2>具体例子：读取 package.json，判断 ESM / CommonJS</h2>
+<p>用户发送：“帮我读取 package.json，告诉我这个项目使用 ESM 还是 CommonJS。”工作区的文件内容固定为 <code>{&quot;name&quot;:&quot;demo&quot;,&quot;type&quot;:&quot;module&quot;}</code>。期望最后回答：“这个项目使用 ESM，因为 package.json 中的 type 是 module。”</p>
+<p>我们把整次任务固定成：第一次请求模型提出读文件 → Harness 真正读文件 → 第二次请求模型解释结果。下面是手写的教学报文，方便逐条对照；不是线上抓包。<code>your-model-id</code> 要换成所选接口支持的模型。</p>
+<h3>A. Chat Completions：调用放在 assistant 消息里，结果放在 tool 消息里</h3>
+<p><strong>第 1 步：Harness 向 <code>/v1/chat/completions</code> 发送下面的请求。</strong> tools 只是告诉模型“有这个工具可以申请”，此时还没读文件。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;model&quot;: &quot;your-model-id&quot;,
+  &quot;stream&quot;: false,
+  &quot;messages&quot;: [{ &quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;帮我读取 package.json，告诉我这个项目使用 ESM 还是 CommonJS。&quot; }],
+  &quot;tools&quot;: [{
+    &quot;type&quot;: &quot;function&quot;,
+    &quot;function&quot;: {
+      &quot;name&quot;: &quot;read_file&quot;,
+      &quot;description&quot;: &quot;读取工作区中的文本文件&quot;,
+      &quot;strict&quot;: true,
+      &quot;parameters&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;properties&quot;: { &quot;path&quot;: { &quot;type&quot;: &quot;string&quot; } },
+        &quot;required&quot;: [&quot;path&quot;],
+        &quot;additionalProperties&quot;: false
+      }
+    }
+  }]
+}</code></pre></details>
+<p><strong>第 2 步：模型返回“我要读 package.json”。</strong> 响应的关键字段如下。<code>arguments</code> 是 JSON 字符串，模型此时没有读到文件内容。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;choices&quot;: [{
+    &quot;index&quot;: 0,
+    &quot;message&quot;: {
+      &quot;role&quot;: &quot;assistant&quot;,
+      &quot;content&quot;: null,
+      &quot;tool_calls&quot;: [{
+        &quot;id&quot;: &quot;call_read_1&quot;,
+        &quot;type&quot;: &quot;function&quot;,
+        &quot;function&quot;: { &quot;name&quot;: &quot;read_file&quot;, &quot;arguments&quot;: &quot;{\&quot;path\&quot;:\&quot;package.json\&quot;}&quot; }
+      }]
+    },
+    &quot;finish_reason&quot;: &quot;tool_calls&quot;
+  }]
+}</code></pre></details>
+<p><strong>第 3 步：Harness 校验路径和权限，然后本地执行读文件。</strong> 工具实际返回字符串 <code>{&quot;name&quot;:&quot;demo&quot;,&quot;type&quot;:&quot;module&quot;}</code>。这一步发生在自己的程序里，不是再调用一次模型 API。</p>
+<p><strong>第 4 步：Harness 再向同一个端点发送请求。</strong> 这次把“用户问题、模型申请、实际结果”一起发回去。为突出这三条消息，本例第二次请求不再提供 tools，让模型直接解释已有结果。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;model&quot;: &quot;your-model-id&quot;,
+  &quot;stream&quot;: false,
+  &quot;messages&quot;: [
+    { &quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;帮我读取 package.json，告诉我这个项目使用 ESM 还是 CommonJS。&quot; },
+    {
+      &quot;role&quot;: &quot;assistant&quot;,
+      &quot;content&quot;: null,
+      &quot;tool_calls&quot;: [{
+        &quot;id&quot;: &quot;call_read_1&quot;,
+        &quot;type&quot;: &quot;function&quot;,
+        &quot;function&quot;: { &quot;name&quot;: &quot;read_file&quot;, &quot;arguments&quot;: &quot;{\&quot;path\&quot;:\&quot;package.json\&quot;}&quot; }
+      }]
+    },
+    { &quot;role&quot;: &quot;tool&quot;, &quot;tool_call_id&quot;: &quot;call_read_1&quot;, &quot;content&quot;: &quot;{\&quot;name\&quot;:\&quot;demo\&quot;,\&quot;type\&quot;:\&quot;module\&quot;}&quot; }
+  ]
+}</code></pre></details>
+<p><strong>第 5 步：模型返回最终解释。</strong> 读取 <code>choices[0].message.content</code>，这次 <code>finish_reason</code> 是 stop。整次任务用了两次模型请求。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;choices&quot;: [{
+    &quot;index&quot;: 0,
+    &quot;message&quot;: { &quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;这个项目使用 ESM，因为 package.json 中的 type 是 module。&quot; },
+    &quot;finish_reason&quot;: &quot;stop&quot;
+  }]
+}</code></pre></details>
+<h3>B. Responses：调用和结果各自是一个 Item</h3>
+<p><strong>第 1 步：Harness 向 <code>/v1/responses</code> 发送下面的请求。</strong> 同一个工具，函数定义少了一层 function，用户问题改放 input。这里选择手动传历史，设置 store 为 false。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;model&quot;: &quot;your-model-id&quot;,
+  &quot;stream&quot;: false,
+  &quot;store&quot;: false,
+  &quot;input&quot;: [{ &quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;帮我读取 package.json，告诉我这个项目使用 ESM 还是 CommonJS。&quot; }],
+  &quot;tools&quot;: [{
+    &quot;type&quot;: &quot;function&quot;,
+    &quot;name&quot;: &quot;read_file&quot;,
+    &quot;description&quot;: &quot;读取工作区中的文本文件&quot;,
+    &quot;strict&quot;: true,
+    &quot;parameters&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;properties&quot;: { &quot;path&quot;: { &quot;type&quot;: &quot;string&quot; } },
+      &quot;required&quot;: [&quot;path&quot;],
+      &quot;additionalProperties&quot;: false
+    }
+  }]
+}</code></pre></details>
+<p><strong>第 2 步：模型仍然只提出读文件申请。</strong> 这次申请是 output 中独立的 function_call Item，响应关键字段如下。本例固定输出只有这一项；实际返回若还有 reasoning 等可回传 Items，下一次也要保留。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;id&quot;: &quot;resp_read_1&quot;,
+  &quot;status&quot;: &quot;completed&quot;,
+  &quot;output&quot;: [{
+    &quot;id&quot;: &quot;fc_read_1&quot;,
+    &quot;type&quot;: &quot;function_call&quot;,
+    &quot;call_id&quot;: &quot;call_read_1&quot;,
+    &quot;name&quot;: &quot;read_file&quot;,
+    &quot;arguments&quot;: &quot;{\&quot;path\&quot;:\&quot;package.json\&quot;}&quot;
+  }]
+}</code></pre></details>
+<p><strong>第 3 步：Harness 执行同一次本地读文件，拿到同一份结果。</strong> 注意上面的 completed 只说明“这次响应已经生成完”，此时用户的问题还没回答。</p>
+<p><strong>第 4 步：Harness 再向 <code>/v1/responses</code> 发请求。</strong> 手动历史包含原问题、调用 Item 和结果 Item。本例同样不再提供 tools，让模型解释结果。结果中的 call_id 必须是 <code>call_read_1</code>，不是 <code>fc_read_1</code>，也不是 <code>resp_read_1</code>。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;model&quot;: &quot;your-model-id&quot;,
+  &quot;stream&quot;: false,
+  &quot;store&quot;: false,
+  &quot;input&quot;: [
+    { &quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;帮我读取 package.json，告诉我这个项目使用 ESM 还是 CommonJS。&quot; },
+    {
+      &quot;id&quot;: &quot;fc_read_1&quot;,
+      &quot;type&quot;: &quot;function_call&quot;,
+      &quot;call_id&quot;: &quot;call_read_1&quot;,
+      &quot;name&quot;: &quot;read_file&quot;,
+      &quot;arguments&quot;: &quot;{\&quot;path\&quot;:\&quot;package.json\&quot;}&quot;
+    },
+    { &quot;type&quot;: &quot;function_call_output&quot;, &quot;call_id&quot;: &quot;call_read_1&quot;, &quot;output&quot;: &quot;{\&quot;name\&quot;:\&quot;demo\&quot;,\&quot;type\&quot;:\&quot;module\&quot;}&quot; }
+  ]
+}</code></pre></details>
+<p><strong>第 5 步：模型返回最终解释。</strong> 这次 output 中是 message Item，正文在 output_text 内容块里。也用了两次模型请求。</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;id&quot;: &quot;resp_answer_2&quot;,
+  &quot;status&quot;: &quot;completed&quot;,
+  &quot;output&quot;: [{
+    &quot;id&quot;: &quot;msg_answer_2&quot;,
+    &quot;type&quot;: &quot;message&quot;,
+    &quot;role&quot;: &quot;assistant&quot;,
+    &quot;status&quot;: &quot;completed&quot;,
+    &quot;content&quot;: [{
+      &quot;type&quot;: &quot;output_text&quot;,
+      &quot;text&quot;: &quot;这个项目使用 ESM，因为 package.json 中的 type 是 module。&quot;,
+      &quot;annotations&quot;: []
+    }]
+  }]
+}</code></pre></details>
+<p>两套报文都经过同一个任务过程：第一次模型请求产生工具申请，自己的程序读文件，第二次模型请求产生回答。<a href="https://developers.openai.com/api/docs/guides/function-calling">请求与工具结果格式依据</a></p>
+<h3>C. 改成流式后，究竟在拼什么？</h3>
+<p>把第一次请求的 stream 改成 true。假设模型把函数参数拆成下面两段，适配器解析 SSE 后读到的关键字段如下。这里省略了块创建、结束等其他事件，只对照两段参数。</p>
+<pre><code>Chat 第 1 段：choices[0].delta.tool_calls[0]
+  {&quot;index&quot;:0,&quot;id&quot;:&quot;call_read_1&quot;,&quot;function&quot;:{&quot;name&quot;:&quot;read_file&quot;,&quot;arguments&quot;:&quot;{\&quot;path\&quot;:&quot;}}
+Chat 第 2 段：choices[0].delta.tool_calls[0]
+  {&quot;index&quot;:0,&quot;function&quot;:{&quot;arguments&quot;:&quot;\&quot;package.json\&quot;}&quot;}}
+
+Responses 第 1 段：response.function_call_arguments.delta
+  {&quot;item_id&quot;:&quot;fc_read_1&quot;,&quot;output_index&quot;:0,&quot;delta&quot;:&quot;{\&quot;path\&quot;:&quot;}
+Responses 第 2 段：response.function_call_arguments.delta
+  {&quot;item_id&quot;:&quot;fc_read_1&quot;,&quot;output_index&quot;:0,&quot;delta&quot;:&quot;\&quot;package.json\&quot;}&quot;}</code></pre>
+<p>Responses 的工具名和 call_id 由对应的 output_item.added 事件取得，不能从参数 delta 里猜。两种适配器最终都要组装出下面这个内部块，再交给工具管线：</p>
+<details><summary>展开本步 JSON 报文</summary><pre><code>{
+  &quot;type&quot;: &quot;tool-call&quot;,
+  &quot;id&quot;: &quot;call_read_1&quot;,
+  &quot;name&quot;: &quot;read_file&quot;,
+  &quot;arguments&quot;: &quot;{\&quot;path\&quot;:\&quot;package.json\&quot;}&quot;
+}</code></pre></details>
+<p>收到第一段时只有 <code>{&quot;path&quot;:</code>，连 JSON 都不完整，不能开始读文件。第二段到达并确认调用完整后，才解析出 path，再校验、执行。调用名和参数流事件的具体结构见 <a href="https://developers.openai.com/api/docs/guides/function-calling">函数调用流式示例</a>。</p>
+<h3>D. 这些具体报文落到 Turn / Step 后长什么样？</h3>
+<pre><code>Turn 1 开始：用户要求判断 ESM / CommonJS
+  Step 1
+    HTTP 请求 1：问题 + read_file 工具定义
+    模型响应：read_file，参数 package.json，调用 ID call_read_1
+    assistant/message：含上面的 tool-call 块
+    tool/call：call_read_1
+    tool/result：call_read_1 → {&quot;name&quot;:&quot;demo&quot;,&quot;type&quot;:&quot;module&quot;}
+  Step 1 结束
+  Step 2
+    HTTP 请求 2：问题 + 先前调用 + 对应文件结果
+    模型响应：“这个项目使用 ESM，因为 package.json 中的 type 是 module。”
+    assistant/message：含最终文本
+  Step 2 结束
+Turn 1 完成</code></pre>
+<p>具体数一下：一个 Turn、两个 Step、两次模型 HTTP 请求、一次本地读文件。Chat 和 Responses 改变的是上面两次 HTTP 的报文形状，工具管线收到的完整调用仍是同一份。</p>
+</section>
 
   <!-- 章节定位与对比：开始 -->
   <nav aria-label="本课阅读导航"><a href="#concept-index">概念逐项对比</a> · <a href="#system-position">本章系统位置</a> · <a href="#visual-diagrams">局部图解</a> · <a href="#framework-comparison">章节概览（可选）</a></nav>
