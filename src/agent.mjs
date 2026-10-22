@@ -1,5 +1,5 @@
 import { Inbox } from './inbox.mjs'
-import { runTurn } from './loop.mjs'
+import { runTurn } from './loop_012.mjs'
 
 /** Agent 是活动的所有者；收到输入不等于开始执行。 */
 export class Agent {

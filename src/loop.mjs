@@ -37,13 +37,22 @@ export async function runTurn({ session, model, tools, signal, config = {}, inbo
       session.append('request/end', { requestId, reason: finish })
       if (finish !== 'tools') { ending = finish === 'stop' ? 'completed' : 'length'; break }
       if (!calls.length) throw Error('工具结束但没有工具调用')
-      for (const call of calls) {
-        session.append('tool/start', { turnId, call }) // 行动前的持久边界。
-        let result
-        try { result = { ok: true, value: await tools.execute(call, { signal, session, turnId }) } }
-        catch (error) { result = { ok: false, error: signal.aborted ? 'CANCELLED_OR_OUTCOME_UNKNOWN' : error.message } }
-        session.append('message/tool', { role: 'tool', callId: call.id, name: call.name, content: result })
+      const execute = async call => {
+        session.append('tool/start', { turnId, call }) // 每个副作用前先留下持久事实。
+        return await tools.execute(call, { signal, session, turnId })
       }
+      // 没装并发策略时仍走同一个执行门；装上后由元数据决定安全并发组。
+      const results = tools.batch
+        ? await tools.batch(calls, { signal, session, turnId, before: call => session.append('tool/start', { turnId, call }) })
+        : await (async () => {
+          const rows = []
+          for (const call of calls) {
+            try { rows.push({ ok: true, value: await execute(call) }) }
+            catch (error) { rows.push({ ok: false, error: signal.aborted ? 'CANCELLED_OR_OUTCOME_UNKNOWN' : error.message }) }
+          }
+          return rows
+        })()
+      calls.forEach((call, index) => session.append('message/tool', { role: 'tool', callId: call.id, name: call.name, content: results[index] }))
     }
   } catch (error) {
     // 保留取消前真正收到的文字，但不伪装成成功完成。

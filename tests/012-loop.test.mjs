@@ -4,7 +4,7 @@ import { Events } from '../src/events.mjs'
 import { Tools } from '../src/tools.mjs'
 import { Scope } from '../src/scope.mjs'
 import { ScriptModel, answer, call } from '../src/model.mjs'
-import { runTurn } from '../src/loop.mjs'
+import { runTurn } from '../src/loop_012.mjs'
 
 test('模型、真实工具、第二次模型构成一轮，调用关联不丢', async () => {
   const session = new Events(), tools = new Tools(), scope = new Scope()
