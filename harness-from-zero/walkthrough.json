@@ -1,0 +1,131 @@
+{
+  "project": "harness-from-zero",
+  "samples": {
+    "main": {
+      "file": "src/main.ts",
+      "code": "// 第 00 步先验证自己的代码能够运行，之后再逐步增加能力。\nconst message = '我的 Harness 开始运行了'\nconsole.log(message)\n"
+    },
+    "test": {
+      "file": "tests/00-baseline.test.ts",
+      "code": "import { expect, test } from 'bun:test'\n\n// 用独立子进程验证实际入口的输出和退出码。\ntest('入口输出固定内容并正常退出', () => {\n  // 使用当前 Bun 可执行文件启动自己写的入口。\n  const result = Bun.spawnSync([process.execPath, 'src/main.ts'])\n  expect(result.exitCode).toBe(0)\n  expect(result.stdout.toString().trim()).toBe('我的 Harness 开始运行了')\n})\n"
+    }
+  },
+  "baseline": [
+    {
+      "title": "先选一条目标，再开始共同的第 00 步",
+      "where": "本地学习笔记",
+      "text": "选择 CLI、Web、ACP、Electron 或完整实现，把目标记下来。所有目标都从 00 开始；选择 Electron 也从通用基础开始。",
+      "done": "写下自己的目标；不确定时也可以先完成通用的 00 步。"
+    },
+    {
+      "title": "单独打开自己的空项目，检查 Bun",
+      "where": "本机编辑器 + 编辑器终端",
+      "text": "在 VS Code 或你熟悉的编辑器中打开 harness-from-zero 文件夹。如果复制到了新目录，打开复制后的项目根目录。终端中应能看到 package.json、src/ 和 tests/；不要在旧实验室目录写代码。",
+      "commands": [
+        {
+          "cwd": "若终端还在课程仓库根目录",
+          "command": "cd harness-from-zero",
+          "expected": "终端进入自己的实现项目。已经在项目内时，跳过这条 cd。"
+        },
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun --version",
+          "expected": "显示 Bun 版本号。课程基线为 1.3.14；若提示找不到 bun，先安装本机 Bun，再继续。"
+        },
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun -e \"console.log(process.cwd())\"",
+          "expected": "打印你刚打开的实现项目路径；该目录应有 package.json。"
+        }
+      ],
+      "done": "编辑器和终端指向同一个实现项目，Bun 命令可用。"
+    },
+    {
+      "title": "自己创建第一份源码",
+      "where": "本机编辑器 · 项目根目录下的 src/",
+      "text": "在 src/ 下新建 main.ts，把下方最小示例手动写进去并保存。这里只有一条固定输出，先把工程入口跑通。后续步骤再增加输入、模型和工具。",
+      "files": [
+        "src/main.ts"
+      ],
+      "sample": "main",
+      "done": "编辑器中存在已保存的 src/main.ts；这里只要求你创建这一个文件。"
+    },
+    {
+      "title": "运行源码，先看见一条真实输出",
+      "where": "本机终端 · 自己的项目根目录",
+      "text": "先确认上一步已保存，再执行下面的命令。请在本机终端执行命令。",
+      "commands": [
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun run dev",
+          "expected": "终端打印“我的 Harness 开始运行了”，程序正常退出。"
+        }
+      ],
+      "done": "看到完全相同的文字。若报入口不存在，检查是否保存为 src/main.ts，以及终端是否在自己的项目根目录。"
+    },
+    {
+      "title": "自己创建首个测试",
+      "where": "本机编辑器 · 项目根目录下的 tests/",
+      "text": "在 tests/ 中新建 00-baseline.test.ts，写入下方测试。它会启动你刚才的 main.ts，检查输出与退出码。写完保存后，才运行测试命令。",
+      "files": [
+        "tests/00-baseline.test.ts"
+      ],
+      "sample": "test",
+      "commands": [
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun test tests/00-baseline.test.ts",
+          "expected": "1 个测试通过、0 个失败；如果找不到测试文件，先回编辑器创建并保存。"
+        }
+      ],
+      "done": "首个测试实际通过；“没有测试”不能算完成。"
+    },
+    {
+      "title": "构建，再运行构建后的产物",
+      "where": "本机终端 · 自己的项目根目录",
+      "text": "源码能跑之后，再确认自己将要发布的 JS 也能跑。两条命令按顺序执行。",
+      "commands": [
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun run build",
+          "expected": "生成 dist/main.js 和对应的 source map 文件。"
+        },
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun dist/main.js",
+          "expected": "仍然打印“我的 Harness 开始运行了”，并正常退出。"
+        }
+      ],
+      "done": "源码运行、首个测试和构建产物运行三个入口都已验证。"
+    },
+    {
+      "title": "停住一次程序，再稳定制造一个错误",
+      "where": "本机终端 + Bun 调试器",
+      "text": "先运行 debug，按终端显示的调试入口连接调试器，先单步执行到 message 赋值之后，观察它的值，再继续执行。首次会停住等待调试，这是正常的；结束后退出调试进程。接着运行第二条命令，故意指定一个不存在的文件，记录错误，再用 bun run dev 验证正常入口仍可用。",
+      "commands": [
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun run debug",
+          "expected": "出现调试入口并在开始处等待；连接调试器后能观察变量、继续执行。"
+        },
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun src/not-found.ts",
+          "expected": "这是刻意失败的命令，应提示找不到文件；不要创建 not-found.ts 来消除这个故障样本。"
+        },
+        {
+          "cwd": "自己的项目根目录",
+          "command": "bun run dev",
+          "expected": "正常入口再次输出固定文字；说明你能区分正确入口与故障入口。"
+        }
+      ],
+      "done": "留下调试观察和“错误命令 → 报错 → 正常命令恢复”的记录。"
+    },
+    {
+      "title": "记录证据并完成第 00 步",
+      "where": "本地学习笔记",
+      "text": "记录自己的解释、实际运行产物、故障复现与修正。保存本机代码和日志，方便之后复查。",
+      "done": "能解释源码与构建产物的区别，运行和测试结果可复查，故障已复现并修正。"
+    }
+  ]
+}

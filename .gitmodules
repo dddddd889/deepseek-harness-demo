@@ -4,3 +4,6 @@
 [submodule "cordis"]
 	path = cordis
 	url = git@github.com:cordiverse/cordis.git
+[submodule "typescript-sdk"]
+	path = typescript-sdk
+	url = git@github.com:agentclientprotocol/typescript-sdk.git

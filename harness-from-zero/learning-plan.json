@@ -1,0 +1,509 @@
+{
+  "00": {
+    "files": [
+      "src/main.ts",
+      "tests/00-baseline.test.ts"
+    ],
+    "test": "tests/00-baseline.test.ts",
+    "command": "bun test tests/00-baseline.test.ts",
+    "breakpoint": "程序入口、输入与退出位置",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "01": {
+    "files": [
+      "src/kernel.ts",
+      "tests/01-kernel.test.ts"
+    ],
+    "test": "tests/01-kernel.test.ts",
+    "command": "bun test tests/01-kernel.test.ts",
+    "breakpoint": "注册、启动失败回滚与 dispose",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "02": {
+    "files": [
+      "src/domain.ts",
+      "tests/02-domain.test.ts"
+    ],
+    "test": "tests/02-domain.test.ts",
+    "command": "bun test tests/02-domain.test.ts",
+    "breakpoint": "创建身份及解析外部输入",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "03": {
+    "files": [
+      "src/session.ts",
+      "src/projections.ts",
+      "tests/03-session.test.ts"
+    ],
+    "test": "tests/03-session.test.ts",
+    "command": "bun test tests/03-session.test.ts",
+    "breakpoint": "append 与两个投影的事件消费",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "04": {
+    "files": [
+      "src/model.ts",
+      "tests/fixtures/scripted-model.ts",
+      "tests/04-model-stream.test.ts"
+    ],
+    "test": "tests/04-model-stream.test.ts",
+    "command": "bun test tests/04-model-stream.test.ts",
+    "breakpoint": "流生产、分片组装与唯一终止",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "05": {
+    "files": [
+      "src/providers/deepseek.ts",
+      "tests/05-deepseek.test.ts"
+    ],
+    "test": "tests/05-deepseek.test.ts",
+    "command": "bun test tests/05-deepseek.test.ts",
+    "breakpoint": "请求发送、SSE 缓冲与错误映射",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "06": {
+    "files": [
+      "src/agent.ts",
+      "src/inbox.ts",
+      "tests/06-inbox.test.ts"
+    ],
+    "test": "tests/06-inbox.test.ts",
+    "command": "bun test tests/06-inbox.test.ts",
+    "breakpoint": "输入接收、原子认领与忙闲切换",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "07": {
+    "files": [
+      "src/tools.ts",
+      "tests/07-tools.test.ts"
+    ],
+    "test": "tests/07-tools.test.ts",
+    "command": "bun test tests/07-tools.test.ts",
+    "breakpoint": "工具注册、参数校验与异常归一",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "08": {
+    "files": [
+      "src/loop.ts",
+      "tests/08-agent-loop.test.ts"
+    ],
+    "test": "tests/08-agent-loop.test.ts",
+    "command": "bun test tests/08-agent-loop.test.ts",
+    "breakpoint": "模型请求、工具执行与下一步循环",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "09": {
+    "files": [
+      "src/cancellation.ts",
+      "src/loop.ts",
+      "tests/09-cancel.test.ts"
+    ],
+    "test": "tests/09-cancel.test.ts",
+    "command": "bun test tests/09-cancel.test.ts",
+    "breakpoint": "取消传播与 Turn 唯一收尾",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "10": {
+    "files": [
+      "src/tools/filesystem.ts",
+      "tests/10-filesystem.test.ts"
+    ],
+    "test": "tests/10-filesystem.test.ts",
+    "command": "bun test tests/10-filesystem.test.ts",
+    "breakpoint": "工作区路径校验、读取与写入",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "11": {
+    "files": [
+      "src/tools/process.ts",
+      "tests/11-process.test.ts"
+    ],
+    "test": "tests/11-process.test.ts",
+    "command": "bun test tests/11-process.test.ts",
+    "breakpoint": "进程启动、输出读取与关闭",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "12": {
+    "files": [
+      "src/approval.ts",
+      "tests/12-approval.test.ts"
+    ],
+    "test": "tests/12-approval.test.ts",
+    "command": "bun test tests/12-approval.test.ts",
+    "breakpoint": "pending 决定与取消竞争的结算点",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "13": {
+    "files": [
+      "src/storage/jsonl.ts",
+      "tests/13-jsonl-store.test.ts"
+    ],
+    "test": "tests/13-jsonl-store.test.ts",
+    "command": "bun test tests/13-jsonl-store.test.ts",
+    "breakpoint": "追加落盘、截断检测与加载",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "14": {
+    "files": [
+      "src/recovery.ts",
+      "tests/14-recovery.test.ts"
+    ],
+    "test": "tests/14-recovery.test.ts",
+    "command": "bun test tests/14-recovery.test.ts",
+    "breakpoint": "重放事件与未完成调用的恢复策略",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "15": {
+    "files": [
+      "src/context.ts",
+      "tests/15-context.test.ts"
+    ],
+    "test": "tests/15-context.test.ts",
+    "command": "bun test tests/15-context.test.ts",
+    "breakpoint": "请求上下文组装与压缩边界",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "16": {
+    "files": [
+      "src/storage/spill.ts",
+      "tests/16-spill.test.ts"
+    ],
+    "test": "tests/16-spill.test.ts",
+    "command": "bun test tests/16-spill.test.ts",
+    "breakpoint": "大结果写入及引用读取",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "17": {
+    "files": [
+      "src/storage/attachments.ts",
+      "tests/17-attachments.test.ts"
+    ],
+    "test": "tests/17-attachments.test.ts",
+    "command": "bun test tests/17-attachments.test.ts",
+    "breakpoint": "内容校验、存储与鉴权读取",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "18": {
+    "files": [
+      "src/skills.ts",
+      "tests/18-skills.test.ts"
+    ],
+    "test": "tests/18-skills.test.ts",
+    "command": "bun test tests/18-skills.test.ts",
+    "breakpoint": "发现、加载与卸载贡献",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "19": {
+    "files": [
+      "src/adapters/mcp.ts",
+      "tests/19-mcp.test.ts"
+    ],
+    "test": "tests/19-mcp.test.ts",
+    "command": "bun test tests/19-mcp.test.ts",
+    "breakpoint": "发现分页、工具桥接与连接释放",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "20": {
+    "files": [
+      "src/capabilities/web.ts",
+      "src/capabilities/lsp.ts",
+      "tests/20-capabilities.test.ts"
+    ],
+    "test": "tests/20-capabilities.test.ts",
+    "command": "bun test tests/20-capabilities.test.ts",
+    "breakpoint": "提供方选择与进程通信",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "21": {
+    "files": [
+      "src/jobs.ts",
+      "tests/21-jobs.test.ts"
+    ],
+    "test": "tests/21-jobs.test.ts",
+    "command": "bun test tests/21-jobs.test.ts",
+    "breakpoint": "创建、读取游标、等待与终止",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "22": {
+    "files": [
+      "src/subagents.ts",
+      "tests/22-subagents.test.ts"
+    ],
+    "test": "tests/22-subagents.test.ts",
+    "command": "bun test tests/22-subagents.test.ts",
+    "breakpoint": "发布子级、父级取消与结果回收",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "23": {
+    "files": [
+      "src/workflow.ts",
+      "tests/23-workflow.test.ts"
+    ],
+    "test": "tests/23-workflow.test.ts",
+    "command": "bun test tests/23-workflow.test.ts",
+    "breakpoint": "并发配额、阶段与 worker 终止",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "24": {
+    "files": [
+      "src/host.ts",
+      "src/cli.ts",
+      "tests/24-host.test.ts"
+    ],
+    "test": "tests/24-host.test.ts",
+    "command": "bun test tests/24-host.test.ts",
+    "breakpoint": "组装、创建会话与退出清理",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "25": {
+    "files": [
+      "src/server.ts",
+      "tests/25-server.test.ts"
+    ],
+    "test": "tests/25-server.test.ts",
+    "command": "bun test tests/25-server.test.ts",
+    "breakpoint": "解析、鉴权、会话路由与输入接收",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "26": {
+    "files": [
+      "src/web/client.ts",
+      "src/server.ts",
+      "tests/26-web-stream.test.ts"
+    ],
+    "test": "tests/26-web-stream.test.ts",
+    "command": "bun test tests/26-web-stream.test.ts",
+    "breakpoint": "快照边界、事件流与断线重连",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "27": {
+    "files": [
+      "src/web/approval.ts",
+      "src/server.ts",
+      "tests/27-web-approval.test.ts"
+    ],
+    "test": "tests/27-web-approval.test.ts",
+    "command": "bun test tests/27-web-approval.test.ts",
+    "breakpoint": "待审批同步、提交决定与附件读取",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "28": {
+    "files": [
+      "src/adapters/acp.ts",
+      "tests/28-acp.test.ts"
+    ],
+    "test": "tests/28-acp.test.ts",
+    "command": "bun test tests/28-acp.test.ts",
+    "breakpoint": "initialize、prompt、输出、cancel 与审批映射",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "29": {
+    "files": [
+      "src/sdk/client.ts",
+      "src/sdk/server.ts",
+      "tests/29-sdk.test.ts"
+    ],
+    "test": "tests/29-sdk.test.ts",
+    "command": "bun test tests/29-sdk.test.ts",
+    "breakpoint": "子进程请求、事件关联与释放",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "30": {
+    "files": [
+      "src/product-state.ts",
+      "tests/30-product-state.test.ts"
+    ],
+    "test": "tests/30-product-state.test.ts",
+    "command": "bun test tests/30-product-state.test.ts",
+    "breakpoint": "Todo、Plan、Goal 等逐项新增，避免一次写完",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "31": {
+    "files": [
+      "src/session-query.ts",
+      "tests/31-session-query.test.ts"
+    ],
+    "test": "tests/31-session-query.test.ts",
+    "command": "bun test tests/31-session-query.test.ts",
+    "breakpoint": "查询授权、游标与引用上下文",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "32": {
+    "files": [
+      "src/storage/sqlite.ts",
+      "tests/32-sqlite.test.ts"
+    ],
+    "test": "tests/32-sqlite.test.ts",
+    "command": "bun test tests/32-sqlite.test.ts",
+    "breakpoint": "事务提交、迁移与同接口验收",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "33": {
+    "files": [
+      "src/providers/pi-ai.ts",
+      "src/retry.ts",
+      "tests/33-pi-ai.test.ts"
+    ],
+    "test": "tests/33-pi-ai.test.ts",
+    "command": "bun test tests/33-pi-ai.test.ts",
+    "breakpoint": "适配事件、attempt 与副作用去重",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "34": {
+    "files": [
+      "src/hooks.ts",
+      "tests/34-hooks.test.ts"
+    ],
+    "test": "tests/34-hooks.test.ts",
+    "command": "bun test tests/34-hooks.test.ts",
+    "breakpoint": "协议映射、超时与拒绝执行",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "35": {
+    "files": [
+      "src/code-runtime.ts",
+      "src/extensions.ts",
+      "tests/35-code-runtime.test.ts"
+    ],
+    "test": "tests/35-code-runtime.test.ts",
+    "command": "bun test tests/35-code-runtime.test.ts",
+    "breakpoint": "子调用守卫与动态贡献释放",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "36": {
+    "files": [
+      "src/web/api-map.ts",
+      "tests/36-native-web.test.ts"
+    ],
+    "test": "tests/36-native-web.test.ts",
+    "command": "bun test tests/36-native-web.test.ts",
+    "breakpoint": "原版 API 对照及传输协议兼容边界",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "37": {
+    "files": [
+      "src/telemetry.ts",
+      "tests/37-telemetry.test.ts"
+    ],
+    "test": "tests/37-telemetry.test.ts",
+    "command": "bun test tests/37-telemetry.test.ts",
+    "breakpoint": "脱敏、非阻塞导出与用量投影",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "38": {
+    "files": [
+      "src/hardening.ts",
+      "tests/38-hardening.test.ts"
+    ],
+    "test": "tests/38-hardening.test.ts",
+    "command": "bun test tests/38-hardening.test.ts",
+    "breakpoint": "故障注入、资源归零与系统隔离",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "39": {
+    "files": [
+      "tests/release.test.ts",
+      "tests/39-release.test.ts"
+    ],
+    "test": "tests/39-release.test.ts",
+    "command": "bun test tests/39-release.test.ts",
+    "breakpoint": "在源码目录外启动构建产物并冷恢复",
+    "note": "先自己创建以下文件并实现，再运行本步命令；空项目尚无这些源码和测试。"
+  },
+  "40": {
+    "files": [
+      "desktop/package.json",
+      "desktop/main.cjs",
+      "desktop/renderer/index.html",
+      "tests/40-desktop-window.test.ts"
+    ],
+    "test": "tests/40-desktop-window.test.ts",
+    "command": "bun test tests/40-desktop-window.test.ts",
+    "breakpoint": "app.whenReady、创建 BrowserWindow、activate 与窗口关闭",
+    "note": "这些文件与测试需要自己创建。Bun 测试仅验证协议与生命周期逻辑；Electron 窗口、IPC 和安装产物须在宿主机另行验收。",
+    "runtime": "host-desktop",
+    "guide": "resources/ELECTRON.md"
+  },
+  "41": {
+    "files": [
+      "desktop/preload.cjs",
+      "desktop/ipc.cjs",
+      "desktop/renderer/desktop-client.js",
+      "tests/41-desktop-bridge.test.ts"
+    ],
+    "test": "tests/41-desktop-bridge.test.ts",
+    "command": "bun test tests/41-desktop-bridge.test.ts",
+    "breakpoint": "contextBridge 窄接口、ipcMain.handle、参数与 senderFrame 校验",
+    "note": "这些文件与测试需要自己创建。Bun 测试仅验证协议与生命周期逻辑；Electron 窗口、IPC 和安装产物须在宿主机另行验收。",
+    "runtime": "host-desktop",
+    "guide": "resources/ELECTRON.md"
+  },
+  "42": {
+    "files": [
+      "desktop/host-process.cjs",
+      "src/desktop-host.ts",
+      "tests/42-desktop-host.test.ts"
+    ],
+    "test": "tests/42-desktop-host.test.ts",
+    "command": "bun test tests/42-desktop-host.test.ts",
+    "breakpoint": "spawn、ready 握手、启动超时、退出与受限重启",
+    "note": "这些文件与测试需要自己创建。Bun 测试仅验证协议与生命周期逻辑；Electron 窗口、IPC 和安装产物须在宿主机另行验收。",
+    "runtime": "host-desktop",
+    "guide": "resources/ELECTRON.md"
+  },
+  "43": {
+    "files": [
+      "desktop/agent-client.cjs",
+      "desktop/renderer/desktop-client.js",
+      "src/web/client.ts",
+      "tests/43-desktop-agent.test.ts"
+    ],
+    "test": "tests/43-desktop-agent.test.ts",
+    "command": "bun test tests/43-desktop-agent.test.ts",
+    "breakpoint": "桌面 ClientPort、事件订阅、序号边界、取消与审批映射",
+    "note": "这些文件与测试需要自己创建。Bun 测试仅验证协议与生命周期逻辑；Electron 窗口、IPC 和安装产物须在宿主机另行验收。",
+    "runtime": "host-desktop",
+    "guide": "resources/ELECTRON.md"
+  },
+  "44": {
+    "files": [
+      "desktop/native.cjs",
+      "desktop/paths.cjs",
+      "desktop/navigation.cjs",
+      "tests/44-desktop-native.test.ts"
+    ],
+    "test": "tests/44-desktop-native.test.ts",
+    "command": "bun test tests/44-desktop-native.test.ts",
+    "breakpoint": "目录选择、userData 路径、单实例、导航与权限分派",
+    "note": "这些文件与测试需要自己创建。Bun 测试仅验证协议与生命周期逻辑；Electron 窗口、IPC 和安装产物须在宿主机另行验收。",
+    "runtime": "host-desktop",
+    "guide": "resources/ELECTRON.md"
+  },
+  "45": {
+    "files": [
+      "desktop/lifecycle.cjs",
+      "desktop/recovery.cjs",
+      "tests/45-desktop-recovery.test.ts"
+    ],
+    "test": "tests/45-desktop-recovery.test.ts",
+    "command": "bun test tests/45-desktop-recovery.test.ts",
+    "breakpoint": "关闭窗口、before-quit、Host shutdown/ack、崩溃恢复与监听撤销",
+    "note": "这些文件与测试需要自己创建。Bun 测试仅验证协议与生命周期逻辑；Electron 窗口、IPC 和安装产物须在宿主机另行验收。",
+    "runtime": "host-desktop",
+    "guide": "resources/ELECTRON.md"
+  },
+  "46": {
+    "files": [
+      "desktop/forge.config.cjs",
+      "desktop/updates.cjs",
+      "desktop/runtime-manifest.json",
+      "tests/46-desktop-release.test.ts"
+    ],
+    "test": "tests/46-desktop-release.test.ts",
+    "command": "bun test tests/46-desktop-release.test.ts",
+    "breakpoint": "打包资源寻址、Host runtime、版本清单、签名与更新状态机",
+    "note": "这些文件与测试需要自己创建。Bun 测试仅验证协议与生命周期逻辑；Electron 窗口、IPC 和安装产物须在宿主机另行验收。",
+    "runtime": "host-desktop",
+    "guide": "resources/ELECTRON.md"
+  }
+}

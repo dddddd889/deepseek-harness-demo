@@ -1,0 +1,12 @@
+# 只提供外部资源。自己的应用与调试进程始终在本机启动。
+services:
+  # 步骤 37 需要观测时再启动；日志输出到容器控制台。
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.150.1
+    command: [--config=/etc/otelcol/config.yaml]
+    volumes:
+      - ./infra/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${OTEL_HTTP_PORT:-14318}:4318"
+      - "127.0.0.1:${OTEL_HEALTH_PORT:-13133}:13133"
+    restart: unless-stopped
