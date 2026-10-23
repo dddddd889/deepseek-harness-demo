@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bun：032跨进程RPC主进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6499/rpc-032"
+    },
+    {
+      "name": "Bun：032 RPC worker子进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6500/rpc-worker-032"
+    }
+  ]
+}

@@ -7,3 +7,4 @@ release/
 .release-config/
 __pycache__/
 .runtime/
+tmp/
