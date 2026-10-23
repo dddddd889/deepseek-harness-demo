@@ -1,0 +1,53 @@
+仅叠加000～018的独立工程：/private/tmp/harness-018-oauth-vdr1qbt1
+命令：bun src/routes-demo.mjs
+
+018路由演示：外部HTTP响应固定；Agent、Routes、SSE解析和sum工具真实执行，不发送收费请求。
+
+=== 1 首片前失败，重试成功并执行工具 ===
+[请求] demo-main/main-model step=0
+[主路由 HTTP #1] main-model https://main.invalid/chat/completions
+[主路由 HTTP #2] main-model https://main.invalid/chat/completions
+[工具开始] sum
+[工具结果] {"ok":true,"value":5}
+[请求] demo-main/main-model step=1
+[主路由 HTTP #3] main-model https://main.invalid/chat/completions
+[正文] 5
+[轮次结束] completed
+
+=== 2 改配置，下一turn使用备用路由 ===
+[请求] demo-alt/alt-model step=0
+[备用路由 HTTP #1] alt-model https://alternate.invalid/chat/completions
+[正文] 来自备用路由的回答
+[轮次结束] completed
+
+=== 3 首片后断流，不重试、不自动换路由 ===
+[请求] demo-main/main-model step=0
+[主路由 HTTP #4] main-model https://main.invalid/chat/completions
+[正文] 已经输出的半句
+[回复状态] interrupted=true，保留半句但不记为完整完成
+[轮次错误] 模型消息未完整结束：缺少finish_reason或[DONE]
+[轮次结束] error
+
+=== 4 未注册模型直接拒绝，不发送HTTP ===
+[请求] demo-main/missing-model step=0
+[轮次错误] 未知模型路由
+[轮次结束] error
+
+=== 5 连续首片前失败，最多尝试两次 ===
+[请求] demo-main/main-model step=0
+[主路由 HTTP #5] main-model https://main.invalid/chat/completions
+[主路由 HTTP #6] main-model https://main.invalid/chat/completions
+[轮次错误] 演示网络失败：尚未返回任何Part
+[轮次结束] error
+
+=== 6 两个并发请求共用过期凭据，只刷新一次后再鉴权发送 ===
+[凭据刷新] 开始刷新；先等待两个模型请求都进入token.get()
+[刷新等待点] 两个get已进入、刷新1次、模型HTTP仍为0；现在放行刷新
+[凭据保存] 新凭据已保存，不输出凭据值
+[鉴权请求 A] 使用新token=true，保存完成后发送=true
+[鉴权请求 B] 使用新token=true，保存完成后发送=true
+[并发Agent A] turn/end=completed
+[并发Agent B] turn/end=completed
+
+六个场景均符合预期；第3～5个场景的error是故意演示的失败，已按事实验收。
+018验收结果：{"scenarios":[{"name":"1 首片前失败，重试成功并执行工具","reason":"completed","mainHTTP":3,"altHTTP":0,"requests":2,"text":"5","interrupted":false,"error":""},{"name":"2 改配置，下一turn使用备用路由","reason":"completed","mainHTTP":0,"altHTTP":1,"requests":1,"text":"来自备用路由的回答","interrupted":false,"error":""},{"name":"3 首片后断流，不重试、不自动换路由","reason":"error","mainHTTP":1,"altHTTP":0,"requests":1,"text":"已经输出的半句","interrupted":true,"error":"模型消息未完整结束：缺少finish_reason或[DONE]"},{"name":"4 未注册模型直接拒绝，不发送HTTP","reason":"error","mainHTTP":0,"altHTTP":0,"requests":1,"text":"","interrupted":false,"error":"未知模型路由"},{"name":"5 连续首片前失败，最多尝试两次","reason":"error","mainHTTP":2,"altHTTP":0,"requests":1,"text":"","interrupted":false,"error":"演示网络失败：尚未返回任何Part"},{"name":"6 并发模型请求合并刷新","reason":"completed","mainHTTP":0,"altHTTP":0,"requests":2,"text":"A完成、B完成","interrupted":false,"error":"","oauthHTTP":2,"refreshes":1}],"stats":{"mainHTTP":6,"altHTTP":1,"toolRuns":1,"replayChecked":true},"oauth":{"getCalls":2,"refreshes":1,"writes":1,"modelHTTP":2,"requests":[{"label":"A","usedNewToken":true,"savedBeforeSend":true},{"label":"B","usedNewToken":true,"savedBeforeSend":true}],"beforeRelease":{"getCalls":2,"refreshes":1,"modelHTTP":0,"pending":true},"reasons":["completed","completed"],"texts":["A完成","B完成"],"pendingCleared":true,"cleanup":{"agentsClosed":true,"listeners":0,"routeRemoved":true}},"cleanup":{"agentClosed":true,"routes":0,"tools":0,"listeners":0}}

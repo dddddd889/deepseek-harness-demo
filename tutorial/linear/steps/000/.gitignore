@@ -1,0 +1,9 @@
+node_modules/
+.env
+.data*/
+.harness*/
+.evidence/
+release/
+.release-config/
+__pycache__/
+.runtime/

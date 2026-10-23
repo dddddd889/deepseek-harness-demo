@@ -1,0 +1,39 @@
+{
+  "name": "harness-own",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "bun": "1.3.14"
+  },
+  "scripts": {
+    "start": "bun src/main.mjs",
+    "test": "bun test ./tests",
+    "desktop": "bun scripts/desktop.mjs",
+    "package": "bun scripts/release.mjs mac-arm64 --unsigned"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.1.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "@agentclientprotocol/sdk": "1.4.0",
+    "zod": "4.4.3",
+    "ws": "8.18.3",
+    "playwright-core": "1.61.1",
+    "fflate": "0.8.2"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.17.0",
+    "typescript": "5.9.3"
+  },
+  "main": "desktop/main.cjs",
+  "description": "从空工程逐步实现的Harness",
+  "author": "Harness learner",
+  "exports": {
+    "./sdk": {
+      "types": "./types/sdk.d.ts",
+      "default": "./src/sdk.mjs"
+    }
+  },
+  "packageManager": "bun@1.3.14"
+}

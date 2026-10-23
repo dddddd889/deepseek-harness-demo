@@ -1,0 +1,25 @@
+{
+  "name": "harness-own",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "bun": "1.3.14"
+  },
+  "scripts": {
+    "start": "bun src/main.mjs",
+    "test": "bun test ./tests",
+    "desktop": "bun scripts/desktop.mjs"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.1.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "@agentclientprotocol/sdk": "1.4.0",
+    "zod": "4.4.3",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "electron": "44.7.0"
+  },
+  "packageManager": "bun@1.3.14"
+}

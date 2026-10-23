@@ -1,0 +1,127 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bun：CLI 入口",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/main.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "args": [
+        "读取 README"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：当前测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：附加子进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "${input:bunInspectorUrl}"
+    },
+    {
+      "name": "Python：SDK 客户端",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/fixtures/python-sdk.py",
+      "cwd": "${workspaceFolder}",
+      "python": "/usr/bin/python3",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/python"
+      },
+      "args": [
+        "bun",
+        "${workspaceFolder}/src/sdk-server.mjs",
+        "${workspaceFolder}/.data-python-debug"
+      ],
+      "justMyCode": true
+    },
+    {
+      "name": "Web：Bun Host",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/web-server.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "env": {
+        "HARNESS_HOME": "${workspaceFolder}/.data-web",
+        "HARNESS_PORT": "0"
+      },
+      "stopOnEntry": false
+    },
+    {
+      "name": "Web：页面",
+      "type": "chrome",
+      "request": "launch",
+      "url": "${input:webBootstrapUrl}",
+      "webRoot": "${workspaceFolder}/web",
+      "pathMapping": {
+        "/view.mjs": "${workspaceFolder}/src/view.mjs"
+      }
+    },
+    {
+      "name": "Electron：Main",
+      "type": "node",
+      "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9229,
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Electron：Bun Host",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6499/harness-host"
+    },
+    {
+      "name": "Electron：Renderer",
+      "type": "chrome",
+      "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/web",
+      "pathMapping": {
+        "/view.mjs": "${workspaceFolder}/src/view.mjs"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "bunInspectorUrl",
+      "type": "promptString",
+      "description": "粘贴子进程 Bun Inspector 打印的完整 ws:// 地址"
+    },
+    {
+      "id": "webBootstrapUrl",
+      "type": "promptString",
+      "description": "粘贴本次 Host 输出的完整 http://127.0.0.1:端口/?token=... 地址"
+    }
+  ]
+}

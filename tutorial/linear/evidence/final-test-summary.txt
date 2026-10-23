@@ -1,0 +1,228 @@
+bun test v1.3.14 (0d9b296a)
+
+tests/046-acp.test.mjs:
+(pass) 真实ACP SDK跨进程握手、prompt、语义输出、列表、关闭和恢复 [127.46ms]
+
+tests/060-audio.test.mjs:
+(pass) 语音走FormData与凭据，翻译复用已有模型流 [0.54ms]
+
+tests/006-journal.test.mjs:
+(pass) 重启恢复、双写拒绝、尾半行修复、中间损坏拒绝 [1.31ms]
+
+tests/035-lsp.test.mjs:
+(pass) 真实进程LSP握手、文档通知、定义查询、关闭 [18.93ms]
+
+tests/049-web-assets.test.mjs:
+(pass) 真正Host服务当前Web产物，认证后才能取得页面和模块 [5.56ms]
+
+tests/022-edit.test.mjs:
+(pass) 模型 edit 消费真实文件提供方，多匹配不做隐式全替换 [1.48ms]
+
+tests/009-inbox.test.mjs:
+(pass) 恢复队列、修改/删除、双目的地与单次认领 [0.55ms]
+
+tests/038-ptc.test.mjs:
+(pass) 内层工具也经过守卫，预算先检查 [0.29ms]
+
+tests/037-workflow.test.mjs:
+(pass) 有依赖的真实工具执行，循环在副作用前拒绝 [0.31ms]
+
+tests/052-desktop-policy.test.mjs:
+(pass) 桌面路径来自产物根，深链接不承载任意命令 [0.08ms]
+(pass) 桌面 Host 始终使用明确的 Bun 路径，缺少时直接失败 [0.05ms]
+
+tests/003-plugins.test.mjs:
+(pass) Profile 中途失败，已经装上的服务也回滚 [0.37ms]
+
+tests/040-attachments.test.mjs:
+(pass) 真实内容寻址与交付快照不随原文件改变 [0.74ms]
+
+tests/051-capabilities.test.mjs:
+(pass) 从同一Agent真正调用接线后的协作工具，拒绝后不绕过审批 [4.05ms]
+
+tests/027-terminal.test.mjs:
+(pass) 真实PTY具有TTY属性、输出游标和退出事件 [76.41ms]
+
+tests/068-web-e2e.test.mjs:
+(pass) 真正浏览器操作同一Host：审批写文件、首片取消、下一轮、刷新恢复 [938.08ms]
+
+tests/043-remote.test.mjs:
+(pass) 原生控制器统一prompt/流/取消入口，资源权限在服务端验证 [2.52ms]
+
+tests/020-pi.test.mjs:
+(pass) 真正 pi-ai SDK 解析固定 HTTP 流，领域层只见自己的 Part [8.36ms]
+
+tests/021-filesystem.test.mjs:
+(pass) 真实文件先读后改、旧版本拒绝、符号链接越界拒绝 [2.29ms]
+
+tests/059-browser.test.mjs:
+(pass) 真实隔离Chrome执行页面动作，截图为PNG；系统动作不接受任意脚本 [592.08ms]
+
+tests/030-jobs.test.mjs:
+(pass) wait超时不杀任务，跨owner拒绝，kill才终止生产方 [11.49ms]
+
+tests/054-runtime-assets.test.mjs:
+(pass) 真实写入运行时缓存，hash错误的载荷不能发布 [0.75ms]
+
+tests/028-sandbox.test.mjs:
+(pass) 沙箱缺失拒绝，命令与参数仍分离，未知平台不裸跑 [0.16ms]
+
+tests/053-login.test.mjs:
+(pass) 真实PKCE编码、state校验和单次消费 [0.35ms]
+
+tests/066-query.test.mjs:
+(pass) 真实SQLite FTS增量去重、授权过滤、ZIP往返与TypeScript消费者 [411.70ms]
+
+tests/029-ssh.test.mjs:
+(pass) 真实Shell验证参数编码，SSH文件与执行共享远端Spec [8.53ms]
+
+tests/015-sse.test.mjs:
+(pass) 按单字节分割中文、CRLF、多行 data，残帧拒绝 [0.92ms]
+
+tests/005-events.test.mjs:
+(pass) 日志失败时不发布；读取者不能篡改已经发布的事实 [0.17ms]
+
+tests/063-workers.test.mjs:
+(pass) 真实隔离Host进程完成Worker任务，关闭后配额归还 [34.05ms]
+
+tests/018-routes.test.mjs:
+(pass) 请求前失败可重试，首片之后不重试；刷新并发合并 [12.57ms]
+
+tests/019-context.test.mjs:
+(pass) 压缩不改日志，不拆当前工具组，溢出原文有完整性校验 [0.86ms]
+
+tests/033-mcp.test.mjs:
+(pass) 真实MCP跨进程握手、分页发现、调用及卸载 [85.73ms]
+
+tests/012-loop.test.mjs:
+(pass) 模型、真实工具、第二次模型构成一轮，调用关联不丢 [0.53ms]
+
+tests/025-process.test.mjs:
+(pass) 真实进程非零退出、输出超限、超时和取消 [58.46ms]
+
+tests/002-services.test.mjs:
+(pass) 提供方可替换，子会话覆盖不污染父服务 [0.16ms]
+
+tests/061-webhook.test.mjs:
+(pass) 签名防篡改，重建接收器仍按持久Inbox身份去重 [0.34ms]
+
+tests/032-rpc.test.mjs:
+(pass) 双向LSP字节帧、中文、未知方法与断连等待清理 [0.50ms]
+
+tests/055-update.test.mjs:
+(pass) 真实Ed25519签名、hash与失败保留旧版状态 [1.30ms]
+
+tests/008-projection.test.mjs:
+(pass) 分片不混进模型历史，fork 不改父会话，搜索是冷读 [0.25ms]
+
+tests/023-approval.test.mjs:
+(pass) 同步答复、跨会话拒绝、取消清理和迟答失效 [0.20ms]
+
+tests/065-market.test.mjs:
+(pass) 真实动态import插件、服务撤销和失败状态不提交 [1.32ms]
+
+tests/045-python.test.mjs:
+(pass) 真正PythonSDK驱动同一Bun Host并正常退出 [61.06ms]
+
+tests/034-web.test.mjs:
+(pass) 真实HTTP跳转、文本提取与私网默认拒绝 [5.35ms]
+
+tests/014-batch.test.mjs:
+(pass) 并发完成顺序可变，结果按调用顺序；独占形成屏障 [18.86ms]
+
+tests/057-teams.test.mjs:
+(pass) 团队名保留、Lead限制和真实持久任务依赖 [1.82ms]
+
+tests/007-generation.test.mjs:
+(pass) 发布前崩溃保留旧代次，迁移不改旧文件 [1.05ms]
+
+tests/047-http.test.mjs:
+(pass) 真实HTTP认证交换和WebSocket领域调用 [4.76ms]
+
+tests/001-scope.test.mjs:
+(pass) 撤销逆序、幂等，异常不阻断剩余清理 [0.77ms]
+
+tests/048-view.test.mjs:
+(pass) 快照与通知交错不重复，旧连接不污染新视图，审批迟答不复活 [0.14ms]
+
+tests/000-entry.test.mjs:
+(pass) 入口既接收中文，也通过退出码报告空任务 [21.04ms]
+
+tests/017-files.test.mjs:
+(pass) 相同内容并发只上传一次，失败不污染缓存 [0.45ms]
+
+tests/031-skills.test.mjs:
+(pass) 同名Skill后层胜出，修改原文件不改变已记录上下文 [1.34ms]
+
+tests/067-comparison.test.mjs:
+(pass) 差分只删除随机身份，不吞掉cancelled或partial [0.05ms]
+
+tests/018-routes-demo.test.mjs:
+(pass) 018独立demo贯通路由重试、工具及并发鉴权前的单次刷新 [53.91ms]
+
+tests/005-session.test.mjs:
+(pass) 完整装配：真实读文件、配置固定、终端退出、游标补读和应用清理 [1.94ms]
+(pass) 真实读取失败不会产生成功消息，坏展示端不阻断其他观察者 [0.78ms]
+
+tests/010-model.test.mjs:
+(pass) 模型按片输出，signal 能结束正在等待的外部流 [0.17ms]
+
+tests/056-release.test.mjs:
+(pass) 正式资格缺凭据失败，打包清单不包含用户数据 [0.16ms]
+
+tests/064-telemetry.test.mjs:
+(pass) 真正序列化OTLP白名单，Key和prompt不发送，失败不阻断业务 [0.22ms]
+
+tests/041-host.test.mjs:
+(pass) 现有模块组合成真实持久Host，双会话隔离、关闭与恢复 [2.68ms]
+(pass) 真实持久化失败后，退出仍清理所有会话与资源 [1.46ms]
+
+tests/013-agent.test.mjs:
+(pass) 首片取消、排队第二轮继续，配置快照不串轮 [0.43ms]
+
+tests/069-cli.test.mjs:
+(pass) 最终CLI真正调用同一个持久Host读取实际工作区文件 [30.12ms]
+
+tests/016-deepseek.test.mjs:
+(pass) OpenAI兼容请求、交错工具分片、推理回放与usage完整保留 [3.51ms]
+(pass) 文字流、system、模型快照与可选v1根路径使用兼容字段 [0.36ms]
+(pass) 缺少DONE或停止原因、截断工具JSON、错误停止原因不能伪造成功 [1.19ms]
+(pass) HTTP失败、取消与length保留各自结果 [0.28ms]
+(pass) 执行循环贯通两次兼容请求：工具真实执行，结果与推理进入下一次历史 [0.76ms]
+
+tests/039-collaboration.test.mjs:
+(pass) 提醒重建后不重复投递，反馈不进入模型历史 [0.25ms]
+
+tests/042-storage.test.mjs:
+(pass) 凭据描述不泄露明文，产品数据真实重启恢复 [1.70ms]
+
+tests/036-subagents.test.mjs:
+(pass) 真实子Agent可继续对话，父关闭后资源撤销 [0.53ms]
+
+tests/024-permissions.test.mjs:
+(pass) 执行工具统一过守卫，拒绝后没有副作用 [1.00ms]
+
+tests/050-product.test.mjs:
+(pass) 产品设置持久化、凭据只返回描述、请求路由真实生效 [2.45ms]
+
+tests/044-sdk.test.mjs:
+(pass) SDK真实启动子进程，通知、结果与持久事实一致，退出回收 [28.30ms]
+
+tests/026-shell.test.mjs:
+(pass) 真实持久 shell 跨调用保留环境，取消后完整回收 [24.88ms]
+
+tests/062-worktree.test.mjs:
+(pass) 未拥有的worktree不能归档或删除；名称/ref不能变成git选项 [0.31ms]
+
+tests/058-hooks.test.mjs:
+(pass) 真实Hook子进程拒绝执行，修改后参数仍重新校验 [10.71ms]
+
+tests/004-config.test.mjs:
+(pass) 请求快照稳定，后续设置只影响下一请求 [0.11ms]
+
+tests/011-tools.test.mjs:
+(pass) 参数和未知工具在执行前拒绝，撤销后不能继续调用 [0.96ms]
+
+ 79 pass
+ 0 fail
+Ran 79 tests across 72 files. [3.02s]

@@ -1,0 +1,119 @@
+{
+  "baseline": "687f282e8625c6b8d11ff58211a90524be2e4317",
+  "scope": "仅固定文字、取消、取消后继续三个ACP样本；不是全产品等价",
+  "equal": true,
+  "own": {
+    "signature": {
+      "messages": [
+        "golden-answer",
+        "partial",
+        "after-cancel"
+      ],
+      "endings": [
+        "end_turn",
+        "cancelled",
+        "end_turn"
+      ]
+    },
+    "rawUpdates": [
+      {
+        "sessionId": "session_39698381-7ea8-4877-9ee0-714d169f9fa0",
+        "update": {
+          "content": {
+            "text": "golden-answer",
+            "type": "text"
+          },
+          "messageId": "message-6",
+          "sessionUpdate": "agent_message_chunk"
+        }
+      },
+      {
+        "sessionId": "session_39698381-7ea8-4877-9ee0-714d169f9fa0",
+        "update": {
+          "content": {
+            "text": "partial",
+            "type": "text"
+          },
+          "messageId": "message-15",
+          "sessionUpdate": "agent_message_chunk"
+        }
+      },
+      {
+        "sessionId": "session_39698381-7ea8-4877-9ee0-714d169f9fa0",
+        "update": {
+          "content": {
+            "text": "after-cancel",
+            "type": "text"
+          },
+          "messageId": "message-23",
+          "sessionUpdate": "agent_message_chunk"
+        }
+      }
+    ]
+  },
+  "oracle": {
+    "signature": {
+      "messages": [
+        "golden-answer",
+        "partial",
+        "after-cancel"
+      ],
+      "endings": [
+        "end_turn",
+        "cancelled",
+        "end_turn"
+      ]
+    },
+    "rawUpdates": [
+      {
+        "sessionId": "51b667e9-3513-4ac3-986b-8e71008a49b8",
+        "update": {
+          "content": {
+            "text": "golden-answer",
+            "type": "text"
+          },
+          "messageId": "7ea33016-d2d1-462c-86ee-1241b4558334",
+          "sessionUpdate": "agent_message_chunk"
+        }
+      },
+      {
+        "sessionId": "51b667e9-3513-4ac3-986b-8e71008a49b8",
+        "update": {
+          "used": 37,
+          "size": 1024,
+          "sessionUpdate": "usage_update"
+        }
+      },
+      {
+        "sessionId": "51b667e9-3513-4ac3-986b-8e71008a49b8",
+        "update": {
+          "content": {
+            "text": "partial",
+            "type": "text"
+          },
+          "messageId": "61e98cb2-a2a7-47ad-967e-344e13d9a12e",
+          "sessionUpdate": "agent_message_chunk"
+        }
+      },
+      {
+        "sessionId": "51b667e9-3513-4ac3-986b-8e71008a49b8",
+        "update": {
+          "content": {
+            "text": "after-cancel",
+            "type": "text"
+          },
+          "messageId": "ac324103-0df5-42e9-b522-5374866f5a71",
+          "sessionUpdate": "agent_message_chunk"
+        }
+      },
+      {
+        "sessionId": "51b667e9-3513-4ac3-986b-8e71008a49b8",
+        "update": {
+          "used": 77,
+          "size": 1024,
+          "sessionUpdate": "usage_update"
+        }
+      }
+    ]
+  }
+}

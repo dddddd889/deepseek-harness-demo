@@ -1,0 +1,866 @@
+{
+  "baseline": "687f282e8625c6b8d11ff58211a90524be2e4317",
+  "goalStatus": "in-progress",
+  "originalGroupCount": 52,
+  "originalPackageManifestCount": 342,
+  "requirements": [
+    {
+      "id": "G01",
+      "title": "插件运行时与能力边界",
+      "groups": [
+        "core",
+        "boot",
+        "bundle",
+        "preset",
+        "util"
+      ],
+      "steps": "001–005,065",
+      "implemented": "作用域、服务层、Profile安装回滚、显式插件装卸",
+      "remaining": "Cordis公共契约、热替换事务、Loader完整配置树与插件市场安装协议",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G02",
+      "title": "Profile、Bundle、Preset 与插件管理",
+      "groups": [
+        "boot",
+        "bundle",
+        "preset",
+        "extensions"
+      ],
+      "steps": "003–004,050,065",
+      "implemented": "有序配置、启停状态、持久模型设置",
+      "remaining": "原版Profile/Bundle/Preset、npm/Git依赖图、失败更新保留旧组合",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G03",
+      "title": "领域协议与模型可见事实",
+      "groups": [
+        "core",
+        "llm",
+        "session"
+      ],
+      "steps": "005,010–016",
+      "implemented": "身份、事实事件、请求输入、provider replay",
+      "remaining": "原版完整品牌类型/事件映射/请求尝试层级与公共导出",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G04",
+      "title": "Inbox 与输入调度",
+      "groups": [
+        "core",
+        "api"
+      ],
+      "steps": "009,013,049–050",
+      "implemented": "两个目的地、队列编辑删除、下一轮调度",
+      "remaining": "崩溃后的认领/执行恢复、原版代次与完整durable splice语义",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G05",
+      "title": "Loop 扩展点、重试尝试和并发",
+      "groups": [
+        "core",
+        "guard",
+        "llm"
+      ],
+      "steps": "012–014,018",
+      "implemented": "循环、取消、并发屏障、有限重试",
+      "remaining": "全部拦截/driver接口、attempt重放、所有持久化失败与并发边界",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G06",
+      "title": "原生 DeepSeek 适配",
+      "groups": [
+        "llm",
+        "credentials",
+        "attachment"
+      ],
+      "steps": "015–017",
+      "implemented": "OpenAI兼容Chat Completions、工具参数分片、推理回传；独立Files缓存示例",
+      "remaining": "原版Messages/推理签名对齐、图片与Files协议接入、系统/工具更新、Files配额回收与真API样本",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G07",
+      "title": "pi-ai 提供方与鉴权",
+      "groups": [
+        "llm",
+        "credentials"
+      ],
+      "steps": "018,020",
+      "implemented": "真实pi-ai边界、路由、刷新single-flight",
+      "remaining": "全provider/API/目录/OAuth/UI接线及原版opaque replay契约",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G08",
+      "title": "Token、上下文压缩和 Spill",
+      "groups": [
+        "llm",
+        "compaction",
+        "spill",
+        "context"
+      ],
+      "steps": "019",
+      "implemented": "可见历史副本压缩、Spill完整性",
+      "remaining": "replay-aware token-meter、自动摘要接线、图片卸载、原版压缩契约",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G09",
+      "title": "日志格式、Checkpoint、恢复与迁移",
+      "groups": [
+        "session"
+      ],
+      "steps": "006–007,041",
+      "implemented": "真实JSONL、锁、恢复、代次发布",
+      "remaining": "原版V4 writer/相邻历史迁移/zstd/generation/checkpoint格式与关系校验",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G10",
+      "title": "会话产品管理与检索",
+      "groups": [
+        "session",
+        "session-query",
+        "workspace",
+        "context"
+      ],
+      "steps": "008,041,066",
+      "implemented": "fork、冷列表、归档、重命名、FTS和ZIP",
+      "remaining": "原版完整lineage、分页/检索/ZIP互操作和历史数据接纳",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G11",
+      "title": "文件工具与编辑语义",
+      "groups": [
+        "fs"
+      ],
+      "steps": "021–022,050",
+      "implemented": "先读后改、唯一替换、链接拒绝、文件面板",
+      "remaining": "原版所有文件操作、glob/grep、图片、跨进程/远端版本保证与TOCTOU补强",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G12",
+      "title": "进程、Shell 与持久终端",
+      "groups": [
+        "subprocess",
+        "shell",
+        "terminal"
+      ],
+      "steps": "025–027",
+      "implemented": "真实进程树、Bash、PTY、输出游标",
+      "remaining": "Pwsh、完整进程读取Spec、终端UI/所有权/平台策略及协议",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G13",
+      "title": "OS 沙箱与远程 SSH",
+      "groups": [
+        "sandbox",
+        "ssh"
+      ],
+      "steps": "028–029",
+      "implemented": "Seatbelt/bwrap Spec、SSH读写/执行边界",
+      "remaining": "真实OS效果验证、Windows ACL/Landlock、完整远端提供方成套契约",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G14",
+      "title": "权限策略与人机交互",
+      "groups": [
+        "interaction",
+        "plan",
+        "api"
+      ],
+      "steps": "023–024,046,049",
+      "implemented": "审批一次结算、迟答失效、预设、ACP反向审批",
+      "remaining": "ask_user_question、计划评审、人机命令目录、完整预设与重连语义",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G15",
+      "title": "后台 Jobs",
+      "groups": [
+        "jobs",
+        "shell",
+        "terminal",
+        "subagent",
+        "api"
+      ],
+      "steps": "030,051",
+      "implemented": "Job生产方、wait/kill、owner、输出游标",
+      "remaining": "完整发布/通知/索引/产品视图和跨工具协议",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G16",
+      "title": "Skills 与上下文组装",
+      "groups": [
+        "skill",
+        "context"
+      ],
+      "steps": "031,051",
+      "implemented": "发现/按需Skill、规则来源事实",
+      "remaining": "原版多来源优先级、目录变化、引用授权、动态请求section与恢复",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G17",
+      "title": "MCP 全量桥接",
+      "groups": [
+        "mcp"
+      ],
+      "steps": "033,046",
+      "implemented": "真实MCP跨进程、分页工具、HTTP/资源入口",
+      "remaining": "断连重连、代次事务替换、分页模板/资源、配置归属与所有错误契约",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G18",
+      "title": "Web 搜索与抓取",
+      "groups": [
+        "web",
+        "credentials"
+      ],
+      "steps": "034,051",
+      "implemented": "有界抓取、来源、搜索提供方接口",
+      "remaining": "真实搜索配置/UI/配额、网络隔离、Spill与原版错误语义",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G19",
+      "title": "LSP 导航",
+      "groups": [
+        "lsp"
+      ],
+      "steps": "035",
+      "implemented": "真实LSP进程、文档通知、definition/refs入口",
+      "remaining": "真实语言语义、完整配置/多服务器路由、版本与取消、启动回滚",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G20",
+      "title": "子 Agent 提供方与可继续会话",
+      "groups": [
+        "subagent",
+        "jobs"
+      ],
+      "steps": "036,051,063",
+      "implemented": "持续子Agent、父权限、外部Worker",
+      "remaining": "深度/并发预算、冷恢复、fork与ACP/Codex/Claude/SDK各后端",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G21",
+      "title": "PTC / Code Mode 与 Workflow",
+      "groups": [
+        "ptc-runtime",
+        "workflow",
+        "core"
+      ],
+      "steps": "037–038",
+      "implemented": "DAG、预算、统一嵌套工具守卫",
+      "remaining": "任意JS/Python run_code、隔离运行时、原版能力绑定与故障收敛",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G22",
+      "title": "Todo、Plan、Goal、Schedule、Feedback",
+      "groups": [
+        "todo",
+        "plan",
+        "goal",
+        "schedule",
+        "feedback"
+      ],
+      "steps": "039,051",
+      "implemented": "Todo/Plan/Goal状态、持久提醒、反馈",
+      "remaining": "计划评审、持续Goal驱动、Host调度投递、完整命令与UI",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G23",
+      "title": "Workspace、Settings、Credentials 与 Storage",
+      "groups": [
+        "workspace",
+        "settings",
+        "credentials",
+        "storage",
+        "identity"
+      ],
+      "steps": "042,050,053",
+      "implemented": "工作区/Store/Key引用、PKCE机制",
+      "remaining": "完整设置层级/账号登录刷新撤销/私有授权/工作区产品管理",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G24",
+      "title": "Host Remote / Typert 与连接权限",
+      "groups": [
+        "api",
+        "typert",
+        "host",
+        "client"
+      ],
+      "steps": "032,043,047–048",
+      "implemented": "自有双向RPC、WebSocket、principal、seq/generation",
+      "remaining": "原版Typert类型图/codec/对象寻址/全部Remote方法与Client互操作",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G25",
+      "title": "完整 Web 产品",
+      "groups": [
+        "client",
+        "api",
+        "document",
+        "attachment"
+      ],
+      "steps": "048–051,068",
+      "implemented": "真实Web对话、队列、审批、取消、文件/模型面板、刷新",
+      "remaining": "完整Client插件slot/Markdown/工具diff/终端/文档/浏览器/搜索/主题语言与快捷键产品面",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G26",
+      "title": "完整 ACP 服务",
+      "groups": [
+        "acp"
+      ],
+      "steps": "046,067",
+      "implemented": "真实ACP握手/prompt/list/resume/close、审批、取消；三个原版差分样本相同",
+      "remaining": "图片、完整模型/推理配置、分页/MCP校验、请求取消及全异常语义",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G27",
+      "title": "原生 SDK 与 Python SDK",
+      "groups": [
+        "sdk"
+      ],
+      "steps": "044–045,063,066",
+      "implemented": "真正Bun/Python子进程、通知/结果、NodeNext公开类型",
+      "remaining": "原版SDK线协议/完整方法、后代观察、patch/profile、wheel和捆绑载体",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G28",
+      "title": "附件、文档和文件交付",
+      "groups": [
+        "attachment",
+        "document",
+        "deliverables",
+        "client"
+      ],
+      "steps": "040,050,066",
+      "implemented": "内容寻址、交付快照、Office进程接口、ZIP",
+      "remaining": "图片像素/类型验证、上传收据与授权下载、完整Office渲染、turn修改diff",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G29",
+      "title": "桌面产品与应用生命周期",
+      "groups": [
+        "host",
+        "boot",
+        "client"
+      ],
+      "steps": "052–053",
+      "implemented": "Electron 主进程 + Bun Host、隔离preload、单实例和退出",
+      "remaining": "独立desktop profile/执行依赖图、欢迎/登录/深链接/菜单/原生桥接与恢复完整产品",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G30",
+      "title": "桌面运行时、更新与发布",
+      "groups": [
+        "boot",
+        "skill",
+        "document"
+      ],
+      "steps": "054–056",
+      "implemented": "hash/原子发布、Ed25519更新资格、真实打包脚本",
+      "remaining": "完整Node/Python/pnpm/Office锁与载荷、平台安装器、签名公证与升级/回滚实测",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G31",
+      "title": "观测、反馈和产品遥测",
+      "groups": [
+        "telemetry",
+        "identity",
+        "session",
+        "feedback",
+        "host",
+        "client"
+      ],
+      "steps": "039,064",
+      "implemented": "OTLP白名单、有界失败不阻断、反馈事实",
+      "remaining": "原版OTel trace/统计/匿名身份/产品事件与全部采集策略",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G32",
+      "title": "实验能力整体",
+      "groups": [
+        "experimental",
+        "computer-use",
+        "browser-use"
+      ],
+      "steps": "057–065",
+      "implemented": "Teams/hooks/browser/部分CUA/audio/webhook/worktree/worker/market机制",
+      "remaining": "原版47个实验包的完整工具/配置/UI、Ralph/Claude mods/Inspector/browser worker/Python PTC等",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G33",
+      "title": "原生平台与执行适配",
+      "groups": [
+        "subprocess",
+        "terminal",
+        "sandbox",
+        "document"
+      ],
+      "steps": "025–029,052–056,059",
+      "implemented": "部分POSIX进程与原生PTY、平台Spec",
+      "remaining": "原版native/system ABI、Windows/POSIX所有提供方、Office native/WASM与全平台诊断",
+      "parity": "incomplete"
+    },
+    {
+      "id": "G34",
+      "title": "兼容测试与工程交付",
+      "groups": [
+        "test-support",
+        "util",
+        "typert"
+      ],
+      "steps": "000–069",
+      "implemented": "每步累计自测、真实协议/文件/浏览器、三个ACP差分样本",
+      "remaining": "全部原版公共契约/历史快照、性能泄漏、真API、全GUI/平台/升级资格",
+      "parity": "incomplete"
+    }
+  ],
+  "groups": [
+    {
+      "name": "acp",
+      "count": 1,
+      "requirements": [
+        "G26"
+      ]
+    },
+    {
+      "name": "api",
+      "count": 10,
+      "requirements": [
+        "G04",
+        "G14",
+        "G15",
+        "G24",
+        "G25"
+      ]
+    },
+    {
+      "name": "attachment",
+      "count": 2,
+      "requirements": [
+        "G06",
+        "G25",
+        "G28"
+      ]
+    },
+    {
+      "name": "boot",
+      "count": 6,
+      "requirements": [
+        "G01",
+        "G02",
+        "G29",
+        "G30"
+      ]
+    },
+    {
+      "name": "browser-use",
+      "count": 1,
+      "requirements": [
+        "G32"
+      ]
+    },
+    {
+      "name": "bundle",
+      "count": 6,
+      "requirements": [
+        "G01",
+        "G02"
+      ]
+    },
+    {
+      "name": "client",
+      "count": 66,
+      "requirements": [
+        "G24",
+        "G25",
+        "G28",
+        "G29",
+        "G31"
+      ]
+    },
+    {
+      "name": "compaction",
+      "count": 5,
+      "requirements": [
+        "G08"
+      ]
+    },
+    {
+      "name": "computer-use",
+      "count": 1,
+      "requirements": [
+        "G32"
+      ]
+    },
+    {
+      "name": "context",
+      "count": 7,
+      "requirements": [
+        "G08",
+        "G10",
+        "G16"
+      ]
+    },
+    {
+      "name": "core",
+      "count": 8,
+      "requirements": [
+        "G01",
+        "G03",
+        "G04",
+        "G05",
+        "G21"
+      ]
+    },
+    {
+      "name": "credentials",
+      "count": 5,
+      "requirements": [
+        "G06",
+        "G07",
+        "G18",
+        "G23"
+      ]
+    },
+    {
+      "name": "deliverables",
+      "count": 2,
+      "requirements": [
+        "G28"
+      ]
+    },
+    {
+      "name": "document",
+      "count": 1,
+      "requirements": [
+        "G25",
+        "G28",
+        "G30",
+        "G33"
+      ]
+    },
+    {
+      "name": "experimental",
+      "count": 47,
+      "requirements": [
+        "G32"
+      ]
+    },
+    {
+      "name": "extensions",
+      "count": 4,
+      "requirements": [
+        "G02"
+      ]
+    },
+    {
+      "name": "feedback",
+      "count": 2,
+      "requirements": [
+        "G22",
+        "G31"
+      ]
+    },
+    {
+      "name": "fs",
+      "count": 7,
+      "requirements": [
+        "G11"
+      ]
+    },
+    {
+      "name": "goal",
+      "count": 4,
+      "requirements": [
+        "G22"
+      ]
+    },
+    {
+      "name": "guard",
+      "count": 2,
+      "requirements": [
+        "G05"
+      ]
+    },
+    {
+      "name": "host",
+      "count": 9,
+      "requirements": [
+        "G24",
+        "G29",
+        "G31"
+      ]
+    },
+    {
+      "name": "identity",
+      "count": 1,
+      "requirements": [
+        "G23",
+        "G31"
+      ]
+    },
+    {
+      "name": "interaction",
+      "count": 5,
+      "requirements": [
+        "G14"
+      ]
+    },
+    {
+      "name": "jobs",
+      "count": 3,
+      "requirements": [
+        "G15",
+        "G20"
+      ]
+    },
+    {
+      "name": "llm",
+      "count": 9,
+      "requirements": [
+        "G03",
+        "G05",
+        "G06",
+        "G07",
+        "G08"
+      ]
+    },
+    {
+      "name": "lsp",
+      "count": 3,
+      "requirements": [
+        "G19"
+      ]
+    },
+    {
+      "name": "mcp",
+      "count": 2,
+      "requirements": [
+        "G17"
+      ]
+    },
+    {
+      "name": "plan",
+      "count": 1,
+      "requirements": [
+        "G14",
+        "G22"
+      ]
+    },
+    {
+      "name": "preset",
+      "count": 3,
+      "requirements": [
+        "G01",
+        "G02"
+      ]
+    },
+    {
+      "name": "ptc-runtime",
+      "count": 2,
+      "requirements": [
+        "G21"
+      ]
+    },
+    {
+      "name": "sandbox",
+      "count": 4,
+      "requirements": [
+        "G13",
+        "G33"
+      ]
+    },
+    {
+      "name": "schedule",
+      "count": 2,
+      "requirements": [
+        "G22"
+      ]
+    },
+    {
+      "name": "sdk",
+      "count": 3,
+      "requirements": [
+        "G27"
+      ]
+    },
+    {
+      "name": "session",
+      "count": 21,
+      "requirements": [
+        "G03",
+        "G09",
+        "G10",
+        "G31"
+      ]
+    },
+    {
+      "name": "session-query",
+      "count": 3,
+      "requirements": [
+        "G10"
+      ]
+    },
+    {
+      "name": "settings",
+      "count": 1,
+      "requirements": [
+        "G23"
+      ]
+    },
+    {
+      "name": "shell",
+      "count": 10,
+      "requirements": [
+        "G12",
+        "G15"
+      ]
+    },
+    {
+      "name": "skill",
+      "count": 5,
+      "requirements": [
+        "G16",
+        "G30"
+      ]
+    },
+    {
+      "name": "spill",
+      "count": 3,
+      "requirements": [
+        "G08"
+      ]
+    },
+    {
+      "name": "ssh",
+      "count": 5,
+      "requirements": [
+        "G13"
+      ]
+    },
+    {
+      "name": "storage",
+      "count": 4,
+      "requirements": [
+        "G23"
+      ]
+    },
+    {
+      "name": "subagent",
+      "count": 9,
+      "requirements": [
+        "G15",
+        "G20"
+      ]
+    },
+    {
+      "name": "subprocess",
+      "count": 3,
+      "requirements": [
+        "G12",
+        "G33"
+      ]
+    },
+    {
+      "name": "telemetry",
+      "count": 1,
+      "requirements": [
+        "G31"
+      ]
+    },
+    {
+      "name": "terminal",
+      "count": 2,
+      "requirements": [
+        "G12",
+        "G15",
+        "G33"
+      ]
+    },
+    {
+      "name": "test-support",
+      "count": 7,
+      "requirements": [
+        "G34"
+      ]
+    },
+    {
+      "name": "todo",
+      "count": 1,
+      "requirements": [
+        "G22"
+      ]
+    },
+    {
+      "name": "typert",
+      "count": 4,
+      "requirements": [
+        "G24",
+        "G34"
+      ]
+    },
+    {
+      "name": "util",
+      "count": 18,
+      "requirements": [
+        "G01",
+        "G34"
+      ]
+    },
+    {
+      "name": "web",
+      "count": 7,
+      "requirements": [
+        "G18"
+      ]
+    },
+    {
+      "name": "workflow",
+      "count": 3,
+      "requirements": [
+        "G21"
+      ]
+    },
+    {
+      "name": "workspace",
+      "count": 1,
+      "requirements": [
+        "G10",
+        "G23"
+      ]
+    }
+  ]
+}
