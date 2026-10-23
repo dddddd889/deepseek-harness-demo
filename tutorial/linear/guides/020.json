@@ -1,0 +1,27 @@
+{
+  "scenario": "仍然调用DeepSeek，但不再自己写HTTP与SSE协议解析：Routes选PiModel，pi-ai发请求并组装工具参数，Harness仍执行sum并把结果送回下一模型请求。换的是访问库，不是把DeepSeek换成另一家模型。",
+  "flow": "Agent → Routes(deepseek-pi) → PiModel.context映射历史 → pi-ai streamSimple → DeepSeek兼容响应 → SDK事件转自有Part → Loop执行sum → tool结果和pi replay → 第二次请求 → 正文5 → Scope清理。",
+  "try": "完成本章package.json、源文件和测试后运行 bun install，再运行 bun src/pi-demo.mjs，随后 bun test ./tests/020-pi.test.mjs ./tests/020-pi-demo.test.mjs。默认demo强制离线固定HTTP，即使本机有Key也不收费；摘要应requests=2、http=2、toolRuns=1、finalText=\"5\"、reasoningReplayed=true。--live会调用真实模型，此轮不需要运行。",
+  "why": "PiModel把第三方SDK概念限制在提供方层，Loop继续使用自己的stream(request)与Part；replay保留SDK完整assistant，避免丢推理/工具信息。Routes掌管重试，因此SDK maxRetries设0，不能叠两套重试。",
+  "accept": "3项测试验证真实SDK解析、真实CLI两次请求与工具续轮、显式live缺Key拒绝。默认HTTP是固定样本，不能声称重新验证真实模型；model配置中的零价格是SDK必填占位，不代表API免费。",
+  "debug": "在VS Code先选tests/020-pi.test.mjs，选择“Bun：当前测试”按F5；在src/pi.mjs的this.context(request)、event.type === \"done\"和yield replay打断点，F11进入context看工具结果映射，F10观察event.message.content与stopReason。完整demo按下方attach配置运行 bun --inspect-brk=127.0.0.1:6499/pi-020 src/pi-demo.mjs；在fetcher第二次调用看assistant.tool_calls、tool_call_id与stats.toolRuns=1。CLI子进程测试不会自动跟随当前调试会话。",
+  "recall": "合上资料写出016和020两条调用链，圈出被替换的一段；再说明HTTP由谁发、sum由谁执行、重试由谁决定。",
+  "transfer": "在离线pi-demo的副本中把第一SSE的工具arguments拆成三段，保留完整JSON后运行，应仍得到5；需改固定样本后再运行。任务与断言固定2+3，不要只改输入数字而忘记同步fixture/验收。",
+  "wiring": "pi-demo确实把PiModel接进Routes、Agent和Tools，并检查第二请求的关联与推理回放；这不是只有独立适配器测试。但后续041 Host仍接受modelFactory，未自动改默认模型提供方为此demo。",
+  "implemented": [
+    "真实pi-ai SDK与自有模型接口适配、Pi历史/工具结果与replay。",
+    "离线和显式live入口、Route接线、真实sum续轮、有限HTTP和清理验收。"
+  ],
+  "missing": [
+    "原版llm-pi-ai从配置和SDK目录解析多个provider/model，支持模型发现、能力/容量、登录及凭据桥；本章手写一个DeepSeek model对象，没有目录与配置服务。",
+    "原版stream映射含AUTH/RATE_LIMIT/TRANSPORT/上下文超限等结构化失败、流内容与usage统一表示；本章普通Error及有限Part映射，未覆盖多模态、完整失败分类和原版上下文更新能力。"
+  ],
+  "testEvidence": "020-pi.test.mjs有1项实际SDK＋固定HTTP测试，020-pi-demo.test.mjs有2项真实CLI测试。离线全链路真实执行SDK、Routes、Agent与sum，外部HTTP固定；真实模式需另行显式运行并独立记录，不能把历史live证据当本次重新实跑。",
+  "sources": [
+    "packages/llm/llm-pi-ai/src/adapter.ts",
+    "packages/llm/llm-pi-ai/src/context.ts",
+    "packages/llm/llm-pi-ai/src/stream.ts",
+    "packages/llm/llm-pi-ai/src/discovery.ts",
+    "packages/llm/llm-pi-ai/src/auth.ts"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "scenario": "一条旧工具结果很长，下一次请求会超预算：历史日志应保留原文，模型副本可用摘要替代较旧轮次；当前轮次的工具调用和结果必须一起留着。另把完整长结果落盘，摘要旁提供hash定位，后续能取回并校验。",
+  "flow": "compact复制history → measure未超则返回 → 找最后user作为当前轮起点 → 保留recent → summarize旧前缀 → 组成摘要消息+recent → 再measure；Spill.put完整文本落盘并给id/preview → get按hash验原文。",
+  "try": "完成context.mjs和测试后运行 bun test ./tests/019-context.test.mjs。预期长500字符的旧history不被修改，压缩副本最后仍是next；Spill先取回“完整原文”，再被测试改坏文件后get报完整性错误。当前测试直接调用两个helper，没有模型HTTP。",
+  "why": "compact控制模型请求副本，不删除事实日志；Spill控制长结果的原文存放，不等于自动压缩模型上下文。两个函数需接在真实请求/工具结果路径上才会起作用，本章只建立并测试基础算法。",
+  "accept": "1项测试证明旧数组不被改、短摘要可放回预算、原文hash可检测篡改。measure实际用JSON字符串长度，不是token；测试没有当前轮工具组，也没有证明流式大文件、自动触发压缩或模型摘要质量。",
+  "debug": "在VS Code选tests/019-context.test.mjs，选择“Bun：当前测试”按F5。在src/context.mjs的const recent、await summarize、measure(result)和完整性比较打断点。F10监视split、copy.length、recent、result；回到测试帧确认history[0].content.length仍500。F11进入Spill.get，在测试篡改后预期hash与id不相等而抛错。",
+  "recall": "闭卷分别说明“摘要副本”和“落盘原文”解决哪件事，再画出旧轮次被摘要、当前轮次完整保留的历史。指出JSON长度为什么不能叫真实token数。",
+  "transfer": "在测试副本把recent内容也扩成超过limit，断言“当前轮次本身超限”；这是需新增的已有分支练习。想用工具组验证需自己补assistant calls与tool消息，不要说原测试已覆盖。",
+  "wiring": "compact与new Spill目前只见019测试，未接Loop、Tools或041 Host；后续模型请求不会自动调用本章压缩。即使前面sum和后面Web能跑，也不能据此判断长上下文已处理。",
+  "implemented": [
+    "副本摘要、保留最后user起始后缀、压缩前后预算检查。",
+    "内容hash原文存取与简单preview、完整性检查。"
+  ],
+  "missing": [
+    "原版compaction-basic按模型容量、预留输出token、压力策略和surface范围工作，记录压缩事实并处理溢出重试；本章无token meter、请求恢复接线或持久压缩事件。",
+    "原版spill-policy在工具后置策略中按token预算裁剪完整图文结果，提供可恢复地址并保持规范值；本章仅文本同步文件helper，未覆盖图像计价、生命周期保留/清理及真实结果处理。"
+  ],
+  "testEvidence": "tests/019-context.test.mjs有1项临时磁盘＋内存测试，摘要函数固定返回“关键事实”；没有请求模型，也没有测试名称所暗示的当前工具组样本。",
+  "sources": [
+    "packages/compaction/compaction-basic/src/index.ts",
+    "packages/compaction/compaction-basic/src/region.ts",
+    "packages/compaction/compaction/src/tool-pairing.ts",
+    "packages/spill/spill-policy/src/index.ts",
+    "packages/spill/spill-local/src/store.ts"
+  ]
+}

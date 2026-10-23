@@ -1,0 +1,28 @@
+{
+  "scenario": "Agent在TypeScript代码中看到一个同名函数，文本搜索不能可靠判断定义位置。语言服务器可以按文件URI与光标坐标返回语义导航结果。",
+  "flow": "languageServer(scope,spec,root) → spawn语言服务器 → Peer/framing使用Content-Length → initialize/initialized → didOpen/didChange版本通知 → textDocument/definition → 返回位置 → shutdown/exit",
+  "try": "先写完src/lsp.mjs及tests/fixtures/lsp.mjs，再运行 bun test ./tests/035-lsp.test.mjs。测试启动固定LSP对端，发送example.ts打开与修改通知，再查第0行第7列definition，检查返回URI和起始行。fixture不会分析TypeScript，因此不需要先安装tsserver。",
+  "why": "LSP规定编辑器与语言服务如何交流；本章重用032的RPC字节分帧，用URI和文档版本维持状态。它是通用进程客户端骨架，不是完整代码导航工具，也不是语言分析器。",
+  "accept": "测试应1项通过，真实进程握手、通知发送、定义请求与关闭路径可走通。返回位置由fixture固定给出，不证明真实语言语义、诊断、新旧版本同步或取消能力。",
+  "debug": "在src/lsp.mjs的await peer.request(\"initialize\"...)、versions.set和query打断点。F10握手后看capabilities.definitionProvider=true；open后Map版本1，change后为2；query发出的line=0、character=7。想看字节数可F11进rpc.mjs的mode===\"lsp\"发送分支。fixture是子进程，父的断点不跨进程；只观察父收到的结果URI。",
+  "recall": "闭卷写出initialize、initialized、didOpen、didChange、definition的先后关系，并解释为什么中文正文的Content-Length必须按UTF-8字节计算。",
+  "transfer": "安全练习：给固定fixture增加hover返回值并用query调用，理解协议扩展；这仍是协议演练。真正接入TypeScript语言服务需要配置服务器与文档同步，当前教程未提供端到端证明。",
+  "wiring": "035确实复用032并启动外部LSP进程；051未注册LSP工具，最终Agent没有自动获得代码导航。诊断/符号辅助接口也未接入产品。",
+  "implemented": [
+    "Content-Length真实进程握手",
+    "文档open/change与版本表",
+    "query/symbols及诊断收集入口",
+    "Scope关闭时shutdown/exit"
+  ],
+  "missing": [
+    "原版lsp按扩展名路由提供方，规范化definition/references/implementation/hover及结构化错误；本章暴露任意query。",
+    "原版lsp-stdio/tool-lsp配对fs/subprocess并处理文件同步和能力验证；本章没有对应统一工具接线。",
+    "原版公共LSP seam刻意不含诊断与符号列表；教程的这些辅助接口是自定义范围，不能算原版完整覆盖。"
+  ],
+  "testEvidence": "035-lsp.test.mjs用真实Bun子进程与Content-Length协议，但语言服务为固定fixture，只验证协议和生命周期，不验证TypeScript分析。",
+  "sources": [
+    "packages/lsp/lsp/README.zh.md",
+    "packages/lsp/lsp-stdio/README.zh.md",
+    "packages/lsp/tool-lsp/README.zh.md"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "scenario": "Lead安排reviewer先完成任务a，再认领依赖a的任务b；同一个成员名即使创建失败也不能随意复用，否则消息和任务容易指向另一个人。当前示例只管理名册和任务状态，还没有真的启动一队模型Agent。",
+  "flow": "Team.create/task/claim/complete → Store更新成员与任务JSON；成员create/send/interrupt通过传入回调委托调用者。当前测试回调只返回名字或receipt，不进入Host/Agent。",
+  "try": "先写完teams.mjs，再运行bun test ./tests/057-teams.test.mjs。按测试观察create reviewer成功后再次create被拒绝；b依赖a，第一次claim b报错，claim a并complete后，第二次claim b成功且owner=reviewer。这里不发送消息给真实Agent或他人。",
+  "why": "Team把“成员叫什么”和“任务做到哪一步”持久保存，不能仅靠一个运行中对象的记忆。provisioning先占名字，再调用创建回调，失败记录failed；任务依赖检查决定现在是否可以认领，不等于自动调度。",
+  "accept": "测试用真实临时JSON Store验证同名拒绝、依赖未完成拒绝和完成后可认领。它没有创建失败成员、重建Team读取、真实Inbox消息、Lead之外权限、取消或模型团队；测试中的create/send/interrupt都是替身。",
+  "debug": "打开tests/057-teams.test.mjs，用“Bun：当前测试”启动。断在src/teams.mjs的成员写入provisioning、if (!task || task.status !== 'pending' || ...)和complete更新。监视this.state().members.reviewer、task.after、state.tasks.a.status；F10看第一次claim b时a=pending，完成a后F11再进入claim，owner应写为reviewer。不要把回调async name => name当成真实Agent创建。",
+  "recall": "闭卷画两张小状态表：成员provisioning/inactive/failed与任务pending/doing/done。再给a→b依赖画箭头，说明完成a为什么允许认领b但不会自动执行b。",
+  "transfer": "练习：把临时测试的create回调改成抛错，补断言成员状态failed且同名不能再创建；只用隔离Store。该失败名字用例当前尚未实现，不代表已具备团队冷恢复。",
+  "wiring": "Team目前只在057测试使用，没有注册到051工具表、Web或CLI，后续也没有真实模型Teams驱动。它不是051 Subagents的自动升级版。",
+  "implemented": [
+    "Lead创建成员时先保留名字，保存provisioning/失败状态。",
+    "持久任务依赖、认领owner及完成状态。",
+    "创建/发消息/中断通过显式回调留出接线位置。"
+  ],
+  "missing": [
+    "原版通过真实Agent身份、名册日志、角色工具、收件箱和生命周期管理团队；这里仅Store加回调。",
+    "未接成员活动、冷恢复、消息/任务投影、UI和模型团队执行。",
+    "当前task/claim没有完整角色/成员权限验证，claim可传任意actor；不能泛称原版Lead权限已补齐。",
+    "失败创建与重启恢复没有当前测试证据。"
+  ],
+  "testEvidence": "tests/057-teams.test.mjs实际读写临时team.json，但没有真实Agent进程或模型。create返回name、send返回receipt、interrupt空函数；断言只覆盖名冲突和两任务依赖链。本次仅改文档。",
+  "sources": [
+    "packages/experimental/agent-team/src/index.ts",
+    "packages/experimental/agent-team/src/roster.ts",
+    "packages/experimental/agent-team/src/task-board.ts",
+    "packages/experimental/agent-team/src/projection.ts",
+    "packages/experimental/tool-agent-team"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "scenario": "桌面程序用外部浏览器登录时，攻击者替换state或重复提交回调，程序应在换票前拒绝；快捷键配置文件损坏时，也不能悄悄用默认值覆盖用户文件。这是两个独立的数据边界，本章尚未把它们放进桌面UI。",
+  "flow": "loginAttempt生成state/verifier/challenge → 拼授权URL → exchange校验回调路径和state → 单次标记consumed → fixed token请求；Shortcuts另走Store.read/write，读取已有版本后才接受修改。",
+  "try": "先写完src/login.mjs和desktop/shortcuts.mjs，再运行bun test ./tests/053-login.test.mjs。该测试不访问accounts.example：先传错state，随后用正确state和固定fetcher换票，最后重放同一回调。分别记录是否触发fetcher、consumed何时变成true。",
+  "why": "state把回调绑定到本次登录尝试；PKCE的verifier让拿到授权码的人也不能脱离本次尝试换票；consumed阻止重复消费。同一章的Shortcuts保护配置文件版本，不是OAuth逻辑，也不会自行在Electron中注册按键。",
+  "accept": "测试证明错state被拒绝、有效state走一次固定换票、verifier存在且长度足够、同一回调不可再用。它没有验证真正OAuth服务器、浏览器回调、凭据落盘、challenge是否等于verifier的SHA256，也完全没有导入或测试Shortcuts。",
+  "debug": "打开tests/053-login.test.mjs用“Bun：当前测试”启动，给src/login.mjs的if (consumed || ...)、consumed = true及fetcher(tokenURL, ...)断点。监视consumed、actualState.length、expected.pathname，以及fetcher是否到达；错state时应在fetch前抛错，正确回调后consumed=true，第三次仍在校验处拒绝。F10检查这些状态，不在日志或截图中输出真实code/verifier/token。Shortcuts当前无测试驱动，不能期待它的断点命中。",
+  "recall": "闭卷写出state、verifier、授权码和access_token四个词各负责什么；再写“为什么改快捷键必须先读文件版本”，不要把两类token混为一谈。",
+  "transfer": "练习：给本章固定换票测试增加HTTP 500情形，再断言同一attempt不能重用，必须重新loginAttempt。只用Response对象，不连接真实账号；这是新增练习，当前没有该测试。",
+  "wiring": "loginAttempt与Shortcuts都是独立模块；截至069，没有把它们接到052欢迎页、系统回调或键盘分发。它们不是已经可登录的桌面产品。",
+  "implemented": [
+    "随机state/verifier、S256 challenge、授权URL和单次回调换票。",
+    "校验回调origin/path/state，错误或重复回调拒绝。",
+    "独立快捷键Store的版本拒绝和基本重复绑定检查。"
+  ],
+  "missing": [
+    "原版账号生命周期包括实际授权提供方、凭据存储、刷新/撤销和UI；本章没有真实登录接线。",
+    "快捷键没有原版命令注册、平台规则、组合键、输入法保护、原生分发和已接受状态发布。",
+    "Shortcuts无测试；当前测试也未密码学比对challenge与verifier，不应把名称里的“真实PKCE”理解为全流程验收。"
+  ],
+  "testEvidence": "tests/053-login.test.mjs只有一项固定网络替身测试，实际使用密码学随机和hash，但网络、账号和token是测试值。desktop/shortcuts.mjs没有本章测试；没有启动外部浏览器或Electron。",
+  "sources": [
+    "packages/credentials/deepseek-account/src/index.ts",
+    "packages/credentials/deepseek-account-platform",
+    "apps/desktop/src/account-backend.ts",
+    "apps/desktop/src/keybindings.ts",
+    "packages/client/shortcuts/src/configuration.ts",
+    "packages/client/shortcuts/src/binding.ts"
+  ]
+}

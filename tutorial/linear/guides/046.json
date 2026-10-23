@@ -1,0 +1,31 @@
+{
+  "scenario": "一个自动化客户端想让Harness修改临时工作区里的proof.txt：先建立ACP连接，创建会话，发送/tool write，回答一次权限请求，最后收到工具结果和end_turn。客户端只翻译协议，真正写文件的仍然是已有Host里的工具。",
+  "flow": "测试主进程ACP客户端 → stdio管道 → acp-server子进程 → acpApp的session/prompt → Host.open → Agent.submit/runTurn → Tools/审批/LocalFS → Session已提交事件 → ACP session/update；审批另走服务端 → 客户端request_permission → 服务端的Approvals.answer。",
+  "try": "先写完本章的acp.mjs、acp-server.mjs和测试，并安装本章依赖，再在练习工程根目录运行env -u DEEPSEEK_API_KEY bun test ./tests/046-acp.test.mjs。对照测试找到三次prompt：hello、写proof.txt、/slow。记录每次的sessionId和stopReason；写入用自动允许回调完成，不会连接收费模型。",
+  "why": "acpApp负责把标准ACP方法翻译成已有Host操作，再把会话事实翻译回标准更新。它不重新实现模型循环、权限或文件系统。pending表示某会话已有尚未结算的prompt；delivery链让本会话输出按顺序发送完后再返回结果。",
+  "accept": "当前测试确实启动另一个Bun进程，用真实ACP SDK完成initialize/new、文字prompt、自动允许后的真实文件写入、取消、list、close和resume。它没有验证所有ACP方法、并发双会话、图片、资源链接、推理更新或请求级取消；取消测试里的20ms等待也不是首片到达的确定性屏障。",
+  "debug": "在VS Code打开练习工程的tests/046-acp.test.mjs，选“Bun：当前测试”按F5。在const result = await client.request(...)、写文件prompt和assert.equal((await slow).stopReason, 'cancelled')处停下，监视created.sessionId、updates和result.stopReason；hello结束应为end_turn，取消应为cancelled。F10看SDK调用前后，F11只会进入主进程中的SDK。acp.mjs运行在子进程，本配置不会自动命中它；不要把主进程断点当成已调试服务端，也不要向服务端stdout打印日志。",
+  "recall": "合上本章，画出一次write调用的五个节点：ACP客户端、ACP粘合层、Host/Agent、Tools、磁盘；在另一条反向箭头写request_permission，并写明真正决定允许的是谁。",
+  "transfer": "练习：只在这份临时目录测试里，把客户端权限回调的optionId从allow改成deny，再补断言proof.txt不存在。完成后恢复示例。这个拒绝变体目前没有自动测试，不算已有验收，也不需要连接外部模型。",
+  "wiring": "本章创建了可运行的ACP stdio服务，真正使用041的Host与既有Agent、工具和持久日志；不是内存echo。后续067复用acpApp做三个差分样本，但没有把以下缺口自动补齐。ACP入口也没有像051的Web入口那样装配capabilities。",
+  "implemented": [
+    "真实ACP SDK与Bun子进程stdio连接，stdout只承载协议。",
+    "一个连接内按会话保存prompt占位和有序更新链，文本prompt驱动已有Host。",
+    "基础会话列表、恢复、关闭、取消、写死的模型选项以及一次性允许/拒绝桥接。",
+    "发送已提交assistant文字和基础tool_call/tool_call_update。"
+  ],
+  "missing": [
+    "原版从实时LLM目录生成provider/model/reasoning选项；这里仅写死offline与deepseek-flash，并只修改settings.model，不代表完成提供方切换。",
+    "原版支持resource_link以及满足路由和附件条件的图片；这里拒绝所有非text输入。",
+    "原版有thought、配置、上下文用量等标准更新；这里仅处理少量会话事件。",
+    "原版有分页cursor、规范工作区检查、提示词准入期间取消、$/cancel_request及更完整的后代/更新drain/关闭语义；本章没有等价覆盖。"
+  ],
+  "testEvidence": "tests/046-acp.test.mjs是一项真实跨进程集成测试，磁盘和Host是真实的，外部模型使用OfflineModel，审批由测试自动回答。现有用例未断言未知会话、多会话隔离、错误回复、配置实际影响模型请求或连接故障。这里说明代码可执行的验收范围，不声称本次文档改写重新跑过测试。",
+  "sources": [
+    "packages/acp/acp/src/index.ts",
+    "packages/acp/acp/src/session.ts",
+    "packages/acp/acp/src/content.ts",
+    "packages/acp/acp/src/model-control.ts",
+    "packages/acp/acp/src/updates.ts"
+  ]
+}

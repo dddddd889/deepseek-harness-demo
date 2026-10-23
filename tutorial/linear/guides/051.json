@@ -1,0 +1,31 @@
+{
+  "scenario": "前面已经写了Todo、Job和Skill等独立能力；这一章让Agent真的调用todo_update，把one任务改为done，而不是仅在测试里直接调用Collaboration.set。输入/tool todo_update后，应在会话日志和真实状态中看到变化。",
+  "flow": "Web或后续CLI输入 → Agent/runTurn → 同一Tools.execute → guard审批 → capabilities注册的todo_update.run → Collaboration.set → Session事实；run/job转交025 execute，skill_load转交031 Skills，子任务转交Subagents与新的Host会话。",
+  "try": "先写完capabilities.mjs、更新后的agent.mjs和Web入口，再运行env -u DEEPSEEK_API_KEY bun test ./tests/051-capabilities.test.mjs。人工操作仍用offline：启动Web、创建会话，发送/tool todo_update {\"value\":{\"id\":\"one\",\"status\":\"done\",\"text\":\"写完了\"}}并允许审批。检查工具结果one.status=done，而不是只看按钮消失。",
+  "why": "capabilities是装配函数，不是第二个Agent循环：它在Host打开会话时创建服务、注册工具并把它们交给已有Tools。Agent.children记录受管子Agent，用来在父活动取消/关闭时把取消继续传下去。",
+  "accept": "测试真正通过Agent的/tool输入调用todo_update，自动允许审批后断言协作状态为done，并确认subagent_create出现在目录。它没有验证拒绝分支、真实子任务执行、Job退出、Web搜索或所有能力清理；测试名里的“拒绝后”没有对应拒绝操作。",
+  "debug": "用“Bun：当前测试”启动tests/051-capabilities.test.mjs。断在src/capabilities.mjs的add、todo/plan/goal/schedule注册循环，以及src/tools.mjs的await this.guard；监视call.name、call.arguments、record.domains.collaboration.state('todo')。F11从工具run进入Collaboration.set，再F10到测试断言，one.status应为done。Terminal只被import，不能给terminal构造函数设断点后期待本章会命中。",
+  "recall": "闭卷写出todo_update、run、skill_load三个工具各调用哪个服务，再画一条Agent→Tools→guard→服务的共同主线。最后写出Terminal为何尚未出现在这条链里。",
+  "transfer": "练习：只在这份临时测试里把approval回答改为false，再补断言todo状态没有one。该拒绝用例当前尚未实现；只改本次测试的临时数据，不授权真实Shell或外网动作。",
+  "wiring": "Web入口实际装了product与capabilities，069 CLI也会装。PTY没有接入：Terminal仅导入，run/job仍用025 execute。SSH、LSP、Teams、Hook、Browser、Telemetry等独立模块也没有因本章标题而全部进入Agent工具链；后续各章仍须分别核实。",
+  "implemented": [
+    "将Job、基础Skill加载、Web、Workflow、自有Program、协作状态、附件呈现和子Agent入口注册到同一Tools。",
+    "读取工作区AGENTS.md，记录上下文并放入系统配置。",
+    "Agent维护children集合，取消传递给受管子Agent；scope关闭负责释放其会话。",
+    "外部搜索未配置时明确失败，不伪造搜索结果。"
+  ],
+  "missing": [
+    "未将026持久Shell迁到027 PTY，也未注册终端输入/resize/读取工具；导入Terminal不是完成接线。",
+    "原版子Agent作用域权限、工具restrict/guard继承、完整后端生命周期与本章简化Host.create不同。",
+    "Skill附属资源、完整PTC、多种文件/模型/外部提供方仍保留前章缺口。",
+    "现有测试只纵向证明一个todo操作，不证明所有注册工具的参数、拒绝、取消和清理均等价原版。"
+  ],
+  "testEvidence": "tests/051-capabilities.test.mjs的Host、Agent、Tools和Session是真实的，外部模型是OfflineModel，审批回调固定允许。它检查todo和工具目录，不运行真实命令、子Agent、搜索或PTY。本次文档改写没有补功能或扩大测试。",
+  "sources": [
+    "packages/preset/agent-preset",
+    "packages/core/tools/src/index.ts",
+    "packages/shell/tool-bash-persistent/src/index.ts",
+    "packages/subagent/subagent-dsh-sdk/src/run.ts",
+    "packages/bundle"
+  ]
+}

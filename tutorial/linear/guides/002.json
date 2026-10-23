@@ -1,0 +1,26 @@
+{
+  "scenario": "应用默认使用本地文件服务；一个子会话改用远端文件服务。子会话查fs应得到remote，父应用仍得到local；关闭子会话的Scope后，子会话再次查fs会退回父层local。",
+  "flow": "root.provide(owner,\"fs\",本地实现) → child=root.child() → child.provide(local,\"fs\",远端实现) → child.get先查当前Map再查parent → local.close撤销子项 → child.get回退父项。",
+  "try": "按本章写完services.mjs和测试，运行 bun test ./tests/002-services.test.mjs。逐个对应四个结果：子读remote、父读local、关闭local后子读local、关闭owner后get抛“缺少服务”。这里remote是测试对象返回值，不是真正SSH访问。",
+  "why": "Services是按名字查能力实现的注册表，Scope是撤销这些注册项的所有者。provide(scope,...)把移除Map项的函数交给scope；没有另一个destroy接口，是因为生命周期从登记时就交给Scope了。调用方仍持有value变量时，关闭Scope也不会神奇删除那个外部引用。",
+  "accept": "父子覆盖与回退成立，关闭后不再留注册项。测试没有打开文件或连接，只验证查找和撤销；服务对象自己的文件句柄或连接若需要关闭，还必须另行scope.own。",
+  "debug": "在VS Code打开练习工程并选中tests/002-services.test.mjs，选择“Bun：当前测试”按F5启动。在src/services.mjs的if(this.entries.has(name))、this.parent.get(name)以及this.entries.delete(name)打断点。F11进入child.get，监视this.entries、this.parent.entries和entry.value；关闭local后再查，F10应走父层。注意看Map大小而不是把“变量仍可见”误认为没有撤销。",
+  "recall": "合上资料写出Services和Scope各负责的一句话；再画出子Map缺项时get沿父链查找的顺序。",
+  "transfer": "把测试服务名改为model，父返回模型A、子返回模型B，重复覆盖与回退断言；这是替换测试数据，不代表已经实现模型网络请求。",
+  "wiring": "003的Plugins只创建一个共享Services供兄弟插件协作，不会自动为每个插件生成Services.child；005的reader从共享注册表取settings与session。子覆盖机制本章只在单测直接使用。",
+  "implemented": [
+    "按名字提供与读取能力，缺依赖立即抛错。",
+    "子注册覆盖父项，Scope关闭撤销，撤销时核对注册项身份。"
+  ],
+  "missing": [
+    "原版Cordis Service/Context结合注入声明、服务可达范围与isolate标记；教程只有显式Map父链，没有依赖等待和拓扑感知解析。",
+    "原版dsh-scope的作用域注册表将贡献可见性与所有权绑定，不能把本章任意child服务覆盖等同于原版所有服务自动按Agent隔离。"
+  ],
+  "testEvidence": "tests/002-services.test.mjs有1项内存测试，覆盖local/remote替代对象、父层不污染和两次Scope关闭后的查找。",
+  "sources": [
+    "vendor/cordis/src/service.ts",
+    "vendor/cordis/src/context.ts",
+    "vendor/loader/src/config/isolate.ts",
+    "packages/core/scope/src/store.ts"
+  ]
+}

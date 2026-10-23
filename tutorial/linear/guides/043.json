@@ -1,0 +1,30 @@
+{
+  "scenario": "网页、SDK或其他客户端都要创建会话、提交输入、订阅输出和取消。把这些操作集中在服务端领域控制器，避免每一种传输各写一套Agent Loop或只在UI隐藏越权按钮。",
+  "flow": "remote(peer,host,principal)注册方法 → 客户端session.create/watch/submit/wait → Host验证owner并操作同一个Agent → Events回调peer.notify(session.event) → 客户端接收；断连dispose撤销订阅",
+  "try": "写完src/remote.mjs和本章测试再运行 bun test ./tests/043-remote.test.mjs。测试用两个内存Peer连接，但调用真实Host：创建Alice会话，watch后submit hi并wait，检查助手通知；再尝试读Bob会话，应该由服务端拒绝。当前不需要启动HTTP服务器。",
+  "why": "Remote是领域方法到Host的映射，Peer是消息调用机制，两者不应混淆。principal由可信外层提供，不取客户端params里的自报owner；watch返回历史并订阅新事实，wait等待空闲，不等同于提交回执。",
+  "accept": "测试应1项通过，完成理由completed、通知含message/assistant、跨owner拒绝。方法虽包含cancel/edit/settings等，测试没有逐一覆盖；通知也不自动证明无缝重连或慢消费者处理。",
+  "debug": "在src/remote.mjs的session helper、bind(\"session.submit\"...)与session.watch回调打断点。F11由请求进入host.open看principal=\"alice\"；提交后F10返回inputId而Agent尚可运行；通知回调看event.sessionId。访问Bob时Host.header抛错，不能进入读取正文。所有Peer在本测试同一进程，没有worker断点。",
+  "recall": "闭卷分清session.submit回执、session.event实时事实、session.wait空闲结果三种消息；说明为什么principal必须从连接身份取得。",
+  "transfer": "安全练习：给测试加客户端关闭后session.listeners清理断言，并确认关闭连接不自动取消Agent。真正的HTTP/WebSocket认证和重连协议需后续传输层，不能把内存Peer当远程网络已验证。",
+  "wiring": "043测试内存传输＋真实Host；044真实stdio SDK与后续Web服务器复用remote，不另建Loop。这里的自定义点号方法名与原版SDK斜杠协议不同。",
+  "implemented": [
+    "会话创建/列表/读写控制映射",
+    "提示提交、等待、取消、队列操作入口",
+    "审批/设置/工具目录映射",
+    "实时订阅与断连撤销",
+    "可信principal交给Host授权"
+  ],
+  "missing": [
+    "原版API Gateway及各controller提供具名Remote namespace、结构验证与激活策略；教程一组手写Peer handler。",
+    "原版历史/follow有严格事件envelope验证、恢复与缓存策略；本章直接推Events。",
+    "本章未做每方法参数schema、协议版本、流量控制或网络身份认证；principal参数本身不是认证实现。",
+    "教程session.cancel/close是自定义API，原版SDK协议当前没有这些方法；不能称为兼容官方SDK。"
+  ],
+  "testEvidence": "043-remote.test.mjs以内存Peer驱动真实Host，验证prompt/通知/等待和跨owner拒绝；名称含取消但测试未实际执行cancel，应按断言范围理解。",
+  "sources": [
+    "packages/api/session-controller/README.zh.md",
+    "packages/sdk/protocol/README.zh.md",
+    "packages/sdk/server/README.zh.md"
+  ]
+}

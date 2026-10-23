@@ -1,0 +1,29 @@
+{
+  "scenario": "父Agent把审阅文档交给子Agent，得到结果后还要补问同一个子Agent，而不是每次重建一次性请求；其他父Agent即使知道child id也不能控制它。",
+  "flow": "Subagents.create(scope,parent,options) → factory创建真实Agent → 记录parent/agent → send提交输入 → wait等待Agent.idle并读会话 → interrupt取消 → 父scope关闭时child.close并撤销id",
+  "try": "先写完src/subagents.mjs和测试，再运行 bun test ./tests/036-subagents.test.mjs。ScriptModel预置first/second，给同一child发送one和two并分别wait；观察model.requests.length=2，stranger取消被拒绝，scope.close后entries为空。不会请求真实模型。",
+  "why": "子Agent管理器保存活的Agent资源和父身份，不只是Promise.all。复用同一child保留它的会话；factory决定模型、工具与配置，本章没有自动复制父权限或历史。",
+  "accept": "测试应1项通过，真实Agent执行两轮、父身份校验、关闭撤销成立。没有验证子孙深度、跨进程提供方、父子权限取交集、完成通知或强制清理失败。",
+  "debug": "在src/subagents.mjs的this.entries.set和get打断点，F10看同一childId对应同一agent；send时F11进入agent.submit，等wait结束再看model.requests从1变2。stranger调用时parent不匹配，agent.cancel不应命中。scope.close时F11进入agent.close，再检查entries.size=0。所有Agent在同一进程，不是worker。",
+  "recall": "闭卷解释factory、parent、childId三个身份各负责什么；列出“同一子Agent继续对话”与“新建第二个子Agent”的历史区别。",
+  "transfer": "安全练习：在临时测试创建两个子Agent，用各自独立ScriptModel，验证一方输入不进入另一方历史。自动继承restrict/guard尚未实现，不能通过同一个parent字符串推断权限已继承。",
+  "wiring": "036只有进程内Agent测试。051真实注册subagent_create/send/wait/interrupt，并由Host创建子会话加入agent.children；没有原版多提供方与权限树组合。",
+  "implemented": [
+    "factory生成可继续对话的真实Agent",
+    "父身份校验",
+    "发送、等待、取消接口",
+    "父scope持有并关闭子资源"
+  ],
+  "missing": [
+    "原版subagent有spawn/fork/ACP/DSH SDK/Codex/Claude Code等具名提供方和统一activation生命周期；教程仅factory。",
+    "原版有准入/并发/深度预算、完成通知、持久谱系与后代排空；本章没有完整控制。",
+    "原版进程内作用域可继承工具限制/守卫；教程新Tools/Settings或Host子会话不等于父权限链。"
+  ],
+  "testEvidence": "036-subagents.test.mjs运行真实Agent与ScriptModel两轮，验证model.requests=2、陌生父拒绝和scope清理；不调用远端模型。",
+  "sources": [
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent-spawn-in-process/README.zh.md",
+    "packages/subagent/subagent-fork-in-process/README.zh.md",
+    "packages/subagent/tool-subagent-control/README.zh.md"
+  ]
+}

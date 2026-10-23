@@ -1,0 +1,30 @@
+{
+  "scenario": "用户说一段话，应用应先录音并把音频交给ASR得到文字，再决定是否把文字送入聊天或翻译；不能把录音base64当普通文本塞给模型。当前章节只写出这些辅助模块，还没有可点击的录音产品。",
+  "flow": "未来页面按钮 → recordAudio申请麦克风/MediaRecorder → Blob；transcribe音频 → FormData与ASR提供方 → text；translate文字 → 已有model.stream → 收集text并检查finish。当前这三段没有串进页面/Remote/Host。",
+  "try": "先写完audio.mjs与web/audio.mjs，再运行bun test ./tests/060-audio.test.mjs。测试只用固定音频bytes和固定fetcher，检查请求体是FormData且带测试凭据，返回你好；随后ScriptModel输出hello作为译文。不要在现有网页找录音按钮：本章尚未提供，也不需要填写真实ASR Key。",
+  "why": "录音属于浏览器媒体资源，停止时必须释放track；ASR属于外部音频提供方，不能和聊天协议混同；translate只是复用模型流做一次翻译请求，完整finish才可当成完整结果。",
+  "accept": "测试证明FormData和测试Authorization构造，以及固定模型流的翻译结果。它不录音，不验证音频编码，不访问真实ASR，不检查UI权限拒绝/取消恢复，也没有验证recordAudio释放track。",
+  "debug": "打开tests/060-audio.test.mjs用“Bun：当前测试”启动，断在src/audio.mjs的form.set、fetcher与if (!ended)。监视form.get('model')应为asr、bytes长度和output/ended；F10越过固定fetcher得到你好，F11进入translate循环，收到finish后ended=true且output=hello。这里调试的是Bun测试；web/audio.mjs属于未来浏览器入口，当前测试不会命中，不要据此声称麦克风已调通。",
+  "recall": "闭卷写出录音、ASR、翻译、聊天四个环节各收什么、返回什么，以及哪个环节拥有麦克风track。",
+  "transfer": "练习：把固定ScriptModel改为只有文字但不发finish，补断言translate抛“翻译未完整结束”。只用固定模型，不连接外网；这个缺finish变体当前未加入测试。",
+  "wiring": "这些函数尚未装配进Host或Agent工具。web/audio.mjs既没有被现有HTTP assets路由提供，也没有被web/app.mjs导入；到069仍未接录音/ASR界面。",
+  "implemented": [
+    "独立浏览器录音辅助函数，在正常stop或录音错误时停止媒体track。",
+    "独立FormData ASR请求、配置缺失与结果text检查。",
+    "复用model.stream的文本翻译和完整finish校验。"
+  ],
+  "missing": [
+    "原版有语音提供方注册、准备状态、语言/输入格式、取消与卸载生命周期；本章只是固定端点调用。",
+    "麦克风权限、音频格式转换、上传API、录音UI和错误恢复尚未接线或验收。",
+    "原版翻译服务有多提供方选择、付费路由和持久结果/会话UI；本章独立请求没有这些契约。",
+    "不能把未核实的实时语音或播报能力列为本章已支持，也不能把固定bytes测试当真实ASR。"
+  ],
+  "testEvidence": "tests/060-audio.test.mjs完全不联网：ASR是固定fetcher，输入bytes只是fixed-audio字符串，翻译用ScriptModel。没有浏览器、真实音频和麦克风；本次仅文档说明，没有补UI。",
+  "sources": [
+    "packages/experimental/speech-to-text/src/index.ts",
+    "packages/experimental/api-speech-to-text",
+    "packages/experimental/client-ui-voice-input",
+    "packages/experimental/translator/src/index.ts",
+    "packages/experimental/client-ui-cot-translation"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "scenario": "产品想记录一次turn结束的原因和耗时，但不能把prompt或API Key发到统计服务器，也不能因为Collector返回503让用户任务失败。当前只演示发送器，不是已经接入业务的全链追踪。",
+  "flow": "调用者手动Telemetry.record → 属性白名单 → 有界queue → 手动flush取最多100项 → OTLP JSON格式POST → response.ok或catch返回false；没有Host事件订阅。",
+  "try": "先写完telemetry.mjs，再运行bun test ./tests/064-telemetry.test.mjs。测试会把prompt/private text与apiKey/secret-value一起传给record，用固定fetcher截获body并返回503；检查敏感值不在body里、flush返回false。不会连接真实Collector或发送用户数据。",
+  "why": "字段白名单限制允许出站的数据，队列和超时限制资源占用。遥测失败不向业务抛网络异常；但调用方仍须明确决定何时record/flush，单独存在一个发送器不会自动观察Agent。",
+  "accept": "测试验证OTLP JSON结构、两项敏感字段被过滤和固定503返回false。它没有真实HTTP、Collector、业务任务、队列满/超时/退出flush测试，也不证明所有可能字段都完成隐私审查。",
+  "debug": "用“Bun：当前测试”启动tests/064-telemetry.test.mjs，断在src/telemetry.mjs的allowed过滤、const batch = this.queue.splice(0, 100)和return response.ok；方法帧监视this.queue.length与batch.length。切到测试回调或调用者帧观察sent：JSON.parse(sent)中attributes应有key为reason、value.stringValue为completed的一项，且原字符串不含private text/secret-value。F10后batch应有一条，flush结果为false。F11进入的是测试固定fetcher，不是外部Collector进程。",
+  "recall": "闭卷给prompt、apiKey、toolName、durationMs四个字段标出当前是否允许出站，再写出网络失败时业务是否应抛错及谁负责flush。",
+  "transfer": "练习：让固定fetcher直接抛错，补断言flush仍返回false；仍不访问真实网络。这个异常变体当前没有测试，不等价于真实Collector超时验收。",
+  "wiring": "Telemetry只在064测试手动调用；Host/Agent、Web和Electron没有订阅并上报事件。后续也未接产品统计开关或全链Trace，不能把它当已开启的遥测系统。",
+  "implemented": [
+    "默认关闭、字段白名单、最多1000条内存队列和最多100条单次批次。",
+    "手动发送OTLP logs JSON，2秒HTTP超时，失败返回false。",
+    "测试敏感字段没有进入序列化正文。"
+  ],
+  "missing": [
+    "原版产品统计与Session遥测分别有政策、采集/分享状态和生命周期，本章没有对应接线。",
+    "没有真实OTel SDK processor/exporter、自动批次调度、完整drain/取消和指标/Trace链。",
+    "手写队列在flush前取走记录，失败不重投；其丢弃策略与原版不可直接视为相同。",
+    "当前fixed fetch测试不证明真实Collector兼容、全字段脱敏或遥测故障下真实任务继续。"
+  ],
+  "testEvidence": "tests/064-telemetry.test.mjs只调用固定fetcher，不启动HTTP服务器或Agent，所谓503是本地Response。真实JSON序列化和过滤确实发生，但不能写成已向Collector发送或已做端到端业务隔离。",
+  "sources": [
+    "packages/host/product-telemetry-otel/src/index.ts",
+    "packages/client/product-analytics/src/index.ts",
+    "packages/client/product-analytics/src/events.ts",
+    "packages/session/session-telemetry/src/index.ts",
+    "packages/session/session-telemetry/src/coordinator.ts"
+  ]
+}

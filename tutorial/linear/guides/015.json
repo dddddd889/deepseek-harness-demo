@@ -1,0 +1,25 @@
+{
+  "scenario": "模型流把“你好”的UTF-8字节拆到不同网络块，又把两条SSE事件合到一个块里。Harness必须先正确解码并按空行还原事件，不能把一次read当作一次模型消息。",
+  "flow": "字节chunks → TextDecoder(stream:true)保留未完整字符 → buffer累计 → /\\r?\\n\\r?\\n/找事件空行 → 按行筛data:并用换行合并 → yield数据正文 → 上层016再解释JSON与[DONE]。",
+  "try": "写完sse.mjs及测试后运行 bun test ./tests/015-sse.test.mjs。测试把含“你好”的原始字节逐字节切开，预期仍输出[\"你好\",\"a\\nb\"]；不带空行的data: partial尾帧必须报错。这里没有网络请求，直接喂字节数组。",
+  "why": "SSE解析器只恢复“事件的data字符串”，不负责thinking、工具调用和请求完成；那些由模型适配器解释。LF与CRLF都可形成行结束，两个行结束形成空行；[DONE]是本教程兼容接口正文约定，不是SSE标准的通用终止符。",
+  "accept": "覆盖单字节中文、CRLF、多行data和未完成尾帧。当前正则只支持LF/CRLF，不支持单独CR；不保存event/id/retry、会忽略空data，也没有完整EventSource重连和无限buffer防护。",
+  "debug": "在VS Code打开练习工程并选中tests/015-sse.test.mjs，选择“Bun：当前测试”按F5启动。在src/sse.mjs的decoder.decode(chunk,{stream:true})、正则exec与yield data打断点。F10喂“你”的前两个字节时观察buffer尚无完整字符，第三字节才出现“你”；监视match.index和buffer，只有空行完整后才yield。F11看上层next收到的是数据正文，不是网络块。",
+  "recall": "闭卷写出一条data: 中文加空行的SSE字节文本，圈出网络块可任意切的位置与不可据此判断事件的位置。",
+  "transfer": "在测试副本把分块改成一块含两个完整事件，结果应与逐字节分块相同；再让CRLF分隔恰好跨块。这是改已有输入数组，不访问远端服务。",
+  "wiring": "016的DeepSeekModel直接调用sse(response.body)，018固定HTTP demo也经016复用；020换pi-ai后由SDK解析SSE，不再使用本章解析器处理该路径。",
+  "implemented": [
+    "流式UTF-8解码、LF/CRLF空行边界、多行data合并。",
+    "事件未完尾部拒绝，不把任意chunk误判为消息。"
+  ],
+  "missing": [
+    "原版llm-deepseek使用eventsource-parser/stream库并处理heartbeat注释活动、事件类型一致性与结构化错误；教程手写data子集，没有watchdog接线。",
+    "原版Messages由message_stop及内容块状态机校验完成；本章只做通用分帧，既不等同原版Messages协议，也不独立证明一次assistant完整结束。"
+  ],
+  "testEvidence": "tests/015-sse.test.mjs有1项纯字节测试；有效覆盖分块和尾帧，未覆盖SSE全部标准字段、单CR或内存预算。",
+  "sources": [
+    "packages/llm/llm-deepseek/src/sse.ts",
+    "packages/llm/llm-deepseek/src/translate.ts",
+    "packages/llm/llm-deepseek/src/transport.ts"
+  ]
+}

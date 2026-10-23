@@ -1,0 +1,28 @@
+{
+  "scenario": "文件a.txt为“x x”，模型只说把x改y时默认拒绝，因为无法判断要改哪个。明确replaceAll:true后才一次改为“y y”；旧version不能接着改，重新读取后可用更具体before做唯一替换。",
+  "flow": "fileTools注册read/write/edit → Tools.execute先校验Schema和guard → read取text/version → edit重新读并核对传入version → split统计非重叠匹配 → 默认唯一或显式全量 → join按字面拼结果 → LocalFS.write再核对版本并发布。",
+  "try": "完成本章代码后运行 bun src/edit-demo.mjs，再运行 bun test ./tests/022-edit.test.mjs。依次应看到默认多匹配拒绝、显式全量得到y y、旧版本拒绝、重新读取后唯一替换得到z y；demo只操作临时目录，退出自动清理。不要用自己的源文件验证删除和替换边界。",
+  "why": "fileTools把021的文件能力变成模型可见Schema。replaceAll是可选布尔值，省略或false仍要唯一匹配；只在本次调用传true才允许全部。pieces.join(after)按普通字符串替换，after里的$&不会触发JS替换模板。",
+  "accept": "6项真实文件测试覆盖默认/false、多处与唯一匹配、true全量、字面$&、空after删除、错误flag类型、空/无匹配、旧版本。read仍只有path，全量读取；replaceAll既不提供分片读，也不解决并发编辑。",
+  "debug": "在VS Code选tests/022-edit.test.mjs，选择“Bun：当前测试”按F5。在src/file-tools.mjs的current.version比较、matches赋值和return fs.write打断点；监视args.replaceAll、matches、pieces与current.version。F10默认遇matches=2应拒绝，true应进入write；F11进LocalFS.write再看expected=current及observed。要调CLI按下方attach配置运行bun --inspect-brk=127.0.0.1:6499/edit-022 src/edit-demo.mjs。",
+  "recall": "闭卷写出省略、false、true、字符串\"true\"四种flag的结果，再说明before空串、零匹配、after空串分别如何处理。",
+  "transfer": "在临时测试副本用“a.b a.b”验证before按普通字符串处理而非正则；再用after=\"$&\"验证按字面保留。需自己补case再运行，不能用全量模式当成“不检查版本”的开关。",
+  "wiring": "本章edit-demo通过真实Tools与LocalFS执行；041 Host会注册fileTools并由Agent Loop使用。后续教程没有自动补齐原版read分片、图片读取和文件搜索全集，不能把Host接线等同文件能力全量实现。",
+  "implemented": [
+    "read/write/edit统一工具入口，默认唯一与显式replaceAll。",
+    "字面替换、空after删除、版本保护、真实demo和6项测试。"
+  ],
+  "missing": [
+    "原版tool-fs/read支持行号offset/limit、字节与单行预算及大文件stream阈值，并有read_image和搜索工具；教程read只有path，不支持分片或图片。",
+    "原版edit通过fs/edit-intent取得Session观察版本并由fs.editText执行，返回前后内容、修改结果及展示metadata；本章工具先全量读取再写，只返回bytes，缺diff和完整展示/沙箱接线。",
+    "原版parseEditArgs拒绝old_string与new_string相同的无操作；教程before===after仍可写入，参数名也使用path/before/after/replaceAll而非原版file_path/old_string/new_string/replace_all。"
+  ],
+  "testEvidence": "tests/022-edit.test.mjs有6项真实临时文件测试，edit-demo真实执行与清理；它们未调用模型。全量替换只覆盖已声明的字面与版本语义，不包含大文件、并发实例或跨进程CAS保证。",
+  "sources": [
+    "packages/fs/tool-fs/src/read.ts",
+    "packages/fs/tool-fs/src/edit.ts",
+    "packages/fs/tool-fs/src/write.ts",
+    "packages/fs/fs-observation-policy/src/index.ts",
+    "packages/fs/tool-fs/src/diff.ts"
+  ]
+}

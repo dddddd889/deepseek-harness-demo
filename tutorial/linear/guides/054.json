@@ -1,0 +1,30 @@
+{
+  "scenario": "应用需要下载运行时归档。如果下载途中被改了一个字节，损坏内容不能被标记为已安装，也不能让模型误以为依赖已经能用。",
+  "flow": "asset读取下载字节 → 与可信spec.sha256比较 → 写入缓存；installRuntime依次调用asset → tar列目录/解包到staging → 写manifest → rename发布；workspaceDependencies读取manifest并返回载荷内路径。三段目前不是桌面自动启动链。",
+  "try": "先写完runtime-assets.mjs，再运行bun test ./tests/054-runtime-assets.test.mjs。测试先用固定字节trusted-archive生成hash并写真实缓存，再将下载响应改为tampered，预期校验失败。这里的响应不是可解包tar，也没有真实运行时，不要直接调用installRuntime期待得到Python或Bun。",
+  "why": "下载URL说明去哪里取，可信hash说明预期取到什么；staging避免把半成品直接暴露为安装目录。workspaceDependencies应该指向随载荷带来的明确路径，不能缺文件后偷偷退回PATH找到另一版本。",
+  "accept": "当前测试只调用asset，证明固定响应内容能写入真实缓存、错误hash被拒绝。它没有调用installRuntime或workspaceDependencies，没有验证tar解包、发布原子性、清理、可执行性、真实运行时冒烟或没有PATH的机器。",
+  "debug": "用“Bun：当前测试”启动tests/054-runtime-assets.test.mjs，在src/runtime-assets.mjs的hash比较和await writeFile(path, bytes, ...)设断点。监视spec.sha256、bytes.toString()和path：第一次是trusted-archive并到达写入，第二次是tampered且在writeFile之前抛错。F10到测试readFile断言缓存内容；installRuntime/rename断点不会命中，因为当前测试没调用安装函数。",
+  "recall": "闭卷画“下载→hash校验→暂存解包→冒烟→发布”五个格子，圈出当前测试真正经过哪两个，再写出冒烟为什么不能被“文件存在”代替。",
+  "transfer": "练习：固定fetcher返回HTTP 500，补断言asset在写缓存前失败。仍使用临时目录与内存Response，不下载真实运行时；本变体未在现有测试实现。",
+  "wiring": "本章提供独立下载/安装/依赖路径辅助函数；052 Main没有调用它们，051也没有注册workspace_dependencies工具。056只携带当前Bun二进制，不等于复用了本章并完成原版全部primary-runtime。",
+  "implemented": [
+    "下载响应状态检查、SHA256接纳和真实缓存写入。",
+    "独立staging解包及rename发布流程，出错清理staging。",
+    "从自有manifest返回载荷里的依赖路径，缺文件报错。"
+  ],
+  "missing": [
+    "原版固定Node/Python/pnpm、wheels/库和Office资源锁及平台清单；本章没有完整可信载荷。",
+    "installRuntime和workspaceDependencies未测试，tar清单字符串检查不能证明链接/特殊条目安全。",
+    "本章未运行依赖版本与可执行smoke，单纯readFile成功不代表工具链可用。",
+    "未接桌面启动、依赖工具、升级/复用和原版primary-runtime复制/别名规则。"
+  ],
+  "testEvidence": "tests/054-runtime-assets.test.mjs使用固定fetcher和真实临时缓存，归档正文只是trusted-archive文本。它不会下载、解包或执行外部二进制。名称中的“不能发布”仅由asset拒绝体现，未验证installRuntime的发布行为。",
+  "sources": [
+    "scripts/primary-runtime/lock.json",
+    "scripts/primary-runtime/prepare.ts",
+    "scripts/primary-runtime/smoke.py",
+    "packages/skill/tool-workspace-dependencies/src/index.ts",
+    "apps/desktop/scripts/prepare-primary-runtime.ts"
+  ]
+}

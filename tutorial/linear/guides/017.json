@@ -1,0 +1,26 @@
+{
+  "scenario": "同一张图片被两个并发模型任务使用，理想情况下只上传一次并共享file id；上传失败不能把失败结果写进缓存，下次应允许重新上传。本章只实现“取得上传id”这一段，还没有让图片进入模型请求。",
+  "flow": "ModelFiles.upload(bytes,mediaType,signal) → SHA-256内容摘要 → 有效cache命中则复用 → 同摘要inflight存在则等待 → POST Files → 校验id并缓存 → finally移除inflight；remove只删除本实例知道的缓存项。",
+  "try": "写完files.mjs与测试后运行 bun test ./tests/017-files.test.mjs。测试第一次固定500应失败；随后两个相同bytes并发上传应都返回file-1，总fetch次数为2（失败一次、合并成功一次）。不要传真实图片到未知服务，也不要把此测试说成真实DeepSeek附件调用。",
+  "why": "ModelFiles是上传去重与短期复用helper；content hash回答“内容是否相同”，inflight回答“是否有人正在上传”。references文件id只代表提供方资源，仍需要附件管理与模型序列化把它放入真正请求；017尚未完成这段。",
+  "accept": "1项测试证明失败后可再试和同内容并发上传合并；删除、过期刷新、独立等待方取消均未验收。源码保留Messages/Files请求头，与016已改用的Chat Completions并没有接成一个协议流程。",
+  "debug": "在VS Code选中tests/017-files.test.mjs，选择“Bun：当前测试”按F5。在src/files.mjs的cache.get、inflight.has、this.inflight.set和this.cache.set打断点；F11进入两个upload，监视digest、cache.size、inflight.size与测试调用者的count。第一次500后两Map应空；并发成功时只有一个operation，最终cache有1项而inflight清空。",
+  "recall": "闭卷写出cache和inflight的区别，并指出file-1还需要在哪一步被引用，才能证明模型真正看到了图片。",
+  "transfer": "在测试副本并发上传两份不同bytes，断言会发两次成功上传；这是需新增代码的练习。过期删除与真实图片投喂没有集成入口，不要直接调用不存在的附件工具。",
+  "wiring": "当前ModelFiles只在017单测使用；搜索后续步骤未发现它接入DeepSeekModel、PiModel或Host。没有后面某一步自动完成图片→上传→模型续轮，必须作为明确缺口保留。",
+  "implemented": [
+    "内容hash缓存、过期余量、同摘要进行中请求合并。",
+    "失败清除inflight，提供已知缓存资源的删除方法。"
+  ],
+  "missing": [
+    "原版file-store按端点和鉴权请求头hash隔离上传索引，包含过期、陈旧id失效、归属文件配额清理；本章只有单实例内存Map，不持久化索引。",
+    "原版支持等待方局部取消、共享上传所有等待者退出才中止，并在request-files中统一选择file-id或受预算约束的内联图片；本章共用首个调用者signal且没有请求投影/预算/回退接线。"
+  ],
+  "testEvidence": "tests/017-files.test.mjs有1项固定HTTP测试，传入image-bytes样本文本，没有真实图片解析或真实上传；remove虽存在但此测试未调用。",
+  "sources": [
+    "packages/llm/llm-deepseek/src/file-store.ts",
+    "packages/llm/llm-deepseek/src/upload-index.ts",
+    "packages/llm/llm-deepseek/src/request-files.ts",
+    "packages/llm/llm-deepseek/src/files-api.ts"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "scenario": "用户级review Skill提供通用规范，项目级同名review需要覆盖它；加载后即使磁盘规范改了，也要能解释当时Agent到底看过哪份正文。",
+  "flow": "Skills([userRoot,projectRoot]).discover → 扫描命名目录并后层覆盖 → load(name,session)读取SKILL.md → 计算hash → 追加context/skill事实 → 返回正文",
+  "try": "写完src/skills.mjs与本章测试再运行 bun test ./tests/031-skills.test.mjs。测试在临时目录创建user/review与project/review，确认discover只列一个review、load返回project；随后把项目文件改成changed，再检查已记录事件仍是project。",
+  "why": "Skills在本章是入口目录＋正文加载器，不是脚本执行器。discover让名字定位到文件，load保留本次读取的来源/hash/内容。scripts、references、assets是附属资源，应按需使用，不应加载Skill时全部读取或执行。",
+  "accept": "测试应1项通过，后层覆盖且历史正文不被后来磁盘内容改写。没有验证frontmatter、资源路径解析、目录watch、实际模型遵循Skill或运行script。",
+  "debug": "在src/skills.mjs的this.catalog.set与session.append(\"context/skill\",...)打断点。第一次循环看review指向user，再F10走到project覆盖同名键；load时看path位于project、content=\"project\"、hash为SHA256。继续到测试改文件后，展开session.records确认旧content仍是project。",
+  "recall": "闭卷写出discover与load各自是否读正文；给出SKILL.md引用references/rules.md时应以哪个目录解析，并指出当前实现没有把该基准显式返回。",
+  "transfer": "安全练习：临时测试第二次调用load应读到changed，而第一次事件保持旧正文。完整“加载Skill→读reference→执行script”目前未实现；不要在load里自动执行scripts来假装补齐。",
+  "wiring": "031仅独立文件测试。051实际注册skill_load，每次discover再load；但没有把Skills.catalog做模型目录，也未把context/skill自动转换成指令快照。资源根目录、附属文件授权和脚本接线未在后续补齐。",
+  "implemented": [
+    "根目录顺序覆盖",
+    "按需读取SKILL.md",
+    "来源路径、正文hash与内容入会话事实",
+    "规则文件读取辅助函数"
+  ],
+  "missing": [
+    "原版skill条目有resourceBase并向模型渲染相对资源路径指引；本章只返回正文。",
+    "原版filesystem提供方解析frontmatter、目录bundle及平铺md，按rank/作用域裁决并监视目录；本章仅目录名和手工discover。",
+    "原版tool-skill、模型目录和用户可调用Skill路径分开接线；本章只有后续基础skill_load。",
+    "scripts/references不是自动加载或执行目录；教程缺少通过文件/执行工具消费这些资源的真实演示及边界测试。"
+  ],
+  "testEvidence": "031-skills.test.mjs用真实临时文件验证覆盖及事件快照；没有调用模型，没有script/reference资源使用测试。",
+  "sources": [
+    "packages/skill/skill/README.zh.md",
+    "packages/skill/skill/src/index.ts",
+    "packages/skill/skill-filesystem/README.zh.md",
+    "packages/skill/tool-skill/README.zh.md"
+  ]
+}

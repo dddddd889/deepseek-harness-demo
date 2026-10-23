@@ -1,0 +1,28 @@
+{
+  "scenario": "一次工具任务需要串起两个操作：先拿到一个值，再把这个值传给下一个工具。希望只给模型一份编排输入，但每个内层工具仍经过权限守卫。",
+  "flow": "runProgram(program) → 先检查条数预算 → 逐条解析id/tool/arguments → 将顶层参数中的{$ref:id}换成之前结果 → Tools.execute → 存values → 返回所有结果",
+  "try": "先写完src/ptc.mjs和测试，再运行 bun test ./tests/038-ptc.test.mjs。程序第一条echo返回ok，第二条text引用a；观察result.b=\"ok\"且checks=2，说明内层调用没有绕过guard。再看maxCalls=0的请求执行前就拒绝。",
+  "why": "本章runProgram是一个可审计的声明式寄存器解释器，不执行JavaScript源码，也不是任意代码沙箱。id是结果寄存器，$ref引用先前值；只有参数第一层的引用会被替换。",
+  "accept": "测试应1项通过：两次真实Tools.execute、引用传值、守卫计数2与预算拒绝。没有执行模型生成代码、循环、嵌套引用或隔离进程，不能称为原版完整PTC。",
+  "debug": "在src/ptc.mjs的argumentsValue[key]=structuredClone(...)和await tools.execute打断点。第一条后values.get(\"a\")应是ok；第二条替换前text是{$ref:\"a\"}，F10后变成字符串ok；F11进入Tools.execute看guard再次执行。预算场景停在program.length>maxCalls，任何tool.run均不应命中。",
+  "recall": "闭卷手写两条指令，把第一条结果传第二条；解释为什么直接调用tool.run会绕过guard，而此解释器必须调用Tools.execute。",
+  "transfer": "安全练习：把第二条引用改成不存在的missing，断言“尚未定义”且第二次工具不执行；再增加嵌套对象引用观察当前不会递归替换。任意JavaScript/Python程序执行需另建真实运行时，当前未实现。",
+  "wiring": "038独立解释器测试；051注册run_program，内层实际复用同一Tools。没有接原版ptcRuntime，也没有Node/Python隔离执行。",
+  "implemented": [
+    "条数预算、唯一指令id",
+    "先前结果引用与结构克隆",
+    "取消检查",
+    "所有内层调用过统一Tools守卫"
+  ],
+  "missing": [
+    "原版ptc-runtime有resolve/run、语言/程序格式描述符、宿主异步函数绑定、日志与结构化结果。",
+    "原版Node运行时在受管隔离进程执行源码并支持明确owner状态；本章只解释数组。",
+    "原版Tools PTC模式还涉及模型工具展示、嵌套调用身份与执行边界；教程run_program不兼容这些约定。"
+  ],
+  "testEvidence": "038-ptc.test.mjs验证声明式引用传值和guard调用次数，测试不包含eval、JS源码执行或OS沙箱。",
+  "sources": [
+    "packages/ptc-runtime/ptc-runtime/README.zh.md",
+    "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
+    "packages/core/tools/README.zh.md"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "scenario": "用户保存API Key后，设置页只应看到“已配置”，不能拿到明文；工作区列表重启后仍保留名称和归档状态，且这些产品设置不应混进模型对话。",
+  "flow": "Credentials/Workspaces → Store.update读现值 → 修改对象 → 私有临时JSON文件 → rename发布 → 新实例Store.read恢复；凭据list只给ref/configured，resolve由宿主消费",
+  "try": "写完src/storage.mjs及本章测试，再运行 bun test ./tests/042-storage.test.mjs。测试用虚构secret-never-send保存凭据，检查list序列化不含它；新Credentials实例resolve可取回；再归档临时工作区，新Workspaces实例看到archived=true。不要把真实Key填进测试。",
+  "why": "Store是产品数据文件，不是模型会话日志。CredentialRef用于引用秘密，resolve仍能读取明文，说明“列表不泄露”不等于“同一OS用户无法读文件”。Workspaces目前只是一张带路径的记录表。",
+  "accept": "测试应1项通过，描述中无明文、重建实例能恢复凭据与工作区归档。没有验证并发更新不丢失、系统钥匙串、原版领域schema、目录存在性、跨进程锁或工作区会话成员。",
+  "debug": "在src/storage.mjs的Store.update与Credentials.list/resolve打断点。只使用测试假secret；F10到rename看temporary与目标路径不同，list返回对象只有ref/configured；新实例resolve应读磁盘。Workspaces.add后检查id与resolve后的绝对path，update后archived=true。不在调试日志打印真实凭据值。",
+  "recall": "闭卷说明ref/configured与secret分别允许谁读取；画出临时文件→rename为何避免半份JSON，但不能保证两个进程读改写不互相覆盖。",
+  "transfer": "安全练习：在测试临时目录执行credentials.remove，确认list不再含该引用；给工作区加title再恢复。多写者事务、OS钥匙串与真实工作区成员关系目前未实现。",
+  "wiring": "042是独立存储测试；050 product(host)真实创建Credentials/Workspaces并注册设置API，deepseek路由在模型请求时调用credentials.resolve(keyRef)。工作区列表也接入产品API；但Workspaces记录仍没有原版的会话成员关系和目录有效性语义。",
+  "implemented": [
+    "临时文件加rename发布JSON",
+    "凭据列表脱敏引用、删除与resolve",
+    "工作区路径规范化/标题/归档记录",
+    "重新实例化恢复"
+  ],
+  "missing": [
+    "原版storage有领域描述符、版本/迁移、single/per-record、JSON/SQLite后端；本章裸对象读改写没有这些约定。",
+    "原版credentials-local有固定环境分层、watch重载、异步写锁与describe来源；教程只有文件优先再process.env。",
+    "原版workspace维护有序项目、目录有效性、会话成员与移除语义；教程记录表没有绑定Session。",
+    "原版本地凭据同UID可读且未提供OS钥匙串，不能把这项共同限制错误描述为原版已经解决。"
+  ],
+  "testEvidence": "042-storage.test.mjs使用真实临时JSON文件和虚构secret，验证脱敏列表及新实例恢复；不验证真实Key请求、并发或数据库事务。",
+  "sources": [
+    "packages/storage/storage/README.zh.md",
+    "packages/storage/storage-domain/README.zh.md",
+    "packages/storage/storage-json/README.zh.md",
+    "packages/credentials/credentials-local/README.zh.md",
+    "packages/workspace/workspace/README.zh.md"
+  ]
+}

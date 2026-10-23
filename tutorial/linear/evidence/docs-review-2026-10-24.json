@@ -1,0 +1,29 @@
+{
+  "lessons": 70,
+  "sourceDeltas": 203,
+  "originalReferences": 255,
+  "allGuideFieldsRendered": true,
+  "allCodeBlocksMatch": true,
+  "runtimeTestsExecuted": false,
+  "date": "2026-10-24",
+  "scope": "tutorial/linear/000-069 documentation",
+  "sourceDeltasUnchanged": true,
+  "generationIdempotent": true,
+  "originalCommit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+  "originalParityComplete": false,
+  "interactiveDebugRechecked": false,
+  "harnessOwnModifiedByThisTask": false,
+  "proseScenariosRetained": [
+    "005",
+    "007",
+    "009",
+    "015",
+    "016",
+    "018",
+    "020",
+    "021",
+    "022",
+    "027",
+    "032"
+  ]
+}

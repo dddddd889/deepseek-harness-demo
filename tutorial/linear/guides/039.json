@@ -1,0 +1,31 @@
+{
+  "scenario": "用户给一条消息点赞，不应把点赞文字伪装成下一次模型用户输入；另有一次到期提醒，正常处理后重建协作对象不应重复投递。",
+  "flow": "Collaboration.set(kind,value) → 校验状态词 → 追加collaboration事件 → state折叠最新值；due(now,deliver) → 找到pending且到期 → deliver → 记录delivered；feedback单独追加sidecar事件",
+  "try": "写完src/collaboration.mjs与测试后运行 bun test ./tests/039-collaboration.test.mjs。先写入at=1的提醒，在now=2投递，再new Collaboration(session)于now=3检查不再投递；添加feedback后messages投影仍为空；给plan传completed应拒绝。",
+  "why": "本章把Todo/Plan/Goal/Schedule存成不同事件状态，避免都叫“任务”。due不是定时器，需要调用者传now并触发；正常路径标记delivered防重复，deliver与写事件之间不是事务，仍要求投递方按id幂等。",
+  "accept": "测试应1项通过，正常重建不重复、反馈不进入模型历史、错误状态拒绝。不能证明提醒后台自动到期、崩溃窗口恰好一次、周期任务或Goal自动继续运行。",
+  "debug": "在src/collaboration.mjs的this.session.append、await deliver及this.set(\"schedule\"...)打断点。第一次due时看status=pending且at<=now；F10完成deliver后再写delivered。第二个实例state应折叠出delivered并跳过；在feedback后切到projection.mjs观察messages过滤结果仍为空。",
+  "recall": "闭卷写出todo.done、plan.accepted、goal.completed为什么不是一个状态；画出deliver成功但delivered落盘前崩溃会导致什么。",
+  "transfer": "安全练习：在纯内存测试让deliver按id记录到Set，再重复调用due验证消费方幂等；模拟deliver抛错应保持pending。重复周期、时区、Goal驱动尚未实现，不要仅增加一个状态名宣称完成。",
+  "wiring": "039独立事件测试；051注册todo/plan/goal/schedule_update，只有状态更新。capabilities没有安排定时器调用due，也没有Goal轮次驱动，不能认为写入schedule就会在后台提醒。",
+  "implemented": [
+    "按类别校验状态并由事件重建",
+    "一次性到期扫描",
+    "成功投递后记录delivered",
+    "反馈与模型消息分离"
+  ],
+  "missing": [
+    "原版todo、plan-mode、goal和schedule各自有独立领域协议；教程一个通用状态表没有相应生命周期。",
+    "原版schedule宿主持久调度、恢复冷会话、周期/cron/时区及投递历史；教程没有后台调度和事务确认。",
+    "原版goal-round-driver管理持续目标的后续轮次；教程goal只存状态。",
+    "原版反馈产品与消息身份关联；本章只追加messageSeq和评分文本。"
+  ],
+  "testEvidence": "039-collaboration.test.mjs验证同一Events上的重建和正常幂等、反馈投影排除、非法plan状态；没有重启Host或真实时钟调度。",
+  "sources": [
+    "packages/todo/tool-todo/README.zh.md",
+    "packages/plan/plan-mode/README.zh.md",
+    "packages/goal/goal-round-driver/README.zh.md",
+    "packages/schedule/schedule/README.zh.md",
+    "packages/feedback/message-feedback/README.zh.md"
+  ]
+}

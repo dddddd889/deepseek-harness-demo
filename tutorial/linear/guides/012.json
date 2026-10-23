@@ -1,0 +1,26 @@
+{
+  "scenario": "用户要算2+3：第一次模型请求输出sum调用，Harness真正执行加法，把结果5作为tool消息放回历史；第二次模型请求读取这个结果并结束。一次turn因此可以包含多个model step。",
+  "flow": "runTurn写turn/start与user消息 → 投影history并取工具catalog → model.stream → 收集assistant及calls → tools.execute(sum) → message/tool关联callId → 第二次stream携带工具结果 → turn/end(completed)。",
+  "try": "写完loop.mjs及测试后运行 bun test ./tests/012-loop.test.mjs。检查model.requests.length=2、第二次请求最后一条工具结果{ok:true,value:5}、callId=call-1，且turn/end恰好一条。本步无CLI演示入口，013才补可运行demo。",
+  "why": "Loop决定“回答结束还是执行工具后继续”，模型适配器只产Part，Tools负责实际执行，Session记录过程。tool/start表示开始尝试，当前结果用message/tool收尾，没有另外的tool/end事件。",
+  "accept": "一个真实sum函数加固定模型完成两次请求；不证明真实HTTP、持久化、取消异常矩阵或并行工具。直接new Events未带persist，日志事实此时只在内存。",
+  "debug": "在VS Code打开练习工程并选中tests/012-loop.test.mjs，选择“Bun：当前测试”按F5启动。在src/loop.mjs的const requestId/history、calls.push(part)、await tools.execute和message/tool追加处打断点。F11进入Tools.execute确认a=2,b=3；返回后监视result.value=5，F10到下一step看history末项callId与calls[0].id相同。",
+  "recall": "闭卷画出两次模型请求之间多出的assistant调用与tool结果，说明为什么不能直接把5打印出来就算模型续轮成功。",
+  "transfer": "在测试副本让sum主动抛Error(\"演示失败\")，再让固定模型回答“计算失败”，断言第二次history带ok:false；这是需新增的失败练习。不要把工具失败等同于整个turn必须立刻结束。",
+  "wiring": "013的Agent.pump真实调用runTurn；014替换loop.mjs加入可选batch，016再保存provider replay。当前直接运行本章测试是最短实际调用链。",
+  "implemented": [
+    "多step工具续轮、调用id关联、流文字与提交消息分离。",
+    "最大步数、工具错误转结果、取消或错误结束标记。"
+  ],
+  "missing": [
+    "原版agent-loop以扩展点运行pre-step、请求恢复、上下文组装和工具调度，不需所有业务改loop；本章把流程写在单一函数中。",
+    "原版在取消与步骤失败时给未分发/未结算调用写明确恢复结果，并有请求头和assistant流持久表示；本章未覆盖完整工具组闭合、崩溃恢复和类型化生命周期。"
+  ],
+  "testEvidence": "tests/012-loop.test.mjs有1项模型替身＋真实sum集成测试，检查第二请求历史和唯一turn/end；不包含实际模型服务、文件工具或并发。",
+  "sources": [
+    "packages/core/agent-loop/src/agent.ts",
+    "packages/core/agent-loop/src/assistant-stream.ts",
+    "packages/core/agent-loop/src/tool-calls.ts",
+    "packages/core/session/src/repair.ts"
+  ]
+}

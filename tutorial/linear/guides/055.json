@@ -1,0 +1,29 @@
+{
+  "scenario": "下载站给出一个新版本清单：程序应先证明清单没有被篡改、目标平台和版本正确，再校验载荷。安装器失败时，要记录失败并保留旧版资格，而不是把“下载完成”显示成“更新成功”。",
+  "flow": "Updates.admit验证原始清单签名 → 校验版本/target/hash → Store记admitted → apply验证载荷hash → Store记installing → 调用平台installer → awaiting-new-version-smoke或failed-keep-old。",
+  "try": "先写完src/update.mjs和测试，再运行bun test ./tests/055-update.test.mjs。观察本地临时密钥签名的raw清单：末尾加空格后必须验签失败；原raw准入后，固定installer抛错，最终状态必须为failed-keep-old。本章不连接更新服务器，也不安装或重启应用。",
+  "why": "签名证明清单来自信任的签发方，hash证明载荷符合清单，版本和平台判断决定它是否适合当前安装。awaiting-new-version-smoke只是等待新版启动验证，不能把它当更新完成。",
+  "accept": "单测验证真实Ed25519签名的篡改拒绝、载荷hash校验通过后固定安装器失败，以及失败状态落盘。它没有测试成功安装、降级/跨平台分支、真实平台安装器、旧应用保留或新版启动；failed-keep-old是状态名，不是磁盘恢复证据。",
+  "debug": "打开tests/055-update.test.mjs，用“Bun：当前测试”启动。断在src/update.mjs的verify(...)、state.status !== 'admitted'条件和catch里的store.update。入口看state.manifest.target、state.previous；state是入口快照，后续监视this.store.read().status才会依次看到admitted、installing、failed-keep-old。F10查看篡改raw被拒绝，再F11进入apply，installer抛错后进入catch。installer是测试回调，不是系统安装程序。",
+  "recall": "闭卷分别写一句“签名通过”“hash通过”“installer返回”“新版smoke通过”各能证明什么，再指出哪一步才有资格宣告新版可运行。",
+  "transfer": "练习：用本地临时密钥给版本0.9.0的清单重新签名，调用admit时currentVersion=1.0.0，断言即使签名有效也被拒绝。不用真实证书或发布服务；该降级变体目前没有测试。",
+  "wiring": "Updates仍是独立类，052 Main没有调用它，056打包也没有因此获得真实自动升级。后续没有平台installer和新版smoke确认接线，不能把本章状态机当作已完成桌面更新。",
+  "implemented": [
+    "对原始清单字节做公钥验签，检查简单三段版本、target与SHA256字段。",
+    "apply校验载荷，记录安装中、等待新版验证或失败保留旧版状态。",
+    "安装动作通过显式installer回调注入，不在通用逻辑里猜平台命令。"
+  ],
+  "missing": [
+    "原版有更新下载、资格/强更策略、进度、原生安装接管、准入锁定与任务中断确认；这里未接。",
+    "没有真实旧产物保留/恢复或新版启动smoke实现，状态文字不能代替行为。",
+    "没有完整版本语义、成功确认方法、多平台升级和故障恢复验收。"
+  ],
+  "testEvidence": "tests/055-update.test.mjs使用真实crypto与临时Store，但载荷只是new-app文本，installer只抛Error。没有网络、签名证书、应用包或系统更新动作。本次文档修改不新增升级资格。",
+  "sources": [
+    "apps/desktop/src/update-coordinator.ts",
+    "apps/desktop/src/update-http-executor.ts",
+    "apps/desktop/src/update-journal.ts",
+    "apps/desktop/src/mandatory-update-policy.ts",
+    "apps/desktop/src/update-presentation.ts"
+  ]
+}

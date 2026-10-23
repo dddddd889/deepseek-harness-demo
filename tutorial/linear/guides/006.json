@@ -1,0 +1,26 @@
+{
+  "scenario": "Harness写了一条用户消息后退出；下次启动要读回已提交行。若磁盘尾部只有半条JSON，应丢掉未完成尾行；若中间有完整换行却不是JSON，要拒绝恢复，不能跳过后继续伪装历史完整。",
+  "flow": "new Journal(path)独占创建.lock → 打开日志 → 定位最后LF → 解析完整行并校验seq/format → 截去尾半行 → Events.persist调用Journal.append → writeSync循环写完并fsync → close释放fd与锁文件。",
+  "try": "按本章创建journal.mjs及测试，运行 bun test ./tests/006-journal.test.mjs。测试自己创建临时目录：正常写一条中文换行消息、拒绝第二写者、追加半行后恢复、追加broken完整行后拒绝。先读测试的四段操作，再运行，不需要手动破坏自己的会话文件。",
+  "why": "Journal是磁盘存储执行器，Events仍是事实接口。只有完整换行才视为提交记录；锁文件阻止第二个写者。两者组合需要把恢复出的records重新放入会话，本章不是仅new一个Journal就自动恢复Agent。",
+  "accept": "本工程format:1日志能恢复，尾半行修剪，中间坏行拒绝，活着的第二写者失败。未验证进程掉电、磁盘写到一半或遗留.lock自动识别；不能宣称等同原版内核锁。",
+  "debug": "在VS Code打开练习工程并选中tests/006-journal.test.mjs，选择“Bun：当前测试”按F5启动。在src/journal.mjs的openSync(this.lock,\"wx\")、const committed、ftruncateSync和fsyncSync打断点。F11进入new Journal，监视last、buffer.length、records；尾半行场景应last+1小于长度，F10后文件截到最后LF。第二次构造应在独占建锁处失败。",
+  "recall": "闭卷写出“无换行尾巴”和“broken\n完整行”的不同处理，再说明append失败为什么不能先把record放进records。",
+  "transfer": "在测试副本追加一个带正确format但跳号seq的完整JSON行，断言构造拒绝；这是需新增代码的练习。不要手动删除真实活跃进程的锁文件。",
+  "wiring": "本章单测把Events.persist接到Journal.append；005原demo仍用自己的同步写入器。041的Host.create/open路径才真正装配本章Journal并恢复会话记录，后续Web/ACP共享Host。",
+  "implemented": [
+    "独占文件锁、完整行恢复、序号和format检查、尾半行修剪。",
+    "同步完整写入循环、fsync提交和正常退出释放。"
+  ],
+  "missing": [
+    "原版JSONL后端默认带校验和Zstandard帧，使用句柄、revision、惰性实体化与历史格式catalog；本章只有全量读入的未压缩JSONL。",
+    "原版POSIX flock／Windows内核信号量随进程退出释放；本章.lock是独占创建的普通文件，崩溃残留需人工核验，不能自动删除后声称安全。"
+  ],
+  "testEvidence": "tests/006-journal.test.mjs有1项临时磁盘测试，覆盖恢复、第二写者、尾部修复和中间坏JSON。无真实杀进程、掉电或跨平台原版格式兼容验收。",
+  "sources": [
+    "packages/session/session-persistence-jsonl/src/storage.ts",
+    "packages/session/session-persistence-jsonl/src/lease.ts",
+    "packages/session/session-persistence-jsonl/src/zstd.ts",
+    "packages/session/session-persistence-jsonl/README.zh.md"
+  ]
+}

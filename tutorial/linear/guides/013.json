@@ -1,0 +1,25 @@
+{
+  "scenario": "Agent输出第一片partial时，用户排队一条新任务并取消当前任务；第一轮以cancelled结束，第二轮仍应执行，且第二轮采用用户刚更新的模型配置。取消不是把所有未来任务都清空。",
+  "flow": "Agent.submit → Inbox.enqueue(turn/step) → 单个pump取turn → Settings.snapshot → runTurn → cancel仅abort当前controller → 下一条turn继续 → idle等待活动结束 → close禁止新输入并取消、等待。",
+  "try": "完成agent.mjs、demo.mjs和测试后运行 bun src/demo.mjs \"/sum 2 3\"，应看到工具结果5及completed；运行 bun src/demo.mjs /slow，看到partial后按Ctrl+C，应以cancelled结束。再运行 bun test ./tests/013-agent.test.mjs 验证排队第二轮继续。此时demo明确使用固定模型。",
+  "why": "Agent是会话当前活动的主人；submit返回的是接收输入凭据，不是最终答案。pump保证同一Agent只执行一个turn，idle等到队列处理完，close等到当前异步工作收敛，外层再清工具Scope。",
+  "accept": "测试首片取消、队列继续与两轮配置不串。没有父子Agent权限继承、会话恢复或多用户控制；close也不会自动关闭另外传入的tools Scope，demo的finally负责两者。",
+  "debug": "在VS Code打开练习工程并选中tests/013-agent.test.mjs，选择“Bun：当前测试”按F5启动。在src/agent.mjs的if(this.active||this.closed)、this.inbox.claim(\"turn\")、this.settings.snapshot()和cancel打断点。F10到第一片回调，监视controller.signal.aborted由false变true；继续后查看第二次config.model=\"second\"，active最终undefined。F11进入runTurn可看两次turn/end。",
+  "recall": "合上资料写出submit、cancel、idle、close各做什么，再说明为何submit后立即读session末条不一定已经是最终答案。",
+  "transfer": "把测试中的第二轮文字改成第三条排队输入，并给ScriptModel补对应answer后验收顺序；必须同时补脚本，否则“脚本耗尽”是正常报错，不是排队实现坏了。",
+  "wiring": "本步demo首次贯通Agent→Loop→Tools；016 demo把model提供方换成真实兼容接口，018/020有真实路由装配，041 Host才把Agent放入持久会话管理。",
+  "implemented": [
+    "单Agent串行pump、持久输入队列接口、每turn配置快照。",
+    "取消当前活动、保留下一轮、idle等待和关闭拒绝新输入。"
+  ],
+  "missing": [
+    "原版Agent注册表提供create/resume、作用域上下文、状态投影、会话生命周期和有序撤销；本章只有手工new Agent与四个活动字段。",
+    "原版循环的边界拦截、输入归属、运行状态和会话恢复异常处理更细；本章无restore、父子作用域、持久状态机及稳定的外部通知接口。"
+  ],
+  "testEvidence": "tests/013-agent.test.mjs有1项集成测试，事件监听器在partial处确定性排队并取消，无sleep猜时序；CLI demo用真实sum函数，模型为ScriptModel。",
+  "sources": [
+    "packages/core/agent/src/index.ts",
+    "packages/core/agent-loop/src/index.ts",
+    "packages/core/agent-loop/src/agent.ts"
+  ]
+}

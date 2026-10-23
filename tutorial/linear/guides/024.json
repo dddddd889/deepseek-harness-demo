@@ -1,0 +1,30 @@
+{
+  "scenario": "同一个write工具，在“询问”模式下需要你同意，在“只读”模式下即使想批准也应直接拒绝。具体任务是阻止一次写配置的工具产生副作用。",
+  "flow": "Tools.execute(call,context) → 参数校验 → tools.guard(tool,call,context) → permissionGuard读取settings.snapshot → 只读拒绝或Approvals.request → 检查取消 → tool.run",
+  "try": "先写完src/permissions.mjs和本章测试，在练习工程运行 bun test ./tests/024-permissions.test.mjs。测试注册计数器write工具，第一次审批回false，第二次settings.set({ permission: \"read-only\" })；两次均检查writes===0。这里没有实际改磁盘。",
+  "why": "permissionGuard是工具执行前的一道策略门：根据effect决定放行、拒绝或询问。它不负责操作系统隔离，也没有管理多个guard。当前tools.guard是一个属性，再赋值会覆盖旧值。",
+  "accept": "测试应1项通过，错误分别包含“用户拒绝”和“只读”，writes一直为0。不能据此证明父子权限叠加、路径限制或沙箱已经实现；这些都不是本章测试范围。",
+  "debug": "在src/tools.mjs的await this.guard(tool, call, context)与src/permissions.mjs的const policy、if (mustAsk...)打断点。F11从Tools.execute进入守卫，第一次看tool.effect=\"write\"、policy=\"ask\"、mustAsk=true；继续到审批答false后观察throw，tool.run不会命中。第二次F10看到policy=\"read-only\"，在请求审批前就抛错。",
+  "recall": "不看源码写出同一次write在ask、read-only两种策略下的顺序；解释为什么审批允许不等于有操作系统文件权限。",
+  "transfer": "安全练习：在临时测试中新增effect=\"read\"的计数工具，证明ask模式下不调用Approvals。父子restrict取交集、多守卫注册属于尚未实现的后续补全方向，不要把给tools.guard第二次赋值当叠加。",
+  "wiring": "041 Host确实安装permissionGuard，051扩展工具继续经过同一个Tools入口。后续没有把单guard改成原版多guard注册，也没有实现作用域继承的restrict。",
+  "implemented": [
+    "读取运行时permission快照",
+    "read/write/execute/network效果校验",
+    "ask审批与read-only拒绝",
+    "拒绝发生在tool.run之前"
+  ],
+  "missing": [
+    "原版tools.restrict叠加允许/拒绝集合，父子作用域只会继续收窄；本章没有工具可见性限制。",
+    "原版tools.guard可注册多个，检查全局和作用域链；本章单属性会覆盖。",
+    "原版pre-execute策略、审批和最终guard是分开的执行阶段；教程合在一个函数中。",
+    "原版权限预设组合沙箱与审批服务；本章没有可配置预设和对应上下文展示。"
+  ],
+  "testEvidence": "024-permissions.test.mjs调用真实Tools.execute，验证审批拒绝和只读拒绝都不进入计数工具；没有父子Agent或OS沙箱测试。",
+  "sources": [
+    "packages/core/tools/src/index.ts",
+    "packages/core/tools/README.zh.md",
+    "packages/interaction/permission-presets/README.zh.md",
+    "packages/interaction/user-approval/README.zh.md"
+  ]
+}

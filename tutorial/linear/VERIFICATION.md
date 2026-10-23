@@ -2,9 +2,9 @@
 
 日期：2026-10-23。环境：macOS ARM64、Bun 1.3.14。独立工程：`/private/tmp/harness-own-bun-qd3jmykr`。从新空目录逐步叠加自己的实现，没有覆盖学习者工程，没有导入原版产品实现，也没有自动提交。
 
-## 逐步运行结果
+## 先前逐步运行结果（不是本次文档改写后的新全量验收）
 
-[verification.json](verification.json) 记录了 000～069 共 **70 个检查点**，全部 exit=0。每步运行当时累计的 `bun test ./tests`；引入依赖时用 Bun 独立安装，最后一次完整复验使用固定 Bun 锁文件和 `--frozen-lockfile --ignore-scripts`。未借用原版 node_modules。各检查点源码 hash 与当前增量、实际累计工程一致。
+[verification.json](verification.json) 记录了 000～069 共 **70 个检查点**，全部 exit=0。每步运行当时累计的 `bun test ./tests`；引入依赖时用 Bun 独立安装，最后一次完整复验使用固定 Bun 锁文件和 `--frozen-lockfile --ignore-scripts`。未借用原版 node_modules。当次各检查点源码hash与当次增量及累计工程一致；新增027/032之后不再代表当前全部源码，参见本文末尾各次单独验证。
 
 最终累计 **86 项测试通过，0 项失败**，未使用 skip/todo 跳过验收。见[最终测试日志](evidence/final-test-summary.txt)。这些是课程具体行为的证据，不是原版全功能等价证明。
 
@@ -110,3 +110,15 @@ Electron Main 使用 Electron 自带的运行时；领域 Host 改由独立 Bun 
 ## 027新增Vim按键演示的单独验证
 
 在独立累计到027的临时工程`/var/folders/hw/tv2bjdwx6fxgmmkdzzvw1zhm0000gn/T/harness-vim-027-5oz4emho`使用Bun 1.3.14运行`bun test ./tests/027-terminal.test.mjs`，2项通过、0失败：TTY与游标检查、真实Vim输入保存退出。新增测试后未重跑000～069；上面的86项完整回归及verification.json是新增Vim测试之前的历史证据，不覆盖此次新增测试。VS Code断点方法仅做静态说明，未交互验收。
+
+## 032新增真实跨进程RPC演示的单独验证
+
+在独立累计到032的工程`/var/folders/hw/tv2bjdwx6fxgmmkdzzvw1zhm0000gn/T/rpc-032-check-jff9nu5f`，Bun 1.3.14运行032两份测试，2项通过、0失败。新CLI通过真实Bun worker与管道调用sum，并复用023审批管理验证允许删除、拒绝保留、未知方法错误和退出清理。另实际以交互终端启动默认demo，分别输入y/n，流程完成；无人类或模型审批结果被伪装成真实用户决策。VS Code attach说明仅静态核对。本次未重跑000～069；已有verification.json的86项完整回归属于新增027/032测试之前的历史证据，不覆盖此次新增内容。
+
+## 2026-10-24：000～069教学说明与原版差距审查
+
+本次仅修改tutorial/linear内的教学说明、元数据和生成/检查脚本；未修改harness-own，未提交。逐页核对本步源码、测试及固定原版687f282e8625c6b8d11ff58211a90524be2e4317，新增70份guide，把具体场景、输入输出、真实接线位置、操作命令、VS Code断点/变量/预期、已实现与差距分别写明；保留原有11份长场景和附加操作说明。修正026/027接线、051终端未注册、040交付语义、061内存测试、062原版行为不同等容易误读之处。
+
+实际运行syllabus.py、build.py、check_docs.py与audit.py：70页全部展示guide字段，255个原版路径存在，203份完整代码增量与steps一致；生成前后的源码清单及hash一致，重复生成结果一致。git diff --check通过。检查摘要见[本次文档审查记录](evidence/docs-review-2026-10-24.json)。这些检查证明文档同步与引用/代码完整性，不证明所有文字中的功能已实现或所有命令已在本次重跑。
+
+本次未重跑000～069运行时测试，未交互重验全部VS Code配置，没有把历史86项测试或三个ACP差分样本扩张为现版本全量通过。原版34项要求仍保持未完成；该状态由audit.py明确保留。本次完成的是教学说明更新，不是缺失功能的实现。

@@ -1,0 +1,28 @@
+{
+  "scenario": "Agent运行测试命令，需要拿到非零退出码；测试卡住时能超时；用户取消时终止命令；某条命令疯狂打印时不能无限占用宿主内存。",
+  "flow": "execute(spec,signal,onOutput) → spawn(command,args,shell:false) → stdout/stderr收集 → 正常close返回code/output，或超时/取消/超限发信号 → 等close后reject",
+  "try": "写完src/process.mjs和tests/025-process.test.mjs再运行 bun test ./tests/025-process.test.mjs。第一个真实Bun子进程打印ok并退出3；其余子进程分别制造100000字符、长时间运行、取消。测试会主动终止自己启动的进程，不用手动kill。",
+  "why": "execute是一次性进程执行器，不是Shell解释器。command和args分开避免经过本地Shell；想用管道、cd等Shell语法必须明确启动Shell。这里的输出预算超限会杀进程，是教学简化。",
+  "accept": "测试应1项通过，正常返回code=3且含ok，超限/超时/取消分别reject。测试没有验证复杂孙进程树、Windows实际taskkill、stdout/stderr分别读取或输出落盘。",
+  "debug": "在src/process.mjs的spawn、bytes +=、stop、child.on(\"close\")回调打断点。第一个调用F10看child.pid与args，F11进入collect后看bytes增长；超限调用看到bytes>maxBytes后进stop。超时调用停在stop看reason.message=\"执行超时\"，继续到close才观察Promise结算。调试停顿会影响短timeout，先单独观察第一条正常命令或在临时调试副本提高timeout。",
+  "recall": "闭卷写出“取消信号已发出”和“进程close已到达”的区别，并列出execute成功返回的code、signal、output、bytes四项。",
+  "transfer": "安全练习：在测试隔离子进程里分别打印stdout与stderr，观察当前实现合并到同一个output；再运行输出恰好低于maxBytes的命令。不要在学习工程启动无限日志任务。",
+  "wiring": "本章独立测试真实子进程。029复用execute启动ssh；040用它启动Office转换器；051把它接成run和job_start工具。原版溢出落盘逻辑没有在后续补齐。",
+  "implemented": [
+    "显式argv且shell:false",
+    "非零退出码和增量输出",
+    "timeout、AbortSignal与POSIX进程组终止",
+    "等待close后结算"
+  ],
+  "missing": [
+    "原版subprocess-local与bash-local管理stdout/stderr各自有界尾部、spill文件和磁盘预算；本章合并输出并在超限时杀进程。",
+    "原版shell执行器把非零退出、超时、取消投影为描述性结果；本章超时/取消主要reject。",
+    "原版managed-range、凭据环境清理、优雅终止与输出排空规则更完整；教程200ms强杀不是等价实现。"
+  ],
+  "testEvidence": "025-process.test.mjs确实启动当前process.execPath（Bun），验证code=3、输出超限、30ms超时与立即取消；没有远端命令或收费模型请求。",
+  "sources": [
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/shell/bash-local/README.zh.md",
+    "packages/shell/tool-bash/src/render.ts"
+  ]
+}

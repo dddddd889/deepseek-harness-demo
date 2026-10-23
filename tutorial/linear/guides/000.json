@@ -1,0 +1,24 @@
+{
+  "scenario": "你在空工程输入“读取 README 并解释”，程序先把任务接住并打印；直接运行、不提供任务时打印用法并以退出码1结束。本步验证的是命令行输入，不会真的读README，也不会请求模型。",
+  "flow": "终端 bun run start \"读取 README 并解释\" → Bun加载src/main.mjs → input(process.argv.slice(2)) → 合并参数并trim → 打印任务；空白输入 → 抛错 → process.exitCode=1。",
+  "try": "在自己的空练习工程按本章代码创建package.json、src/main.mjs和tests/000-entry.test.mjs，写完再运行 bun run start \"读取 README 并解释\"；然后运行 bun run start \"   \" 并立即运行 echo $?，预期分别收到完整中文任务、退出码1。最后运行 bun test ./tests/000-entry.test.mjs。不运行原版、不填写模型Key。",
+  "why": "input只负责把操作系统传来的字符串数组变成一条非空任务。把检查放到独立函数，后面终端入口与测试可共用；import.meta.url判断使测试导入函数时不自动启动命令行程序。",
+  "accept": "带任务输出“收到任务：读取 README 并解释”；空任务输出用法并退出1。测试直接检查input及一个真实失败子进程；没有证明文件读取、Agent执行或任何原版profile已经实现。",
+  "debug": "在VS Code打开练习工程，在src/main.mjs的 const prompt = argv.join 行和 process.exitCode = 1 打断点，选择“Bun：CLI 入口”按F5启动；这是launch配置，不需要手动attach。监视argv、process.argv、prompt，F10越过join后任务不应含Bun与脚本路径。要验证失败，在launch.json该配置的args暂改为[\"   \"]后重启，F11进入input并继续到catch，预期process.exitCode为1；恢复args。再打开tests/000-entry.test.mjs，选择“Bun：当前测试”按F5运行函数断言；其中spawnSync创建的子进程不自动进入当前调试会话。",
+  "recall": "合上教程，在纸上写出process.argv前两个元素是什么，再不看示例重写input；分别口述空数组、两个中文参数、纯空格的返回或错误。",
+  "transfer": "仅把启动参数改成 \"读取 README\" \"并解释取消逻辑\"，预期合并为一条任务；再传空白验证仍拒绝。此变体只使用已有入口，不需要新API。",
+  "wiring": "本步可独立运行；005的session-demo会复用input校验文件路径，013才出现Agent演示。当前start仍只是000的接收入口，不会因为复制了后续文件就自动成为完整Harness CLI。",
+  "implemented": [
+    "中文与空格参数接收，空白任务失败退出。",
+    "测试导入与直接启动分离，Bun子进程验收退出码。"
+  ],
+  "missing": [
+    "原版apps/cli/src/args.ts负责profile选择、--patch、配置导出和内层参数转交；000没有这些启动分支。",
+    "原版profile-boot负责加载插件树，000没有Loader、持久会话恢复或工具执行。原版以Node与pnpm组织应用，教程有意使用Bun，不构成运行时完全兼容。"
+  ],
+  "testEvidence": "tests/000-entry.test.mjs有1项测试：中文参数合并、input空任务抛错、真实Bun子进程失败退出。运行命令只启动本地程序，无收费模型调用。",
+  "sources": [
+    "apps/cli/src/args.ts",
+    "apps/cli/src/profile-boot.ts"
+  ]
+}

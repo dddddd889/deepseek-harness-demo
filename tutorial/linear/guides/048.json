@@ -1,0 +1,29 @@
+{
+  "scenario": "浏览器重连时，实时通知可能先于历史快照到达：先收到seq=1的审批，再收到seq=0的文字；同一条通知还可能重送。页面需要按顺序展示一次，并且不让旧连接的回复改变新连接状态。",
+  "flow": "快照事件或实时通知 → View.apply(event, generation) → 拒绝旧连接和已接纳seq → waiting暂存缺口 → 按seq连续接纳到events → View.state折叠消息、流文字、工具和待审批 → 后续页面render。",
+  "try": "先写完src/view.mjs和本章测试，再运行bun test ./tests/048-view.test.mjs。按测试顺序记录每次apply后的seq和waiting.size：先seq1会等待，补seq0后连续接纳到1，重复seq0不追加；reconnect后旧generation的seq2被忽略，新generation的seq2才移除审批。这里没有浏览器或网络请求。",
+  "why": "View是页面的读模型：只整理已经发生的事实，不负责执行工具。seq解决同一会话事件的顺序与重复，generation解决消息属于哪一次连接；这两个数字不能相互替代。",
+  "accept": "纯内存测试验证乱序暂存、重复文字不追加、旧generation不结算新视图审批以及新generation结算审批。它不证明真正断网重连、快照下载、流控、有界历史或完整原版会话投影。",
+  "debug": "在VS Code打开tests/048-view.test.mjs，选“Bun：当前测试”按F5。给src/view.mjs的this.waiting.set、while (this.waiting.has(this.seq + 1))及generation比较设断点；监视event.seq、generation、this.generation、this.seq和this.waiting.size。用F10逐次apply，第一条seq1后this.seq应为-1，补seq0后应为1。F11进入state观察approval/settled怎样删除id=p。",
+  "recall": "闭卷写一个四行事件表：seq1、seq0、重复seq0、seq2，并在旁边标出哪些等待、哪些接纳、哪些忽略；再写出generation不匹配时为什么不能修改状态。",
+  "transfer": "练习：在这份纯内存测试里把seq2安排在快照seq0/seq1之前，预测waiting的变化，再补断言最终三条各出现一次。它是新增练习，当前测试没有这个排列；不需要添加另一套网络实现。",
+  "wiring": "本章仅完成View类及单测；049的真实页面会调用它。View本身既不建立连接也不请求快照；后续页面重连仍不是原版ConnectionController的完整实现。",
+  "implemented": [
+    "通过seq暂存乱序、去重并连续接纳事件。",
+    "通过generation忽略旧连接事件，对过大seq缺口报错。",
+    "从少量事件类型派生消息、流文字、工具状态和待审批列表。"
+  ],
+  "missing": [
+    "原版有独立的会话投影、conversation节点和chunkrow处理；本章仅识别少量字符串事件。",
+    "本章events一直增长，state每次扫描全部历史，没有原版的增量节点折叠和窗口管理。",
+    "reconnect只增加generation，不清理waiting或完成网络ready握手；不等价于原版连接恢复。",
+    "未处理所有终态、媒体、子Agent、上下文位置及原版持久日志格式。"
+  ],
+  "testEvidence": "tests/048-view.test.mjs是一项同步内存单测，没有Host、浏览器、WebSocket、磁盘或模型。它覆盖测试里列出的三个事件和两个generation；文档不把它扩大成完整客户端恢复验收。",
+  "sources": [
+    "packages/session/session-projection/src/index.ts",
+    "packages/client/ui-conversation/src/client/conversation/assembler.ts",
+    "packages/client/ui-conversation/src/client/conversation/event-registry.ts",
+    "packages/client/connection/README.zh.md"
+  ]
+}

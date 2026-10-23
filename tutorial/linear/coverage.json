@@ -92,8 +92,8 @@
         "credentials"
       ],
       "steps": "018,020",
-      "implemented": "PiModel/Routes/Agent接线、真实DeepSeek工具续轮、鉴权前刷新single-flight",
-      "remaining": "全provider/API/目录/OAuth/UI接线及原版opaque replay契约",
+      "implemented": "独立PiModel/Routes/Agent demo、真实DeepSeek工具续轮、鉴权前刷新single-flight",
+      "remaining": "最终产品未接018Routes/020PiModel；全provider/API/目录/OAuth/UI接线及原版opaque replay契约",
       "parity": "incomplete"
     },
     {
@@ -142,8 +142,8 @@
         "fs"
       ],
       "steps": "021–022,050",
-      "implemented": "先读后改、默认唯一/显式全量替换、链接拒绝、文件面板",
-      "remaining": "原版所有文件操作、glob/grep、图片、跨进程/远端版本保证与TOCTOU补强",
+      "implemented": "先读后改、默认唯一/显式全量替换、路径检查、文件面板",
+      "remaining": "按行/字节窗口与大文件读取、原版全部文件操作/搜索/图片、文件元信息与权限保留、跨实例/远端版本保证及TOCTOU补强",
       "parity": "incomplete"
     },
     {
@@ -155,8 +155,8 @@
         "terminal"
       ],
       "steps": "025–027",
-      "implemented": "真实进程树、Bash、PTY、输出游标",
-      "remaining": "Pwsh、完整进程读取Spec、终端UI/所有权/平台策略及协议",
+      "implemented": "独立进程、管道持久Bash、独立Bun PTY/输出游标/Vim测试",
+      "remaining": "026未迁移到PTY，051未注册终端；原版owner生命周期/起止marker/重置/裁剪与spill、Pwsh及进程Spec",
       "parity": "incomplete"
     },
     {
@@ -167,8 +167,8 @@
         "ssh"
       ],
       "steps": "028–029",
-      "implemented": "Seatbelt/bwrap Spec、SSH读写/执行边界",
-      "remaining": "真实OS效果验证、Windows ACL/Landlock、完整远端提供方成套契约",
+      "implemented": "Seatbelt/bwrap参数编译、每次启动ssh的读写/执行封装",
+      "remaining": "真实OS效果验收、Windows后端；SSH helper/RPC/流与进程租约、远端fs/subprocess/sandbox成套契约",
       "parity": "incomplete"
     },
     {
@@ -180,8 +180,8 @@
         "api"
       ],
       "steps": "023–024,046,049",
-      "implemented": "审批一次结算、迟答失效、预设、ACP反向审批",
-      "remaining": "ask_user_question、计划评审、人机命令目录、完整预设与重连语义",
+      "implemented": "一次性审批、迟答拒绝、单一效果守卫、ACP反向审批",
+      "remaining": "多guard注册与作用域叠加、restrict交集、完整权限预设、ask_user_question/计划评审、重连和取消结果语义",
       "parity": "incomplete"
     },
     {
@@ -207,8 +207,8 @@
         "context"
       ],
       "steps": "031,051",
-      "implemented": "发现/按需Skill、规则来源事实",
-      "remaining": "原版多来源优先级、目录变化、引用授权、动态请求section与恢复",
+      "implemented": "目录名字发现、入口正文加载与来源hash、051基础skill_load",
+      "remaining": "frontmatter/调用开关、多来源rank/作用域、resourceBase与scripts/references实际使用、监视失效/目录刷新/动态请求section",
       "parity": "incomplete"
     },
     {
@@ -253,8 +253,8 @@
         "jobs"
       ],
       "steps": "036,051,063",
-      "implemented": "持续子Agent、父权限、外部Worker",
-      "remaining": "深度/并发预算、冷恢复、fork与ACP/Codex/Claude/SDK各后端",
+      "implemented": "子Agent持续对话、父身份访问检查、真实外部教学Host",
+      "remaining": "父子工具限制和guard叠加、深度/并发预算、冷恢复、fork与原版各subagent后端；063未接主Agent工具",
       "parity": "incomplete"
     },
     {
@@ -281,8 +281,8 @@
         "feedback"
       ],
       "steps": "039,051",
-      "implemented": "Todo/Plan/Goal状态、持久提醒、反馈",
-      "remaining": "计划评审、持续Goal驱动、Host调度投递、完整命令与UI",
+      "implemented": "Todo/Plan/Goal状态、提醒状态记录与显式due、反馈事实",
+      "remaining": "真实Host定时投递、崩溃后exactly-once依赖投递方幂等、持续Goal驱动、计划评审、完整命令与UI",
       "parity": "incomplete"
     },
     {
@@ -310,8 +310,8 @@
         "client"
       ],
       "steps": "032,043,047–048",
-      "implemented": "自有双向RPC、WebSocket、principal、seq/generation",
-      "remaining": "原版Typert类型图/codec/对象寻址/全部Remote方法与Client互操作",
+      "implemented": "自有双向RPC及真实跨进程工具/反向审批demo、WebSocket、principal、seq/generation",
+      "remaining": "032未作为Agent产品工具通道；原版Typert类型图/codec/对象寻址/Remote全方法和Client互操作、取消与流控",
       "parity": "incomplete"
     },
     {
@@ -360,8 +360,8 @@
         "client"
       ],
       "steps": "040,050,066",
-      "implemented": "内容寻址、交付快照、Office进程接口、ZIP",
-      "remaining": "图片像素/类型验证、上传收据与授权下载、完整Office渲染、turn修改diff",
+      "implemented": "自有附件内容寻址与交付副本、Office进程接口、自有ZIP",
+      "remaining": "原版present为交付声明，需语义对齐；图片验证/上传收据与授权下载、Office渲染、turn修改diff及原版含lineage/附件的ZIP",
       "parity": "incomplete"
     },
     {
@@ -402,8 +402,8 @@
         "client"
       ],
       "steps": "039,064",
-      "implemented": "OTLP白名单、有界失败不阻断、反馈事实",
-      "remaining": "原版OTel trace/统计/匿名身份/产品事件与全部采集策略",
+      "implemented": "独立OTLP发送器的白名单/有界队列/固定fetch失败测试、反馈事实",
+      "remaining": "未订阅Host业务；真实collector/任务不阻断E2E、完整OTel trace/统计/匿名身份与产品采集策略",
       "parity": "incomplete"
     },
     {
@@ -415,8 +415,8 @@
         "browser-use"
       ],
       "steps": "057–065",
-      "implemented": "Teams/hooks/browser/部分CUA/audio/webhook/worktree/worker/market机制",
-      "remaining": "原版47个实验包的完整工具/配置/UI、Ralph/Claude mods/Inspector/browser worker/Python PTC等",
+      "implemented": "Teams/Hook/音频/遥测等独立模块，真实Chrome动作、教学外部Host、本地插件装卸",
+      "remaining": "许多模块未接Host/UI；061无真实重启HTTP证据，062语义不同，原版各实验包完整工具/配置/产品与平台矩阵",
       "parity": "incomplete"
     },
     {

@@ -1,0 +1,26 @@
+{
+  "scenario": "读取你指定的README：读文件任务把开始、工具结果和最终文字记入JSONL，终端订阅这些事件显示。然后卸载显示插件再读一次，业务与磁盘仍成功，显示端可按seq补读自己错过的事件。",
+  "flow": "session-demo读取CLI路径 → createReaderApp合并并安装settings/session/terminal/reader → readTask.run取配置快照 → Events.append先同步落盘再入内存 → 真实readFile → 订阅者显示 → remove(\"terminal\") → 第二次读取 → session.read(cursor)补读 → app.close。",
+  "try": "完成本章所有文件后，在练习工程运行 bun src/session-demo.mjs package.json，再运行 bun test ./tests/005-events.test.mjs ./tests/005-session.test.mjs。终端先出现[终端]事件，卸载后第二次任务不再出现这种前缀，却会显示补读序号；按输出路径打开.data-005中的本次JSONL核对记录。不要用不存在的README作为第一次成功验收。",
+  "why": "Events保存业务事实，订阅者只观察；终端退出不等于取消任务。createReaderApp把000～004真实装起来，避免只学到孤立类。持久化回调在发布前执行，让写入失败时不产生假成功事件。",
+  "accept": "三个测试覆盖日志失败不发布、读副本不改事实、真实文件读取、配置固定、卸载显示、补读、关闭，以及读取失败不写成功消息。当前日志是本工程format:1；不是原版Session V4，也没有模型参与。",
+  "debug": "在VS Code打开练习工程并选中tests/005-session.test.mjs，选择“Bun：当前测试”按F5启动。在src/session-app.mjs的const config = settings.snapshot()、session.append(\"tool/start\",...)和readFile处打断点；在src/events.mjs的this.persist(record)、this.records.push(record)再打点。F10观察persist先执行、records后增加；F11进入display触发set后，当前config.prefix仍旧而settings.snapshot().prefix已新。",
+  "recall": "合上教程画出“任务写事实→磁盘→内存→展示”的顺序；再说明卸载terminal为什么不停止reader，关闭reader为什么应早于关闭日志文件。",
+  "transfer": "用自己新建的短文本文件替代package.json运行同一入口，再传不存在的临时文件观察错误；这是已有入口的安全变体。不要删除原项目文件或故意占满真实磁盘。",
+  "wiring": "这是000～004第一次真实装配的独立读文件应用，未接模型循环。006的Journal还没有替换此处最小JSONL写入器；041 Host另行装配Journal和Agent，不是自动升级这个demo。",
+  "implemented": [
+    "事实提交、独立订阅撤销、游标补读、读副本防修改。",
+    "真实文件任务、配置快照、插件组合、日志fd与运行任务的有序清理。"
+  ],
+  "missing": [
+    "原版Session有类型化事件、header、surface派生、请求重建和会话注册/释放事件；本章接受任意type/data且只用数组保存记录。",
+    "原版持久化通过SessionPersistence句柄和session/flush耐久点协调；本章把同步fsync回调嵌在每次append，不复刻原版的缓冲、后端切换与恢复协议。"
+  ],
+  "testEvidence": "005-events.test.mjs有1项测试，005-session.test.mjs有2项真实磁盘测试；session-demo可手动运行并留下本次独立日志。所有内容来自本地文件，没有模型收费请求。",
+  "sources": [
+    "packages/core/session/src/index.ts",
+    "packages/core/session/src/surface.ts",
+    "packages/session/session-persistence/src/index.ts",
+    "packages/session/session-persistence-jsonl/src/index.ts"
+  ]
+}

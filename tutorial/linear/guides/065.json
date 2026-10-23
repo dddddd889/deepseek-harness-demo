@@ -1,0 +1,30 @@
+{
+  "scenario": "市场列表里出现插件p不应该立即运行代码；用户显式启用一个可信本地插件后，它提供proof服务=42，禁用后服务应消失。若setup失败，持久配置不能错误地记为已启用。",
+  "flow": "marketIndex过滤/排序条目，仅返回数据；PluginManager.enable显式import本地模块 → Plugins.install执行setup → 成功后Store记录enabled；disable关闭插件Scope并修改状态，restore按Store重新启用。",
+  "try": "先写完market.mjs，再运行bun test ./tests/065-market.test.mjs。测试只在临时目录写两份固定插件：proof成功提供42，bad抛broken。按顺序确认enable后能get proof、disable后get拒绝、bad失败后Store没有bad。无需下载第三方插件或访问市场。",
+  "why": "市场发现属于数据，执行属于用户明确安装的可信代码，二者不能混在一起。Plugins/Scope负责撤销运行贡献，Store记录重启要恢复什么；写enabled必须在setup成功之后。",
+  "accept": "测试实际动态import本地模块、撤销服务和拒绝失败setup状态，另检查一个marketIndex条目。没有远程索引、下载安装、兼容检查、真实UI、重启restore或旧版本更新失败回滚测试。",
+  "debug": "打开tests/065-market.test.mjs用“Bun：当前测试”启动，断在src/market.mjs的await import、await this.runtime.install和this.store.update；监视name、module.setup类型及manager.runtime.services.get('proof')。F11进入临时插件setup，返回后F10看enabled提交；bad应在Store更新前抛错。disable后服务查找应报缺少。import的本地插件仍在当前Bun进程，不是隔离沙箱。",
+  "recall": "闭卷写出列出、下载、安装、启用、禁用、恢复六个动作，圈出本章实际实现了哪些；再说明为什么禁用Scope和写enabled=false都需要做。",
+  "transfer": "练习：给临时插件增加一次setup日志，并在仅调用marketIndex时断言日志没有出现。只使用测试自建模块；当前未写这个变体，不安装来历不明插件。",
+  "wiring": "PluginManager独立于产品Host和原来的Plugins装配，只被065测试使用；没有Web市场页面或CLI管理命令。后续没有npm/Git安装或原版Cordis profile兼容层。",
+  "implemented": [
+    "从输入manifest构造简单市场条目，不自动执行模块。",
+    "显式启用可信本地文件、动态import、setup成功后记录状态。",
+    "通过Plugins卸载Scope贡献并提供基础restore方法。"
+  ],
+  "missing": [
+    "原版市场源注册、HTTP下载与缓存、索引格式/搜索、版本兼容和安装状态计算未实现。",
+    "原版plugin-manager处理npm/Git、构建审批、Loader/profile变更和安装错误；本章仅本地文件import。",
+    "同名更新失败保留旧运行实例的事务语义未具备，restore也未测试。",
+    "插件代码运行在Host进程，不能把动态import称为权限沙箱。"
+  ],
+  "testEvidence": "tests/065-market.test.mjs读写真实临时文件并真实import，代码完全由测试固定生成；无外网、npm安装或模型。当前只有本地生命周期证据，不是完整市场安装验收。",
+  "sources": [
+    "packages/boot/plugin-market/src/index.ts",
+    "packages/boot/plugin-market/src/search.ts",
+    "packages/boot/plugin-market/src/parse.ts",
+    "packages/boot/plugin-manager/src/index.ts",
+    "packages/boot/plugin-manager/src/operations.ts"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "scenario": "主进程需要把工具交给独立worker执行：先算2+3，再请求删除临时文件。删除时worker没有UI，反向向主进程请求询问真人，收到允许才unlink。",
+  "flow": "rpc-demo父进程spawn worker → 两边new Peer并framing接stdin/stdout → tools/call请求 → worker处理sum或请求approval/request → demo复用Approvals询问用户 → worker按独立RPC id收回答案 → unlink或拒绝 → 原工具请求按原id回复",
+  "try": "先写完本章rpc.mjs、rpc-demo.mjs、rpc-worker.mjs及两份测试，再在练习工程运行 bun src/rpc-demo.mjs。看到跨进程sum=5后，对allow.txt输入y，对deny.txt输入n；临时文件在项目tmp/rpc-032-随机后缀下，结束只清理本次子目录。随后运行 bun test ./tests/032-rpc.test.mjs ./tests/032-rpc-demo.test.mjs 自动复验允许/拒绝。",
+  "why": "Peer管理method、id、pending和错误；framing把对象编码成字节并按NDJSON换行或Content-Length拆完整消息。两边都可发请求，所以父等待delete时仍能响应子发来的审批。反向只描述请求方向，批准仍由用户给出；--auto是验收预设，不是模型审批。",
+  "accept": "两项测试应通过：内存LSP帧中文echo与真实CLI→Bun worker链路。demo报告sum=5、separateProcess=true，允许文件删除、拒绝文件保留、exitCode=0、rpcPending和approvalPending均0。真人回答结果取决于输入；不要要求输入n也必须删除。",
+  "debug": "子进程断点：运行 bun src/rpc-demo.mjs --debug-worker，VS Code附加6500/rpc-worker-032，在src/rpc-worker.mjs的peer.handle、peer.request(\"approval/request\",...)和await unlink(path)停下，看name、args、decision.allowed。父子一起：主进程以6499/rpc-032 inspect-brk启动并preload调试脚本，附加父后继续使worker启动，再附加6500；父在src/rpc-demo.mjs的审批handler停下，F11进Approvals，切换会话查看两张pending。F10跨await会等对端回复，先继续运行负责回复的另一个进程。",
+  "recall": "闭卷画出P1工具请求、C1反向审批、C1回复、P1回复四条消息，标出父子各自pending；再把framing(new Peer(),...)拆成const peer=new Peer(); framing(peer,...)并解释为何不是两个Peer。",
+  "transfer": "安全练习：正常模式同样对两个文件都输入n，观察都保留直到finally清理；给sum参数换成中文字符串应拒绝有限数校验。超时后真正取消远端操作协议尚未实现，不能只删pending宣称worker已停。",
+  "wiring": "032已有真实跨进程demo，不再只有内存echo。035 LSP复用其Content-Length传输，043 Remote与044/045 SDK复用Peer/NDJSON；033 MCP和046 ACP走各自SDK；047 WebSocket承载自定义Remote协议。sum/delete处理函数仍是演示分支，未进入Agent的Tools。",
+  "implemented": [
+    "双向请求、回复、通知、关联错误与pending清理",
+    "NDJSON及Content-Length字节分帧",
+    "真实Bun worker、sum与真人反向审批",
+    "allow/delete与deny/保留的真实磁盘验收",
+    "父/子独立Inspector与调试等待预算"
+  ],
+  "missing": [
+    "原版SDK有共享具名协议、initialize就绪边界与正式session通知；本章自定义tools/call和approval/request不兼容原版SDK。",
+    "原版SDK传输具备反向请求能力，但当前SDK服务器不发送反向请求；本章反向审批是解释双向RPC的示例，不能说是官方SDK既有调用链。",
+    "worker没有统一Tools校验/策略/guard链，文件检查也不是完整沙箱，realpath到unlink之间仍有时间窗口。",
+    "未实现领域取消、断连期间副作用结果确认、完整畸形帧/并发/流控矩阵；请求超时仅停止等待。"
+  ],
+  "testEvidence": "032-rpc.test.mjs用PassThrough验证LSP分帧、中文、未知方法及断连拒绝；032-rpc-demo.test.mjs实际启动demo再spawn worker，以--auto验证真实文件副作用、独立PID和待处理表清空。",
+  "sources": [
+    "packages/sdk/protocol/README.zh.md",
+    "packages/sdk/protocol/src/transport.ts",
+    "packages/sdk/server/README.zh.md",
+    "packages/interaction/user-approval/README.zh.md"
+  ]
+}

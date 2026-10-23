@@ -1,0 +1,30 @@
+{
+  "scenario": "外部系统把同一条review任务重复投递两次，教学实现希望它只进入既有会话Inbox一次。这里讲自定义接收身份和去重的思路，不是直接实现GitHub官方Webhook格式，也不是原版Webhook同语义复刻。",
+  "flow": "调用webhook返回的接收函数 → 检查时间/delivery与body签名 → 扫Session历史寻找webhook_delivery身份 → 首次追加inbox/add → agent.pump；重复身份直接返回duplicate。当前没有HTTP服务器路由。",
+  "try": "先写完src/webhook.mjs，再运行bun test ./tests/061-webhook.test.mjs。找到测试的body、delivery-1和pumps，第一次调用后pumps=1，重新构造webhook接收函数再调用仍为1；篡改body后签名应拒绝。不要向公网配置Webhook，本章无需真实GitHub secret或外部投递。",
+  "why": "把接收身份放在输入事件里，目的是让“接收过”和“已入队”共享事实来源，减少跨两个存储提交的空隙。不过这个目标必须由真实日志与重启测试验证；重新创建一个函数不等于重启进程。",
+  "accept": "现有测试只验证HMAC篡改拒绝，以及同一个内存Events对象被两个接收函数读取时不重复pump。它没有Journal、磁盘、进程重启、HTTP或真实Agent，因此不能声称已验证持久去重和重启恢复。",
+  "debug": "用“Bun：当前测试”启动tests/061-webhook.test.mjs，断在src/webhook.mjs的identity赋值、session.read().some(...)和session.append('inbox/add', ...)处。监视identity应为webhook_delivery-1、record.session.read().length与测试pumps；第一次F10会追加一条并pump，第二次在some判断直接返回duplicate。篡改body应在签名比较抛错。所有这些代码都在测试进程，当前没有外部HTTP进程可附加。",
+  "recall": "闭卷画“HTTP接收、验证投递、写Inbox、模型执行”四层，并在当前实现真正存在的层上打勾；再写出重建函数与重启后重读磁盘为什么不同。",
+  "transfer": "练习：用同一delivery和另一份合法签名body调用，观察当前实现会直接认duplicate，记录它与“相同身份不同正文应拒绝”的差距。只用固定secret和内存Events，不能把此观察写成已经实现拒绝。",
+  "wiring": "本章接收函数只由测试调用，没有挂047 HTTP路由，也没有为渠道创建真实Agent。原版Webhook走已验证投递→规则→创建新Session；本章走既有record的Inbox，属于不同设计，后续没有自动对齐。",
+  "implemented": [
+    "自定义HMAC-SHA256正文验签和基本时间/delivery格式检查。",
+    "按Session里inbox/add身份判断重复，并在首次接收后pump。",
+    "明确签名针对原始body，不对JSON重编码后验签。"
+  ],
+  "missing": [
+    "原版GitHub provider实际读取HTTP事件/投递头验签并交给规则创建新Session；本章没有HTTP渠道或规则注册。",
+    "原版deliveryId只是来源信息，不是内建去重状态；本章持久Inbox去重是自定义语义，不能称原版功能已简化复刻。",
+    "本章timestamp和delivery未纳入body的HMAC覆盖；重复delivery但不同正文也未显式拒绝。",
+    "没有真实日志落盘/重启/并发接收测试，不能声称持久接收、执行去重或故障原子性已证明。"
+  ],
+  "testEvidence": "tests/061-webhook.test.mjs使用new Events()和仅递增计数的agent.pump替身，没有Journal或模型。签名计算是真实crypto；第二次调用只是重建接收函数，仍共享同一个内存日志。本次未新增真实Webhook接入。",
+  "sources": [
+    "packages/experimental/webhook/src/index.ts",
+    "packages/experimental/webhook/src/types.ts",
+    "packages/experimental/webhook/src/session.ts",
+    "packages/experimental/webhook-github/src/handler.ts",
+    "packages/experimental/webhook-github/src/body.ts"
+  ]
+}

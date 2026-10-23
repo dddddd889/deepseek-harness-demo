@@ -1,0 +1,30 @@
+{
+  "scenario": "用户希望把已有Web Harness作为桌面应用打开。Electron只拥有窗口和受限桥，领域任务仍由独立Bun Host执行；关掉窗口和退出整个应用要按平台处理，不能复制另一套Loop。",
+  "flow": "bun scripts/desktop.mjs → Electron Main → 显式Bun路径启动web-server子进程 → Host打印本机启动URL → BrowserWindow加载同一Web页面 → 受限preload提供desktop.info；应用退出 → Main发SIGTERM → Host关闭会话与资源。",
+  "try": "先写完desktop、scripts和package.json，再执行bun scripts/install-electron.mjs、bun test ./tests/052-desktop-policy.test.mjs；安装器会下载Electron二进制，不调用模型。随后env -u DEEPSEEK_API_KEY bun scripts/smoke-desktop.mjs会启动隔离窗口检查桥和退出。人工窗口用env -u DEEPSEEK_API_KEY bun run desktop，创建会话并读取package.json。",
+  "why": "Main是桌面窗口与子Host的所有者，preload是Renderer内的受限桥，不是第三个独立进程。Renderer关闭Node集成，页面不能任意fs/spawn；模型、工具和日志留在Bun Host。",
+  "accept": "普通单测只证明路径、深链接解析和Bun运行时选择，不启动GUI。独立smoke脚本才会启动Electron窗口，检查页面就绪、desktop.info、window.require为undefined和退出；它没有完成真实登录、所有菜单、平台矩阵或安装包验收。",
+  "debug": "终端执行HARNESS_VSCODE_DEBUG=1 env -u DEEPSEEK_API_KEY bun run desktop。VS Code先附加“Electron：Main”(9229)，在desktop/main.cjs的spawn(runtime, hostArgs, ...)和new BrowserWindow断点，监视runtime、hostArgs、address，继续后再附加“Electron：Bun Host”(6499)与“Electron：Renderer”(9222)。Renderer断web/app.mjs的rpc，Host断src/remote.mjs的session.submit；F11只在当前调试进程前进，跨边界要切会话。Main的type=node是Electron自身运行时，领域Host仍是Bun。",
+  "recall": "闭卷画出Electron Main、Renderer/preload、独立Bun Host三块，标明各自谁创建谁、谁发消息、谁在退出时清理谁。",
+  "transfer": "练习：在隔离用户数据目录启动应用，macOS关闭最后一个窗口后重新打开窗口，再真正退出应用；记录窗口生命周期和Host生命周期的区别。该人工行为不是普通policy单测的已有断言，不操作日常用户数据。",
+  "wiring": "本章实际启动已有Web Host并加载同一页面，未另写Loop。053登录/快捷键、054运行时和055更新目前仍是独立模块，后文不会自动把它们接到这份Main；它也不是原版desktop profile启动图。",
+  "implemented": [
+    "Electron Main、隔离Renderer和固定IPC白名单的preload。",
+    "单实例锁、独立Bun Host路径、基础窗口导航限制和退出等待/兜底终止。",
+    "分开的Main/Bun Host/Renderer调试端口及独立GUI smoke。"
+  ],
+  "missing": [
+    "原版使用profile runner、runtime-tree和应用协议/认证桥等桌面启动机制；本章用HTTP直接加载教学Web。",
+    "欢迎页、真实账号、托盘、任务中断退出确认、完整原生菜单、嵌入文档和深链接系统事件没有接齐。",
+    "本章deepLink只是解析函数，不能据此声称操作系统深链接已注册并贯通。",
+    "打包安装后运行、签名/公证、升级和所有平台生命周期仍需独立证据。"
+  ],
+  "testEvidence": "tests/052-desktop-policy.test.mjs是无GUI函数测试；scripts/smoke-desktop.mjs才是独立真实窗口烟测。课程历史证据记录过该smoke，不等于每次bun test都弹窗，也不等于完整桌面功能验收。本次仅改说明，不重跑Electron或下载。",
+  "sources": [
+    "apps/desktop/src/main.ts",
+    "apps/desktop/src/host-process.ts",
+    "apps/desktop/src/runtime-tree.ts",
+    "apps/desktop/src/web-document.ts",
+    "apps/desktop/src/quit-confirmation.ts"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "scenario": "先固定模型依次要求调用sum、再回答5，才能稳定调试工具循环；另一个样本先返回partial后等待，方便每次在同一点触发取消，而不依赖真实服务随机生成或网络快慢。",
+  "flow": "ScriptModel(script)保存响应队列 → stream(request)记请求并shift一个响应 → 按数组yield Part；hang样本先yield partial → 可取消delay → signal中止等待；answer/call构造stop或tools样本。",
+  "try": "完成model.mjs和测试后运行 bun test ./tests/010-model.test.mjs。第一段收集结果应为text、finish；第二段收到partial后abort，再stream.next应拒绝。不要等60秒，测试主动取消会结束等待。",
+  "why": "ScriptModel是可控的模型替身，接口仍是async generator，后续Loop无需判断真假模型。Part表达正文、工具、结束等语义；它不是HTTP字节，也不是SSE帧，finish只结束一次模型请求。",
+  "accept": "证明异步事件接口和signal中止正在等待的流。测试请求只有signal，没有验收完整请求历史、工具schema或usage；更没有访问真实模型服务。",
+  "debug": "在VS Code打开练习工程并选中tests/010-model.test.mjs，选择“Bun：当前测试”按F5启动。在src/model.mjs的this.requests.push(request)、this.script.shift()、yield和await delay打断点。F11进入stream，监视requests.length与response；F10返回partial后在测试controller.abort处继续，下一次next应走取消拒绝。",
+  "recall": "闭卷写一份answer(\"你好\")的Part序列，再写call(\"sum\",...)为什么以tools结束；解释“模型一次请求结束”和“整个任务结束”的区别。",
+  "transfer": "把answer文字改成中文多句，再在测试副本加第三次stream验证“脚本耗尽”报错；写完新增断言再运行，不填API Key。",
+  "wiring": "012以此驱动模型→工具→模型，013 demo首次展示Agent。016的DeepSeekModel和020的PiModel也遵守stream接口，但它们才负责模型协议；固定脚本不会自动变成智能模型。",
+  "implemented": [
+    "固定Part脚本、请求记录、样本耗尽拒绝和可取消等待。",
+    "answer和call快捷样本，保留工具调用id。"
+  ],
+  "missing": [
+    "原版LlmRuntime有注册适配器、结构化GenerateOptions/StreamChunk、路由与冻结调用配置；本章只是一个脚本队列。",
+    "原版llm-replay从已记录会话恢复流，关联父子会话与本地压缩调用，并显式覆盖throw/hang；本章没有真实日志回放、录制协议或请求匹配。"
+  ],
+  "testEvidence": "tests/010-model.test.mjs有1项测试：正常文字结束和partial后取消。所有事件是本地数组，不是模型推理。",
+  "sources": [
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm/src/types.ts",
+    "packages/test-support/llm-replay/src/index.ts"
+  ]
+}

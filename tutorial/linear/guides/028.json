@@ -1,0 +1,28 @@
+{
+  "scenario": "模型获准运行一个命令，但不应该因此能写任意宿主路径。执行之前要把“只读/工作区可写”的策略转换成操作系统沙箱启动参数；缺少沙箱程序应拒绝运行。",
+  "flow": "Sandbox.wrap(spec,{workspace,mode}) → 检查mode与平台 → probe runner → 生成sandbox-exec或bwrap启动Spec → 调用者再交execute；本章测试只检查生成结果",
+  "try": "写完src/sandbox.mjs和测试后运行 bun test ./tests/028-sandbox.test.mjs。先看伪探测返回false时拒绝，再看linux探测true时返回command=bwrap且最后一个参数仍为hello world，最后检查win32明确拒绝。这不是在本机Linux沙箱里执行命令。",
+  "why": "本章是“策略转启动参数”的编译器，不是审批器，也不是完整沙箱。wrap不启动进程；真正限制是否生效，必须由实际runner执行并用越界读写测试证明。命令argv保持分离避免二次解释。",
+  "accept": "测试应1项通过，证明缺失不裸跑、参数边界保留、未实现平台拒绝。它不证明macOS Seatbelt或Linux bwrap能实际隔离，也没有验证网络策略。",
+  "debug": "在src/sandbox.mjs的if (!this.probe(...))与return {...spec,command:\"bwrap\"...}打断点。F10检查platform=\"linux\"、workspace=\"/tmp/a\"、spec.args=[\"hello world\"]；展开result.args，确认hello world仍是一个参数。Windows分支应直接throw，不应到execute。测试没有子进程可附加。",
+  "recall": "闭卷写出审批允许、路径校验、OS沙箱三者各负责哪一层；指出wrap返回Spec为什么不能当作“限制已生效”的证据。",
+  "transfer": "安全练习：给wrap传mode=\"unknown\"并断言拒绝；检查read-only生成参数没有可写工作区绑定。真实隔离验证需要另建临时目录并显式执行runner，当前测试未提供，不能拿手写预期字符串替代。",
+  "wiring": "028本章只验证编译参数。051确实将sandbox.wrap传给execute，连接run与job_start；但并未扩大成本章原版的多平台功能探测和强制能力报告。",
+  "implemented": [
+    "read-only/workspace-write两种mode",
+    "macOS与Linux命令包装",
+    "不可用和未知平台拒绝，不降级裸跑"
+  ],
+  "missing": [
+    "原版sandbox-local有runner功能探测、候选选择与缓存、结构化不可用/失败签名。",
+    "原版报告full/partial强制能力并支持Windows ACL以及其他Linux机制；本章Windows一律未实现，只判断程序是否可启动。",
+    "原版sandbox-policy与shell/fs提供方配套生成权限；本章固定宽泛策略模板不是等价安全边界。"
+  ],
+  "testEvidence": "028-sandbox.test.mjs仅用注入probe检查Spec和拒绝逻辑，没有启动bwrap/sandbox-exec或测试实际越界读写。",
+  "sources": [
+    "packages/sandbox/sandbox/README.zh.md",
+    "packages/sandbox/sandbox-local/README.zh.md",
+    "packages/sandbox/sandbox-policy/README.zh.md",
+    "packages/sandbox/sandbox-windows-acl/README.zh.md"
+  ]
+}

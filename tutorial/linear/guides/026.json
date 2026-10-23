@@ -1,0 +1,29 @@
+{
+  "scenario": "连续两次命令需要共享环境：先export HARNESS_PROOF=kept，再读取它。每次都启动新Bash会丢状态，因此本章复用同一个Bash进程。",
+  "flow": "new Shell(cwd) → spawn Bash普通管道 → run排入tail队列 → 写入command与随机结束marker → 收集至marker并解析退出码 → 下一条run沿用同一进程",
+  "try": "写完src/shell.mjs和本章测试再运行 bun test ./tests/026-shell.test.mjs。观察先export再printf得到kept；随后运行sleep 60，由测试取消并等待shell.close。此处不出现终端窗口，也不运行PTY。",
+  "why": "Shell是有状态命令执行器，tail避免同一个Shell的两个前台调用互相串输出，marker用于区分“这一条命令结束”和“Bash进程结束”。持久状态来自进程复用，与PTY是两回事。",
+  "accept": "测试应1项通过，环境保留且取消返回错误并完成close。它没有测试cd、并发排队取消、超时后恢复；当前实例被杀后不会自动重建。",
+  "debug": "在src/shell.mjs的this.child.stdin.write、new RegExp(marker...)、this.tail=pending.catch(...)打断点。第一次F10检查command与marker；第二次停在data回调看output里kept和marker，match[1]应为\"0\"。不要把调试断点停过5秒，否则本章固定超时会杀Shell。取消场景继续运行到abort，再F11看kill，最后在close等this.closed。",
+  "recall": "闭卷画出为什么不能用child.close判断每一条命令结束；写出“只用结束marker”能解决的边界和后台输出混入时它不能解决的事。",
+  "transfer": "安全练习：临时测试先cd到测试临时目录再pwd，验证目录保留。再观察exit导致“Shell已退出”。自动重建、起止marker和PTY迁移目前未实现，不要用新的Shell实例掩盖旧实例的恢复缺口。",
+  "wiring": "026仅独立类和测试。027新增独立Terminal类，没有改造Shell；051也没有注册这个持久Shell。因此教程末尾没有自动补齐原版持久bash链路。",
+  "implemented": [
+    "单个Bash进程保留环境/cwd",
+    "Promise串行命令队列",
+    "随机结束marker与退出码解析",
+    "取消/超时/close清理"
+  ],
+  "missing": [
+    "原版tool-bash-persistent按Agent惰性创建、隔离和持有Shell；教程调用者手动new Shell。",
+    "原版通过ctx.terminals和PTY后端运行，使用起止marker、回显控制与终端历史提取；教程是普通管道和结束marker。",
+    "原版exit/取消/超时后重置并在下次调用重建；本章杀死实例后不可继续恢复。",
+    "原版返回有界部分输出及重置/历史丢失提示；本章超1MiB杀Shell并抛错。"
+  ],
+  "testEvidence": "026-shell.test.mjs一个真实Bash测试证明export跨调用保留以及sleep取消后回收；没有PTY属性、恢复或输出历史测试。",
+  "sources": [
+    "packages/shell/tool-bash-persistent/README.zh.md",
+    "packages/shell/tool-bash-persistent/src/index.ts",
+    "packages/terminal/terminal/README.zh.md"
+  ]
+}

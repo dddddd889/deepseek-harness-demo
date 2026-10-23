@@ -1,0 +1,25 @@
+{
+  "scenario": "一个读文件插件打开日志文件、订阅会话事件，还创建了子任务。卸载时必须先停子任务与订阅，再关日志；其中一个清理失败，也要继续清掉其他资源。Scope保存的是这些销毁函数。",
+  "flow": "创建Scope → own登记清理函数／child登记子close → close取走销毁数组并反向执行 → 每项单次撤销 → 汇总清理错误；单独关闭子Scope会撤掉父数组里的对应登记。",
+  "try": "先在纸上写出测试的两个登记：父资源parent、子资源child，并预测关闭顺序。按本章创建scope.mjs与测试后运行 bun test ./tests/001-scope.test.mjs；预期order为[\"child\",\"parent\"]，第一次close拒绝为AggregateError，第二次close不重复清理。",
+  "why": "own表示“这个Scope负责调用这份销毁函数”；child表示“这个子Scope的关闭也属于父资源”。Scope不申请资源、不查找服务；创建文件或连接的代码要把真正的关闭函数交给own。逆序针对登记顺序，不是按资源类别自动排优先级。",
+  "accept": "一个抛错子清理不阻止父清理，重复close不重复调用，已关闭Scope不接收新own。只验证本地所有权和逆序；不是进程沙箱，也不是原版按Agent继承可见性的完整Scope。",
+  "debug": "在VS Code打开练习工程并选中tests/001-scope.test.mjs，选择“Bun：当前测试”按F5启动。在src/scope.mjs的 active = false、this.closed = true 和 await dispose() 打断点。F11进入测试触发的close，监视disposers长度、order、errors；F10经过child抛错后errors增加，继续应仍进入parent。再次close应在if(this.closed)返回。",
+  "recall": "不看资料画出父数组[父清理1,子1.close,父清理2,子2.close]反向执行的顺序，并说明为什么active要在await dispose之前改成false。",
+  "transfer": "在测试副本中再登记一个不抛错的子资源，写断言确认其仍清理；这属于需要自己补代码的练习，写完再运行本章测试。不要拿真实数据库或长驻进程做故障实验。",
+  "wiring": "002的服务撤销、003的插件卸载使用这个Scope；005第一次在真实日志文件与订阅上装配。没有注册own的资源不会自动被发现。",
+  "implemented": [
+    "资源撤销单次执行、父子关闭关联、反向清理和AggregateError汇总。",
+    "子项主动关闭后移除父登记，避免仅因父数组继续持有已释放子项。"
+  ],
+  "missing": [
+    "原版vendor/cordis/src/fiber.ts拥有插件PENDING/LOADING/ACTIVE/UNLOADING等状态与正在清理工作的等待；教程closed布尔值不能让并发第二次close等待第一次清理收敛。",
+    "原版packages/core/scope通过scopeOf、scopeTarget、父链和ScopedLayers控制注册可见性与事件路由；本章只实现销毁所有权，尚无这些隔离行为。"
+  ],
+  "testEvidence": "tests/001-scope.test.mjs的1项测试覆盖逆序、重复关闭、抛错仍清理、关闭后拒绝注册；没有并发close等待或真实网络连接验收。",
+  "sources": [
+    "vendor/cordis/src/fiber.ts",
+    "packages/core/scope/src/index.ts",
+    "packages/core/scope/src/store.ts"
+  ]
+}

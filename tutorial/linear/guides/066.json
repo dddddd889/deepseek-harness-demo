@@ -1,0 +1,31 @@
+{
+  "scenario": "用户想找到以前说过cancel的任务，并导出自己的会话。全文索引只是可重建的读模型，不能把它当成新的Session事实存储；导出文件也必须说明是自己的格式还是能被原版导入的格式。",
+  "flow": "调用者给事件快照 → Query.index按seq水位写SQLite FTS → search参数化短语查询并过滤allowedSessions；exportSession生成自有ZIP → importSession校验并读回；另一个Bun子进程运行tsc检查SDK声明消费者。",
+  "try": "先写完query.mjs、types声明与测试，安装本章依赖，再运行bun test ./tests/066-query.test.mjs。测试在内存SQLite索引同一快照两次，搜索cancel仍只有一条；换成不授权的Session集合得到0条，再检查自有ZIP往返与tsc退出码0。无需模型或原版历史数据。",
+  "why": "indexed.seq避免同一快照重复插入，FTS加快召回；权威事实仍在Session日志。ZIP和SDK类型是公开契约，格式能自己往返只证明自身一致，不证明能读原版V4或与原版SDK互通。",
+  "accept": "测试确实运行SQLite FTS、allowedSessions过滤、自有ZIP往返和真实TypeScript消费者编译。它没有原版数据、跨进程索引、历史删改对账、恶意ZIP、分页或UI接线；声明编译通过也不证明所有运行时方法等价。",
+  "debug": "在tests/066-query.test.mjs用“Bun：当前测试”启动，断在src/query.mjs的previous读取、事件filter和search结果过滤；监视previous、events.at(-1).seq和allowedSessions。第一次index时previous=-1，第二次应已等于已索引水位，搜索仍一条。F11进入exportSession/importSession查看manifest.format=harness-own-export-v1；tsc在子Bun里，只观察checked.status=0，父调试器不会自动进入编译器进程。",
+  "recall": "闭卷画两份存储：权威Session日志和可丢弃FTS索引，标出删除哪一份可以重建；再写“自有ZIP往返”和“原版ZIP兼容”各需要什么样本。",
+  "transfer": "练习：用测试构造的ZIP增加一个../escape条目，补断言importSession完整拒绝；它只解压内存，不写用户磁盘。恶意ZIP变体当前没有测试，不能提前算安全验收。",
+  "wiring": "Query、exportSession/importSession仍独立于Remote、页面与Host，没有搜索/导入按钮。SDK声明覆盖已有自有HarnessSDK的一小部分，不是原版公开协议生成物。",
+  "implemented": [
+    "真实SQLite FTS5，按seq水位增量去重、字面短语参数化查询。",
+    "调用者传入allowedSessions后过滤结果；简单自有会话ZIP导出/导入。",
+    "自有SDK的少量TypeScript声明和NodeNext消费者编译。"
+  ],
+  "missing": [
+    "原版索引观察实时/持久日志的修订、删除、seed/shadowed语义、稳定排序和游标；本章只追加快照，没有对账。",
+    "当前先LIMIT再过滤allowedSessions，结果可能不足请求数量；原版查询服务本身是可信服务，调用方授权边界仍须独立设计。",
+    "自有ZIP含manifest.json与events.json；原版导出无manifest，流式打包当前代日志、lineage和attachments，格式并不兼容。",
+    "恶意归档、超限和完整事件schema未全面验收；原版V4与全部SDK类型/方法未覆盖。"
+  ],
+  "testEvidence": "tests/066-query.test.mjs使用SQLite :memory:、单条自有事件、内存ZIP与真实tsc子进程，不读原版历史，不启动Agent/UI。权限断言只证明这一个allowedSessions例子；本次未新增兼容格式或数据迁移。",
+  "sources": [
+    "packages/session-query/session-query-sqlite/src/index.ts",
+    "packages/session-query/session-query-sqlite/src/query.ts",
+    "packages/session-query/session-query-sqlite/src/schema.ts",
+    "packages/session-query/session-log-export/src/archive.ts",
+    "packages/sdk/protocol/src/types.ts",
+    "packages/sdk/client/src/client.ts"
+  ]
+}

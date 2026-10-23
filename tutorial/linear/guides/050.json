@@ -1,0 +1,31 @@
+{
+  "scenario": "用户把会话设为只读，关闭再打开仍应只读；文件面板保存时必须带刚读取的version，不能因为来自UI就绕开审批和版本检查。模型设置也应真正影响后续请求，而不是只改下拉框文字。",
+  "flow": "页面设置/文件动作 → Remote及product挂载的settings、credentials、file方法 → 会话Store或Tools.execute → Agent下一轮请求配置/LocalFS → 结果返回页面；product包裹Host.open和modelFactory，使恢复与模型选择使用同一份持久设置。",
+  "try": "先写完本章文件和更新后的页面，再运行env -u DEEPSEEK_API_KEY bun test ./tests/050-product.test.mjs。查看测试中permission=read-only被保存后closeSession/open的结果；再看backend=missing产生turn/end.reason=error。人工Web验收保持backend=offline，读取练习文件后修改并保存，观察它仍请求审批；不要为了本章验证而填写真实Key。",
+  "why": "product把已有领域装到产品接口上：设置通过Store落盘，凭据由Host解析，文件操作仍调用同一Tools守卫。请求拿到的是本轮配置快照，保存设置不是直接修改正在进行中的HTTP请求。",
+  "accept": "现有单测证明设置在同一个Host关闭/重新打开会话后保留，以及未知backend确实导致Agent错误结束。测试没有重启整个进程，没有验证真实DeepSeek请求、凭据隐藏、文件面板保存或两个窗口的版本冲突。",
+  "debug": "在tests/050-product.test.mjs用“Bun：当前测试”启动。断在src/product.mjs的set(store.read())、record.settings.set及if (route === 'offline')；监视store.read()、request.config.backend和request.config.permission。F10执行closeSession后，F11进入host.open，恢复的permission应为read-only。最后backend=missing时确认throw发生在模型factory，最终turn/end.reason应为error。UI文件调试另用Web两个会话，在file.write到Tools.execute处观察version。",
+  "recall": "闭卷写出“保存设置→写Store→新轮次取snapshot→选择模型”的四步；再写一个例子说明文件面板为什么不能直接调用fs.write绕过Tools。",
+  "transfer": "练习：在本章临时测试里将permission先设ask，再close/open并断言ask；随后保留现有missing-backend错误用例。这个变体只验证设置持久化，不需要真实模型或额外路线。",
+  "wiring": "product已接Web入口，069也会接CLI入口；它增加Remote方法并替换Host模型factory。当前factory只支持offline和直接DeepSeekModel，没有把018 Routes或020 PiModel自动装成最终产品路由。ACP和SDK入口也没有因此获得同一套product装配。",
+  "implemented": [
+    "每会话JSON设置存储，恢复时载入并应用设置。",
+    "挂载凭据引用、工作区、待输入队列和手动文件read/write/edit RPC。",
+    "文件面板操作复用Tools权限门与LocalFS已读版本保护。",
+    "backend为offline或deepseek时选择相应模型，未知值明确失败。"
+  ],
+  "missing": [
+    "原版有配置层级、模型/provider能力目录、账号授权和独立凭据接口；本章只有简化Store与两个backend分支。",
+    "018重试/Token刷新和020 PiModel没有在此factory中装配，不能按前文章节存在就认定产品已使用。",
+    "原版workspaceFiles有目录、文本窗口、字节读取、watch和变化接口；本章只全量read/write/edit。",
+    "没有证明多窗口/多LocalFS实例的写入原子版本比较，当前LocalFS保护范围仍有边界。"
+  ],
+  "testEvidence": "tests/050-product.test.mjs使用真实临时文件Store和Host，模型使用offline或故意无效的backend。测试不通过页面、WebSocket或真实凭据调用；名称中的凭据描述比实际断言范围宽，本章不能据此勾选凭据安全或文件面板自动验收。",
+  "sources": [
+    "packages/api/settings-controller/src/index.ts",
+    "packages/api/workspace-files/src/index.ts",
+    "packages/api/workspace-files/src/types.ts",
+    "packages/settings/settings",
+    "packages/credentials/credentials"
+  ]
+}

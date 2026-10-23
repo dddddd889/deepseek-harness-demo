@@ -1,0 +1,27 @@
+{
+  "scenario": "网络在任何Part交付之前断开时，同一个逻辑请求最多再试一次；已经交付半句正文后断开则不重试，避免重复输出。另有两个Agent同时拿到过期凭据，必须合并为一次刷新，并且都等新凭据保存后再发模型请求。",
+  "flow": "Agent取配置快照 → Routes按provider/model选实例 → provider.stream → 未published失败时重试一次 → DeepSeekModel解析 → sum执行 → 下一step；并发鉴权路径先await token.get → 共用pending刷新并保存 → 各请求以新token构造Bearer → 再HTTP。",
+  "try": "完成本章所有源文件与测试后运行 bun src/routes-demo.mjs，再运行 bun test ./tests/018-routes.test.mjs ./tests/018-routes-demo.test.mjs。按六场景日志看首片前重试、切路由、半句后不重试、未知模型、两次失败耗尽、双请求单刷新；最后摘要中refreshes=1、modelHTTP=2、两个usedNewToken=true。此demo固定外部HTTP，不读真实模型Key。",
+  "why": "Routes负责模型路由与有限重试；RefreshToken负责共享正在刷新的Promise。published不是“是否有正文”，任意Part（包括usage）交给Loop后即为true。三个gate只是demo确认两个请求都已到达再放行刷新，不是生产token锁；生产合并来自RefreshToken.pending。",
+  "accept": "两项测试分别覆盖路由/刷新原语和真实CLI全链路，demo有6个场景；其中3～5的error是预期结果。没有真实OAuth登录服务器、跨进程token事务或按HTTP错误种类分类，usage-only失败目前同样不重试。",
+  "debug": "在VS Code先选tests/018-routes.test.mjs，选择“Bun：当前测试”按F5；在src/routes.mjs的published=true、catch和this.pending ??=打断点，F10监视attempt、published、pending与测试调用者的attempts/refreshes。要调实际六场景，按下方现有attach配置运行 bun --inspect-brk=127.0.0.1:6499/routes-018 src/routes-demo.mjs 并附加；在refreshScene放行finishRefresh前查看beforeRelease应为getCalls=2、refreshes=1、modelHTTP=0。CLI测试spawn的子进程不会自动跟随F11调试。",
+  "recall": "闭卷给“HTTP之前失败、只收到usage、已输出半句、用户取消”四种情况写当前实现是否重试，再画token.get等待者与pending的关系。",
+  "transfer": "在routes.test的副本把第一Part改成usage后抛错，断言attempts不再增加；这是需新增的策略边界测试。若要让usage-only重试，需另外设计计费归属，当前教程未实现，不能只删published判断。",
+  "wiring": "018的routes-demo确实把Routes、RefreshToken、DeepSeekModel、Agent和Tools串起来；020的pi-demo也使用Routes。041 Host未统一改成此Routes装配，故独立demo通过不代表所有Web/ACP请求都自动采用这套重试与刷新。",
+  "implemented": [
+    "显式路由、未知模型拒绝、首Part前最多一次重试。",
+    "进行中刷新合并、鉴权前等待保存、确定并发到达的6场景演示。"
+  ],
+  "missing": [
+    "原版llm-retry接agent/request-recover，按提供方策略和结构化失败分类处理，记录可恢复退避事实并读取Retry-After；本章固定10ms且所有首Part前错误最多重试一次。",
+    "原版pi-ai鉴权桥使用credentials记录与带排他的modify刷新，authorization负责登录；本章refresh回调是本地假凭据，pending只协调同一实例，不能保证多进程刷新不冲突。"
+  ],
+  "testEvidence": "018-routes.test.mjs有1项原语测试，018-routes-demo.test.mjs有1项真实Bun CLI测试。后者验证工具续轮、半句中断、实际请求头使用更新凭据和退出清理；HTTP与刷新返回值均固定，无付费调用。",
+  "sources": [
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm-retry/src/index.ts",
+    "packages/llm/llm/src/retry-policy.ts",
+    "packages/llm/llm-pi-ai/src/auth.ts",
+    "packages/credentials/credentials/src/index.ts"
+  ]
+}

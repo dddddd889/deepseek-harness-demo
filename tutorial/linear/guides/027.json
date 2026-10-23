@@ -1,0 +1,30 @@
+{
+  "scenario": "程序必须连接终端才正常交互，例如在Vim输入文字、按Esc、保存退出。普通管道没有终端属性，本章用真实PTY承接按键和原始屏幕输出。",
+  "flow": "Terminal(scope,command,args) → Bun.spawn({terminal})创建PTY → write传入按键字节 → 子程序处理 → data回调连续解码并保存chunks → read(cursor)读取增量 → scope.close回收",
+  "try": "先确认 bun --version 和 vim --version 可运行，写完src/terminal.mjs及本章完整测试，再运行 bun test ./tests/027-terminal.test.mjs。第一项检查TTY=true，第二项启动隔离目录中的真实Vim，等待.vim-ready后输入 ihello from PTY、Esc、:wq和回车，最后读取demo.txt验证保存。不会弹出Vim窗口。",
+  "why": "PTY是一对模拟终端端点：程序连接slave，Harness读写master。Terminal保存的是输出窗口；write是输入，不直接追加chunks。read的offset按解码后JS字符串长度累计，不是行号和字节偏移；Vim输出还包含ANSI控制序列。",
+  "accept": "测试应2项通过，TTY=true、读到末尾后返回空串、Vim退出码0且文件为hello from PTY换行。测试证明真实按键和文件效果，没有验证可视终端渲染、所有信号、历史游标过期或子进程树清理。",
+  "debug": "在src/terminal.mjs的append与read打断点，看text.length如何推进offset、chunks如何保存文本；它不对应屏幕行。Vim测试在terminal.write(...)前打断点，检查.vim-ready已存在，按F10发送含真实Esc的字符串，再继续等待closed。Vim就绪/测试超时只有数秒，长停断点需在临时调试副本延长保护时间，不要把超时报错当PTY失败。",
+  "recall": "不看代码画出write(\"\\x1b\")→PTY输入→Vim→PTY输出→chunks的链路，说明为什么write(\"^[\")发送两个普通字符，而read(offset)不会删除旧输出。",
+  "transfer": "安全练习：仅在测试临时目录，把输入文字改成中文并保持Esc与:wq不变，验证UTF-8保存。想看Esc编码可在iTerm运行cat -v后按Esc观察^[，Ctrl+C退出。网页xterm渲染与持久Shell迁移目前未实现。",
+  "wiring": "027为真实PTY类与两项测试；026仍是普通管道。051仅导入Terminal，未实例化或注册终端工具，后续没有形成原版ctx.terminals→后端→工具→界面的完整接线。",
+  "implemented": [
+    "Bun原生PTY、TTY属性",
+    "输入、resize、signal、等待进程与输出EOF",
+    "连续UTF-8解码、有界块窗口与字符串游标",
+    "真实Vim输入保存测试"
+  ],
+  "missing": [
+    "原版terminal服务有不透明id、精确Agent所有权、后端注册、open/send/read/signal/list/close及并发发送约束；教程只是一个实例。",
+    "原版terminal-bash提供Shell启动/就绪检测、沙箱与进程组控制；本章没有这些组合。",
+    "教程没有终端模拟器或UI接线，不能把原始ANSI文本当作Vim可视屏幕。",
+    "未把026迁移为原版持久bash，未补齐起止marker与异常重建。"
+  ],
+  "testEvidence": "027-terminal.test.mjs两项测试启动真实Bun PTY和真实Vim；靠VimEnter通知文件而非固定睡眠判断就绪，核验真实落盘内容；依赖本机Vim且缺失时失败。",
+  "sources": [
+    "packages/terminal/terminal/README.zh.md",
+    "packages/terminal/terminal-bash/README.zh.md",
+    "packages/subprocess/subprocess-local/src/terminal.ts",
+    "packages/experimental/tool-terminal/README.zh.md"
+  ]
+}

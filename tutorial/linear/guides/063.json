@@ -1,0 +1,30 @@
+{
+  "scenario": "主程序想把一个任务放到另一个Bun Host进程执行，并且最多允许两项同时占用资源。任务完成或失败后要归还配额，否则后面任务会一直被误判超额。这里的Worker是外部Host，不是浏览器Web Worker。",
+  "flow": "Workers.run → 检查active配额 → HarnessSDK创建独立home并spawn sdk-server → stdio RPC → 子Host/Agent → 结果返回 → finally关闭SDK子进程并删除active项；signal可请求session.cancel。",
+  "try": "先写完workers.mjs，再运行env -u DEEPSEEK_API_KEY bun test ./tests/063-workers.test.mjs。测试实际启动另一个Bun sdk-server，完成offline任务worker后检查active.size=0，再把limit设0验证启动前超额拒绝。不要把普通输出worker当成真实模型推理，也无需配置模型Key。",
+  "why": "Workers拥有SDK子进程和配额，Scope则让父生命周期关闭时能收回子资源。独立home隔离会话存储，但不是操作系统沙箱；模型、工具和文件访问仍取决于子Host实际装配。",
+  "accept": "测试有真实Bun子Host和stdio RPC，验证普通任务结果、完成后配额归还及limit=0拒绝。它不验证真实并发上限、运行中取消、两个home磁盘隔离、后代或子工具审批；也不证明原版Browser Worker runtime。",
+  "debug": "在tests/063-workers.test.mjs用“Bun：当前测试”启动，断在src/workers.mjs的this.active.set(id, sdk)、return await sdk.run(...)和finally的await close()；监视id、sdk.child.pid、this.active.size。F10跨过run等待真实子进程结果后，active.size应从1回到0。F11进入src/sdk.mjs只到父侧RPC；sdk-server/Agent在子进程，本配置不自动附加，子进程内部断点不会因父侧F11就命中。",
+  "recall": "闭卷画Workers、HarnessSDK、子sdk-server、子Host四个节点，给每个对象标所有者，再写出任务结束时配额在哪一行归还。",
+  "transfer": "练习：给SDK父侧断点停留期间观察active包含的id，再继续到finally确认删除；不要修改limit绕过约束。运行中取消与真正双并发目前没有测试，不能把观察一个任务扩大成这些能力通过。",
+  "wiring": "Workers只被063测试调用，没有装成051子Agent工具后端。sdk-server确实支持有Key时直接DeepSeek、无Key时OfflineModel，但没有装product/capabilities。原版subagent-dsh-sdk与浏览器Dedicated Worker分别是另一套完整领域实现。",
+  "implemented": [
+    "真实Bun子Host、独立home路径和已有SDK/Remote协议复用。",
+    "内存active配额、Scope关闭、finally回收和基本取消转发。",
+    "超额时在创建SDK前拒绝。"
+  ],
+  "missing": [
+    "不是原版Browser Worker的VFS、模块装载、shell仿真和页面传输后端。",
+    "与原版subagent-dsh-sdk相比，缺初始化配置契约、完整取消/停稳释放、失败分类、后代和公开后端注册。",
+    "子Host仅基础工具，未完整继承产品能力/权限；没有进入主Agent委派工具链。",
+    "当前测试不验证并发、取消、异常退出、磁盘隔离或模型工具调用。"
+  ],
+  "testEvidence": "tests/063-workers.test.mjs通过HarnessSDK启动真实Bun进程，外部模型在无Key时为OfflineModel，结果只是带输入的离线文字。不是内存Promise假Worker，但也不是原版完整Worker验收；本次文档改写没有新增进程测试。",
+  "sources": [
+    "packages/subagent/subagent-dsh-sdk/src/index.ts",
+    "packages/subagent/subagent-dsh-sdk/src/run.ts",
+    "packages/sdk/client/src/client.ts",
+    "packages/experimental/webworker-runtime/src/worker.ts",
+    "packages/experimental/webworker-runtime/src/node/process-table.ts"
+  ]
+}

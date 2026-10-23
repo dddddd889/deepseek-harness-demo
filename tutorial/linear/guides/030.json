@@ -1,0 +1,30 @@
+{
+  "scenario": "运行一个耗时构建时，Agent不应一直阻塞。先获得任务id，过10ms询问状态仍显示running，稍后读取新日志；只有明确kill或owner关闭才请求终止。",
+  "flow": "Jobs.start(scope,owner,producer) → 登记job与AbortController → producer异步emit输出 → wait只观察done或时间到 → read按块cursor取增量 → kill/Scope.close取消并等待done",
+  "try": "写完src/jobs.mjs与测试后运行 bun test ./tests/030-jobs.test.mjs。测试producer先emit first再等待60秒，但wait(10)返回running；用s2读取s1任务应拒绝，随后kill让producer因signal中止，最后close把entries清空。测试不真的等待60秒。",
+  "why": "Jobs管理“谁拥有一份持续工作，以及怎么观察它”，生产方才负责具体做事。wait的timeout是观察期限，不是执行期限；read的cursor是输出块下标，不是027的字符串offset。取消是协作式，producer必须理会signal。",
+  "accept": "测试应1项通过：wait超时仍running、输出first可读、跨owner拒绝、kill后cancelled、关闭后entries=0。没有输出内存上限、任务持久化或非协作producer强杀保证。",
+  "debug": "在src/jobs.mjs的this.entries.set、Promise.race和job.controller.abort打断点。start后看job.state=\"running\"；F10通过wait返回时看仍running且controller.signal.aborted=false；kill时F11进入producer的delay中止路径，done处理后state=\"cancelled\"。最后scope清理删除id。短等待测试受断点影响，应看state/信号而非测精确毫秒。",
+  "recall": "闭卷说明wait(10)与kill的区别；画出owner关闭时为什么既要abort又要await done，而不能只从Map删除id。",
+  "transfer": "安全练习：用会主动结束的producer emit两段，第一次read存cursor，第二次读取只拿新块；不要用忽略signal的无限循环，因为当前Jobs不能强制中断它。",
+  "wiring": "030独立producer测试；051实际注册job_start/wait/read/kill，并用025 execute作生产方。该execute仍有默认5秒执行期限，所以当前job_start并不等于原版无前台截止的长期后台Shell。",
+  "implemented": [
+    "owner校验、稳定job id",
+    "producer信号与输出块游标",
+    "观察超时不取消",
+    "作用域关闭取消、等待、删除"
+  ],
+  "missing": [
+    "原版jobs-local维护有界输出环、stdout/stderr/log分流、绝对字节观察游标与独立模型消耗游标；本章output数组无界。",
+    "原版注册控制器、生命周期事件、完成通知、进度、列表与显式移除；教程没有完整接口。",
+    "原版受管进程后台句柄无前台deadline；051复用execute默认超时不等价。",
+    "原版持久记录任务元数据并明确重启语义；本章只在内存中。"
+  ],
+  "testEvidence": "030-jobs.test.mjs用真实可取消的timers/promises等待作生产方，验证观察、权限、终止和清理；没有启动真实后台构建。",
+  "sources": [
+    "packages/jobs/jobs/README.zh.md",
+    "packages/jobs/jobs-local/README.zh.md",
+    "packages/jobs/tool-jobs/README.zh.md",
+    "packages/shell/bash-local/README.zh.md"
+  ]
+}

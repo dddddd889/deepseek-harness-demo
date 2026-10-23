@@ -1,0 +1,31 @@
+{
+  "scenario": "同一个宿主同时打开Alice和Bob的会话，Alice不能读取Bob历史；关闭一个会话不应关闭另一个，重新打开要从磁盘恢复，写盘失败时仍尽量清理全部资源。",
+  "flow": "Host.create写header → Host.open校验owner → Journal恢复Events → 修复未结束turn → new Scope/Tools/Settings/LocalFS/Approvals/Agent → fileTools与guard/batch装配 → submit/idle → closeSession清理Agent/Scope/Journal",
+  "try": "写完src/host.mjs和两项测试再运行 bun test ./tests/041-host.test.mjs。第一项创建a/b两会话，a回复后关闭再打开，检查助手事实仍在；第二项故意把persist改成抛disk full，验证host.close报告AggregateError同时两个scope清理计数均执行。默认OfflineModel不访问DeepSeek。",
+  "why": "Host是把前面模块组装为产品会话的入口，不是第二套Agent Loop。header用于列表和owner/cwd等元数据，events.jsonl才是会话事实；恢复中工具结果不确定时记录interrupted，不自动重放副作用。",
+  "accept": "测试应2项通过：双会话隔离与恢复、持久化失败仍清理。通过只证明这些装配路径，不证明原版V4日志、完整迁移、所有领域工具或跨进程锁已实现。",
+  "debug": "在src/host.mjs的new Journal、fileTools(...)、this.loaded.set与closeSession各清理try处打断点。创建a/b后看loaded.size=2；关闭a后=1；open恢复时检查journal.records包含message/assistant而model不会自动再请求。故障测试F10经过各catch，看errors积累但仍继续scope.close与journal.close，最后loaded.size=0。",
+  "recall": "闭卷画出header.json与events.jsonl的职责，写出关闭会话为什么不能只从loaded Map删除；说明恢复未完成工具为何不能盲目重试。",
+  "transfer": "安全练习：在测试临时home里更新title再冷列表，确认不产生新模型请求；不要直接修改真实学习者历史。原版V4格式迁移需单独实现，本章repair一个turn/end不是完整恢复系统。",
+  "wiring": "041首次把文件工具、批处理、权限与Agent/Journal真正统一装进Host。后续043～048的Remote/SDK/Web/ACP继续调用它，051再附加部分能力；没有装配过的helper不会因Host存在自动启用。",
+  "implemented": [
+    "持久会话header与事件日志",
+    "owner校验、冷列表与分页参数",
+    "Agent/文件工具/权限/批处理组合",
+    "未结束turn中断标记",
+    "分会话关闭及失败后继续清理"
+  ],
+  "missing": [
+    "原版Agent/Session/Loader/持久化/投影控制器分层，含当前V4结构和历史迁移；本章单Host不兼容原版日志。",
+    "原版冷列表用投影缓存与专门激活策略；教程扫描header文件且未有跨进程占用控制。",
+    "原版插件profile、模型目录、媒体、工具所有权等由组合系统提供；Host当前只默认装文件能力与离线模型。"
+  ],
+  "testEvidence": "041-host.test.mjs真实读写临时home并运行OfflineModel Agent；第二项通过抛disk full验证实际清理控制流，不涉及收费模型或原版日志兼容。",
+  "sources": [
+    "packages/core/agent/README.zh.md",
+    "packages/core/session/README.zh.md",
+    "packages/api/session-controller/README.zh.md",
+    "packages/session/session-persistence-jsonl/README.zh.md",
+    "packages/session/session-projection-cache/README.zh.md"
+  ]
+}

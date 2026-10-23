@@ -1,0 +1,29 @@
+{
+  "scenario": "Agent需要在网页表单填入中文并点击提交，再看真实页面是否改变。浏览器DOM操作与操作系统屏幕点击是两个领域：网页里能定位button，不代表已经能控制其他应用窗口。",
+  "flow": "browser(scope, Chrome路径) → Playwright启动隔离headless Chrome → page.fill/click/screenshot → DOM状态或真实PNG；network route复用Web.check。另一个computer(action)只把有限OS动作编译成固定命令，当前测试没有执行这些系统动作。",
+  "try": "先写完browser.mjs、computer.mjs并安装本章依赖，确认本机有Chrome；再运行bun test ./tests/059-browser.test.mjs。测试在隔离页面创建input和button，填中文、点击后检查data-done=yes，并验证PNG签名；它不访问公网、不接管个人登录浏览器。缺Chrome时应明确修复路径，不能把测试skip当通过。",
+  "why": "Playwright管理浏览器和DOM，Scope保证关闭测试创建的浏览器。computerSpec只接受明确动作和参数，避免把模型提供的任意系统脚本当命令执行。两类动作的权限、取消和画面来源都不同。",
+  "accept": "测试确实启动Chrome并验证中文输入、按钮改变DOM、截图PNG及一个不支持的OS按键被拒绝。它没有测试navigate、外网/私网路由、真实系统截图/点击、OS授权或Agent工具接线。",
+  "debug": "在tests/059-browser.test.mjs用“Bun：当前测试”按F5，断在src/browser.mjs的chromium.launch、fill、click和screenshot；监视executablePath、await page.locator('#name').inputValue()及await page.locator('body').getAttribute('data-done')，后两者应为中文和yes。F10会等待外部Chrome动作，F11只能进入当前Bun的Playwright客户端，不能直接跳进Chrome页面JS。context.route断点本用例可能不命中，因为它使用setContent而非网络navigate。",
+  "recall": "闭卷画Bun测试、Playwright协议、Chrome页面、操作系统桌面四块；给fill输入框、截图网页、点击另一个应用各放到正确领域。",
+  "transfer": "练习：只在隔离测试页面把button选择器改为不存在的#missing，观察明确定位失败而不是返回模拟成功，随后恢复。该失败变体不在现有断言中；不要为了练习操作个人浏览器或系统桌面。",
+  "wiring": "browser/computer是独立辅助模块，未注册进051 Agent工具表。068会复用browser来验收自己的Web页面，但不会因此获得完整Browser/CUA模型工具或OS控制产品。",
+  "implemented": [
+    "真实隔离headless Chrome，支持基本navigate、fill、click和PNG screenshot。",
+    "浏览器网络请求可进入已有URL政策，scope关闭拥有的浏览器。",
+    "有限OS动作到固定命令的编译函数，不支持的组合明确报错。"
+  ],
+  "missing": [
+    "原版有Browser提供方注册、Agent身份独占资源、激活/发现、操作队列和释放约定；这里直接创建Playwright页面。",
+    "缺完整MCP/native浏览器提供方、模型schema、会话图像接纳及产品界面。",
+    "本章OS动作平台矩阵极小且未实测，不代表完整CUA；网络政策也未由本章测试验证。"
+  ],
+  "testEvidence": "tests/059-browser.test.mjs是实际Chrome测试，外部模型不参与，页面内容由测试内联固定。系统动作只测computerSpec拒绝任意脚本，没有调用computer执行系统命令。未完成的真实动作和平台资格仍保留缺口。",
+  "sources": [
+    "packages/experimental/browser-use-runtime/src/index.ts",
+    "packages/experimental/browser-use-runtime/src/mcp.ts",
+    "packages/experimental/browser-use-playwright-mcp",
+    "packages/experimental/cua",
+    "packages/experimental/cua-macos"
+  ]
+}

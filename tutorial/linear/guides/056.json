@@ -1,0 +1,30 @@
+{
+  "scenario": "开发者准备把桌面程序交给另一台机器安装。先区分“本机未签名安装包能生成”和“具备正式分发资格”，并确认包里带了Bun，而不是依赖开发机PATH或夹带credentials。",
+  "flow": "release脚本解析目标 → releaseTarget检查原生平台与正式签名凭据 → 复制当前架构Bun到.runtime → 生成electron-builder配置 → electron-builder --publish never → 本机产物；安装后验证、签名公证和升级仍是后续独立资格。",
+  "try": "先写完本章package.json、electron-builder.json和release脚本并安装依赖，再运行bun test ./tests/056-release.test.mjs。该测试不打包；按测试检查无证书的正式mac目标被拒绝、跨平台目标被拒绝、配置files不包含用户数据。人工打包只能在匹配目标的原生主机上按本章命令执行，保留unsigned标记，不要上传或发布。",
+  "why": "打包清单决定交付哪些产品文件；目标检查避免把交叉构建命令结束误当目标平台已经可用。Bun绝对路径在开发时来自启动器，安装后来自随包载荷；签名、公证、安装与启动是不同的验收项。",
+  "accept": "自动测试只调用releaseTarget并读配置，证明少数资格判断与files字段检查。课程历史记录未生成安装包，不能声称已经安装、签名、公证、升级或验证干净机器可用；electron-builder --version通过也不证明这些。",
+  "debug": "用“Bun：当前测试”启动tests/056-release.test.mjs，断在scripts/release.mjs的if (!result || result[0] !== platform)和正式凭据条件。监视target、unsigned、platform、result：mac-arm64/unsigned在darwin应返回--mac/--arm64；win-x64在darwin应先抛错。F10观察返回，勿在监视窗口展开真实签名秘密。该测试不会走文件复制或spawnSync，相关断点不命中是正常的。",
+  "recall": "闭卷把源码构建、复制运行时、生成安装包、签名、公证、干净机安装、升级七件事排成顺序，并在每项旁写需要什么独立证据。",
+  "transfer": "练习：只改测试输入，以platform=linux和target=linux-x64验证目标映射，不能据此宣称Linux产物通过。真实跨平台构建需要对应主机；本章不要求立刻购买证书或发布产品。",
+  "wiring": "本章提供实际electron-builder入口，携带当前Bun以运行052 Host。它没有装配054完整runtime安装、055更新器，也不是原版完整桌面发布流水线。",
+  "implemented": [
+    "明确支持目标表，限制在对应原生系统构建。",
+    "正式mac/Windows构建检查签名凭据，unsigned显式关闭相关签名设置。",
+    "复制本机目标架构Bun并在产品包中声明extraResources，发布参数固定never。"
+  ],
+  "missing": [
+    "原版完整runtime graph、生产依赖/工具运行时、平台载荷和签名清单尚未复刻。",
+    "Windows安装/卸载安全路径、原生辅助程序、PE签名和mac公证流程未等价实现。",
+    "未获得真实安装、启动、升级、恢复、全平台和干净机器验收证据。",
+    "files字段不含明显credentials字样只是静态检查，不是对最终包内容的完整审计。"
+  ],
+  "testEvidence": "tests/056-release.test.mjs只做函数和配置断言，不启动electron-builder。脚本有真实打包分支，但存在分支不等于该分支已运行。本次文档改写未执行打包、读取签名秘密或发布。",
+  "sources": [
+    "apps/desktop/scripts/package-target.ts",
+    "apps/desktop/scripts/desktop-publish.ts",
+    "apps/desktop/scripts/prepare-primary-runtime.ts",
+    "apps/desktop/installer",
+    "apps/desktop/windows-signing/README.md"
+  ]
+}

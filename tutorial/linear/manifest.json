@@ -431,13 +431,28 @@
   },
   {
     "step": "032",
+    "path": "src/rpc-demo.mjs",
+    "sha256": "c473cb0c03f9bacc5ecda456edd65e58e0b5ebc1c593592232b1fa4080e08b7d"
+  },
+  {
+    "step": "032",
+    "path": "src/rpc-worker.mjs",
+    "sha256": "874da809efcadb6b54a005b5031358655f451cb76b47bcc926b64d4f9ac9295b"
+  },
+  {
+    "step": "032",
     "path": "src/rpc.mjs",
     "sha256": "39c30c1bce7df5ec217ed1caf5c701c786f1dc8338d6e8225f42d90648fb4437"
   },
   {
     "step": "032",
+    "path": "tests/032-rpc-demo.test.mjs",
+    "sha256": "4d9d3c1e7971c4884e7e653a19b8d511e0500026e217ee650c34c30d526ffc74"
+  },
+  {
+    "step": "032",
     "path": "tests/032-rpc.test.mjs",
-    "sha256": "3fa3e0b4b6b778a3c42d39e6197d87bf284532959ba9c4ee1e166e8acc8a1dd8"
+    "sha256": "2db064ca92f826d0065de36cda6ad980a4eba99d7158d900180c74533a7d8566"
   },
   {
     "step": "033",

@@ -1,0 +1,29 @@
+{
+  "scenario": "开发者希望在另一个checkout里做修改，避免影响当前目录。教学Worktrees还额外设计了“先tar归档再删除自有checkout”；这和原版“创建新分支并让Session进入新工作区”的行为不同，不能混称同一能力。",
+  "flow": "Worktrees.create校验名字/ref → git worktree add --detach → 内存owned记路径；archive校验owned → git ls-files → tar打包 → rename归档 → git worktree remove --force。当前没有Agent或Session工作目录切换。",
+  "try": "先写完worktree.mjs，再运行bun test ./tests/062-worktree.test.mjs。该测试只尝试归档不拥有的名字、../escape名称和以-开头的ref，应该在运行git/tar之前拒绝。不要对当前仓库调用archive来试验：它包含真实删除，现有用例没有建立安全的真实归档测试环境。",
+  "why": "owned表示这份管理器允许删除哪些checkout，先归档再移除是避免误删的教学顺序。它只在内存里保存所有权，不等于Git自身的worktree清单，也不等于原版Session工作目录服务。",
+  "accept": "测试只证明未拥有路径与恶意名字/ref在外部命令之前被拒绝，没有运行一次真实git worktree或tar。不能依据这项测试宣布创建、归档、删除、恢复或中文文件保留通过。",
+  "debug": "用“Bun：当前测试”启动tests/062-worktree.test.mjs，在src/worktree.mjs的if (!target)和名称/ref校验条件断点；监视name、reference、this.owned.size应为0。F10应直接进入抛错，src/process.mjs的execute断点不应到达。不要为命中tar断点而跳过owned检查或指向日常仓库。",
+  "recall": "闭卷写出教学实现的detach checkout和原版新建branch的区别，再写出当前owned在进程退出后会发生什么，以及tar文件为什么不自动等于完整Git上下文。",
+  "transfer": "练习：只给纯输入测试增加一个以-开头的name，验证它仍在任何git命令前拒绝。真实创建/归档练习需要另建完全隔离Git仓库和恢复核对，当前没有这份自动验收，不在本章冒进执行。",
+  "wiring": "Worktrees只在062测试使用，未注册Agent工具、未更新Session cwd。后续没有恢复实现。它额外提供的tar归档删除不能冒充原版worktree服务的同语义简化。",
+  "implemented": [
+    "显式git argv创建detached worktree的辅助方法。",
+    "内存所有权检查与先归档后删除的自定义流程。",
+    "基本名字/ref拒绝和NUL分隔文件清单。"
+  ],
+  "missing": [
+    "原版创建新分支及checkout、固定基线commit，并切换调用Session工作目录；本章使用--detach且没有Session。",
+    "原版失败时保留已创建checkout/branch，不自动删除；本章archive/remove是另一套行为，不能算同项完成。",
+    "本章owned不持久，缺恢复和完整Git上下文；删除过的tracked文件可能让tar失败，临时清单/失败清理也未完整处理。",
+    "没有真实git/tar、中文空格文件、取消或失败后恢复的测试证据。"
+  ],
+  "testEvidence": "tests/062-worktree.test.mjs调用的全是拒绝路径，命令执行器不会真正运行。测试路径字符串不是已创建的隔离Git仓库；本次文档修改也没有创建、归档或删除任何worktree。",
+  "sources": [
+    "packages/experimental/worktree/src/index.ts",
+    "packages/experimental/worktree/src/types.ts",
+    "packages/experimental/worktree/src/process.ts",
+    "packages/experimental/tool-worktree"
+  ]
+}

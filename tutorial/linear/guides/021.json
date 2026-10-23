@@ -1,0 +1,28 @@
+{
+  "scenario": "Agent读到a.txt内容one，准备改成two；外部编辑器已经改过时，应拒绝旧版本覆盖。另有link指向工作区外的secret，应在真实路径检查时拒绝读取，避免只检查表面文件名。",
+  "flow": "LocalFS.path检查词法相对路径与已存在祖先realpath → read全量读字节、算SHA-256并记observed → write进入同实例pending队列 → 重读版本并核对expected/observed → 同目录临时文件 → rename目标 → 清除observed。",
+  "try": "写完filesystem.mjs和测试后运行 bun test ./tests/021-filesystem.test.mjs。测试会在系统临时目录建workspace、outside和link；首次新建允许，读取后写two允许，再用旧version写stale拒绝，读取越界链接拒绝。别在自己的工作区造真实机密链接。",
+  "why": "LocalFS是实际读写磁盘的提供方，022才把它包装成模型工具。expected核对调用者依据的版本，observed核对本实例确实读过它；临时文件再rename避免半份内容暴露，但不是原子“检查版本并替换”。",
+  "accept": "1项真实文件测试验证先读后改、旧版本拒绝和链接越界。pending只在同一个实例生效，注释“同进程”范围偏宽；两个实例、外部进程不共用锁，版本检查与rename之间仍可能被外部修改插入。",
+  "debug": "在VS Code选tests/021-filesystem.test.mjs，选择“Bun：当前测试”按F5。在src/filesystem.mjs的inside(await realpath(...))、observed.set、版本条件及rename打断点。F11进入read，监视path/version；写入时看this.observed.get(path)与current/expected，F10后observed应清空。链接场景realpath指向outside，应在inside抛错而不进入readFile。",
+  "recall": "闭卷给“只拿到别人传来的hash”“本实例读过但外部已改”“本实例刚新建”三种情况写出当前write结果，说明原子替换与原子版本检查为何不同。",
+  "transfer": "在测试副本读取后用writeFile把临时目标改成external，再带旧版本调用fs.write，断言external被保留；这是需新增的检查前冲突练习，不证明检查之后的竞态已解决。",
+  "wiring": "021只在文件提供方单测使用；022 fileTools与edit-demo接入统一Tools.execute，041 Host为每个会话创建LocalFS(header.cwd)。不同会话实例的pending不会互相串行。",
+  "implemented": [
+    "工作区词法/真实祖先检查、全量文本读取与内容版本。",
+    "同实例写入排队、先观察后覆盖、临时文件原子替换。"
+  ],
+  "missing": [
+    "原版Fs契约提供resolve/stat/readText/streamText/readByteRange/list/write/edit等，fs-local按targetKey排队且保留修改结果与mode；本章单一全实例队列、全量UTF-8文本及简单bytes结果，缺分片读取等接口。",
+    "原版先读后改由独立fs-observation-policy按Session owner记录，再通过intent给提供方条件；本章把observed绑定LocalFS实例并写后删除，不能复刻会话共享策略。",
+    "原版文件约束还由fs-sandbox接入；本章路径检查存在TOCTOU窗口，临时文件失败清理、原权限保留、跨实例并发与掉电持久性未验收。"
+  ],
+  "testEvidence": "tests/021-filesystem.test.mjs有1项真实临时磁盘测试；没有并发两实例、检查后修改、失败临时文件清理或大文件分片读取验收。",
+  "sources": [
+    "packages/fs/fs/src/types.ts",
+    "packages/fs/fs-local/src/index.ts",
+    "packages/fs/fs-local/src/fsio.ts",
+    "packages/fs/fs-observation-policy/src/index.ts",
+    "packages/fs/fs-sandbox/src/containment.ts"
+  ]
+}

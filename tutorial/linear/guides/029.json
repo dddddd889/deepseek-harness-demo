@@ -1,0 +1,32 @@
+{
+  "scenario": "代码在远端服务器/home/project，Harness在本机。读文件、写文件和运行测试必须都指向这同一个远端项目，否则容易改本机文件却测远端旧代码。",
+  "flow": "SSH(host,workspace) → read/write/run共用run(argv) → quote逐个编码远端参数 → 本机execute启动ssh → 远端Shell cd工作区并exec命令",
+  "try": "先写完src/ssh.mjs和测试，再运行 bun test ./tests/029-ssh.test.mjs。真实本地/bin/sh先验证带单引号与分号的文字不变；SSH部分使用注入runner记录spec，不需要账户也不会连接服务器。查看specs中的host、远端cd和cat/写入模板，最后验证../secret拒绝。",
+  "why": "029是SSH命令适配器：本地通过argv启动ssh，远端仍解析命令字符串，所以quote必需。write先把正文转Base64避免正文被当Shell语法。它不是原版远端helper或通用文件系统接口。",
+  "accept": "测试应1项通过：本地Shell输出精确等于原参数、read返回替代runner的remote、所有spec指向user@host、越界拒绝。没有真实SSH握手、远端磁盘效果、断连、远端终止或文件版本验收。",
+  "debug": "在src/ssh.mjs的run返回this.runner(...)与write里的const encoded打断点。F10看argv每项、quote(text)及spec.args最后一项；read(\"a.txt\")应生成远端cat，write中文应看到Base64而非原正文。测试注入runner处看specs长度增长，此时不会有ssh子进程；不要附加一个不存在的远端进程。",
+  "recall": "闭卷画出本地argv与远端Shell解析两层，解释为什么本地shell:false仍不能省略远端quote；说明杀本地ssh不等于确认远端进程树已停。",
+  "transfer": "安全练习：给quote测试加包含美元符号、空格和换行的普通文字，仍用本地printf比较原值。真实服务器试验必须使用专门空目录与现有SSH授权；029没有准备远端资源，不要把占位user@host当可运行目标。",
+  "wiring": "029仅独立适配器测试。后续Host仍实例化LocalFS，051没有挂载SSH；因此没有真正切换成远端文件/执行/PTY能力组。",
+  "implemented": [
+    "固定host与远端绝对工作区",
+    "POSIX参数引用和host校验",
+    "文件读写与执行共用远端Spec",
+    "拒绝绝对文件路径和..段"
+  ],
+  "missing": [
+    "原版ssh复用连接，启动已部署helper并校验协议与摘要；029每次操作启动ssh并拼cat/sh。",
+    "原版fs-ssh用结构化fs.readText、流读取、字节窗口及版本/原子修改接口；教程没有。",
+    "原版subprocess-ssh管理远端进程、独立流、PTY与控制；教程复用025合并输出。",
+    "原版helper通过EOF、信号与心跳租约清理，且断连不自动重放副作用；教程没有远端租约或结果不确定性处理。",
+    "本章路径字符串检查不能阻止远端符号链接越界，也不是远端沙箱。"
+  ],
+  "testEvidence": "029-ssh.test.mjs只有quote经过本地真实Shell；SSH读写用替代runner检查命令Spec，不能称为真实SSH端到端验证。",
+  "sources": [
+    "packages/ssh/ssh/README.zh.md",
+    "packages/ssh/ssh/src/index.ts",
+    "packages/ssh/fs-ssh/README.zh.md",
+    "packages/ssh/subprocess-ssh/README.zh.md",
+    "packages/ssh/ssh-helper-runtime/README.zh.md"
+  ]
+}

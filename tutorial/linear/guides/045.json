@@ -1,0 +1,30 @@
+{
+  "scenario": "Python脚本也想提交Harness任务，但不能另写一套Python Agent。它启动同一个Bun sdk-server，用NDJSON请求驱动Host，专用读取线程同时分发回复和会话通知。",
+  "flow": "Bun测试spawn Python fixture → Python HarnessSDK.Popen(Bun,sdk-server) → request登记queue并写JSON行 → 读取线程按id入队或收通知 → run组合create/watch/submit/wait/read → close发EOF并等待Bun退出",
+  "try": "先写完python/harness_sdk.py、tests/fixtures/python-sdk.py和本章测试；确认python3 --version，再在练习工程运行 bun test ./tests/045-python.test.mjs。测试设置PYTHONPATH并传入当前Bun路径，Python发送“来自Python的任务”，应打印completed；不需要安装Node.js，也不需要真实模型Key。",
+  "why": "Python SDK只是另一种语言的协议客户端。主线程等待queue时读取线程仍可接收消息，所以通知不会被误认成当前请求结果；pending锁保证先登记等待者再把请求发出去。参数名node是代码沿用名，测试实际传process.execPath即Bun，不是启动Node.js。",
+  "accept": "测试应1项通过，证明真实Python→Bun Host链路和退出。没有覆盖Python并发写、未知通知、请求超时后远端取消、审批回调、官方协议兼容或wheel分发。",
+  "debug": "外层Bun断点可放tests/045-python.test.mjs的spawnSync，F10等待完整Python结束，查看status=0和stdout。Python断点需用VS Code Python调试器，以tests/fixtures/python-sdk.py为程序，参数依次是Bun绝对路径、src/sdk-server.mjs绝对路径、专用临时home，并设置PYTHONPATH为项目python目录；在harness_sdk.py的self.pending[identity]=waiting、_read里的waiting.put、run的session/wait处观察id与消息。Bun调试器不能直接F11进入Python线程，当前本章没有自动配置这条跨语言附加。",
+  "recall": "闭卷画出Python主线程、读取线程、Bun服务三方；解释queue为什么必须按请求id分开，以及Bun服务为什么仍然是唯一Agent执行方。",
+  "transfer": "安全练习：Python fixture连续run两个任务，确认两组事件各自sessionId不同且close后Bun退出。仅在专用临时home实验；官方SDK初始化、恢复和打包尚未实现，不要直接把此文件发布成官方Python SDK。",
+  "wiring": "045真实复用044的Bun sdk-server与043 remote；Python不包含第二套Loop。后续没有把它换成原版Python SDK或补齐官方共享方法词汇。",
+  "implemented": [
+    "Python subprocess真实启动Bun",
+    "独立读取线程分发回复/通知",
+    "锁保护pending登记和发送",
+    "queue等待、超时与断线拒绝",
+    "上下文管理器关闭并回收"
+  ],
+  "missing": [
+    "原版Python SDK镜像官方SDK协议、管理运行时与正式类型/事件；本章镜像的是教程自定义点号方法。",
+    "缺少initialize、resume、工作目录、正式shutdown、图片内容与Agent状态/子Agent通知等原版接口。",
+    "缺少官方Python包与runtime发行、异步/高级API及完整多请求错误清理矩阵；单个脚本测试不能证明这些。"
+  ],
+  "testEvidence": "045-python.test.mjs真实启动python3与Bun服务，显式去掉模型Key；fixture断言completed及assistant事件，测试确认Python退出0，不依赖真实LLM。",
+  "sources": [
+    "python/README.zh.md",
+    "packages/sdk/protocol/README.zh.md",
+    "packages/sdk/server/README.zh.md",
+    "packages/sdk/client/README.zh.md"
+  ]
+}

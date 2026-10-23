@@ -1,0 +1,25 @@
+{
+  "scenario": "Agent正在计算时，用户补充“别改测试文件”。这条消息可指定step，在下次模型请求前注入；用户另发“完成后再生成说明”则指定turn排下一轮，不能改写已经发给模型的HTTP正文。",
+  "flow": "Inbox.enqueue写inbox/add → pending重放add/edit/remove/claim → claim(destination)先写inbox/claim再返回输入 → 013 Agent取turn → 012/014 Loop在每次模型step开始取step并追加message/user。",
+  "try": "写完inbox.mjs及测试后运行 bun test ./tests/009-inbox.test.mjs。按测试查看turn输入从old改new、step输入steer先被claim、第二次claim同一目的地返回undefined。restored只是用同一Events新建Inbox，尚未从磁盘重启Agent。",
+  "why": "Inbox把“接收输入”与“何时执行”分开。认领也是事实，所以重建队列时不会再次返回已认领项；同步claim避免同一进程连续取两次。step只是下一个模型边界，不会打断已运行工具或正在接收的模型流。",
+  "accept": "单测验证事件重放、编辑、两个目的地与单次认领；没有实际Agent在运行中接收step的集成测试。step没有下一模型步骤时会留在队列，不会自行启动新turn，也没有绑定特定turnId。",
+  "debug": "在VS Code打开练习工程并选中tests/009-inbox.test.mjs，选择“Bun：当前测试”按F5启动。在src/inbox.mjs的rows.set、rows.delete与this.session.append(\"inbox/claim\",...)打断点。F11进入pending，监视type、data.id、rows.size；F10经过claim后再次pending不应包含该id。继续到013时，在Agent.pump的claim(\"turn\")和loop的claim(\"step\")对照两种消费时机。",
+  "recall": "合上教程，用“当前模型请求、下一个step、下一turn”三个框放置两条输入；解释认领后为什么不能update，以及step为何不等于立即中断。",
+  "transfer": "在测试副本enqueue后调用remove，再新建Inbox断言不能claim该项；这需要补一段测试。要练真正运行中steer，需以后在Agent/Loop测试增加确定的请求边界，不能只改destination就声称已演示。",
+  "wiring": "本章为独立队列单测；012 Loop接入step认领，013 Agent接入turn认领。与原版不同，本章新turn的claim本身不合并step队列，step是在runTurn内部再取。",
+  "implemented": [
+    "输入事件化、重放恢复、未认领编辑/删除和两个目的地。",
+    "先持久化认领再交付，防同进程重复消费。"
+  ],
+  "missing": [
+    "原版agent-loop/inbox有经过schema验证的持久splice投影，提供批量认领、替换及插入/丢弃/认领通知；本章每次重新全扫日志，方法与事件格式都不同。",
+    "原版claim(next-turn,turn)会合并待处理next-step消息并绑定turn；本章step无turn归属、无恢复投影校验，也未覆盖取消后输入转交策略。"
+  ],
+  "testEvidence": "tests/009-inbox.test.mjs有1项内存测试，验证两Inbox实例共用同一Events的重放；标题提到删除，但当前测试并未实际调用remove，不能据此声称删除路径已验收。",
+  "sources": [
+    "packages/core/agent-loop/src/inbox.ts",
+    "packages/core/agent-loop/src/agent.ts",
+    "packages/core/agent/src/types.ts"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "scenario": "外部MCP服务已经有工具，Agent不应另建第二张工具表。连接后分页发现工具，加服务器前缀注册到Tools，关闭连接时一并撤销，避免调用已失效服务。",
+  "flow": "mountMCP → SDK Client连接stdio或Streamable HTTP → listTools分页 → 当前generation构建Tools注册 → Tools.execute → client.callTool(signal) → 卸载贡献Scope撤销工具并close连接",
+  "try": "先写完src/mcp.mjs和tests/fixtures/mcp.mjs，按本章package.json安装依赖后运行 bun test ./tests/033-mcp.test.mjs。测试真实启动本地MCP服务进程；目录应出现project__first与project__second，执行second返回文本second，remote.close后目录为空。无需远端账户。",
+  "why": "MCP适配器把外部协议翻译成现有Tools入口：模型看到的是统一工具名与schema，实际调用委托官方SDK。revision用于防止旧刷新覆盖新一代目录；Scope负责撤销注册，不代表已经自动取消所有在途副作用。",
+  "accept": "测试应1项通过，覆盖真实stdio握手、两页发现、调用和卸载。没有实际验证HTTP、list_changed动态刷新、资源模板分页、OAuth或在途取消。",
+  "debug": "父进程在src/mcp.mjs的await client.connect、definitions.push、tools.register和client.callTool打断点。F10完成两次listTools后看definitions.length=2、generation===revision；执行second时看注册名project__second但远端name=\"second\"。在await contribution.close后检查旧注册撤销。外部fixture是单独Bun进程，父调试器不能直接停到其handler；需显式为该子进程配置独立Inspector才可调试。",
+  "recall": "闭卷画出project__second→远端second名称映射；说明为什么关闭连接要移除工具，而不是仅把client变量设undefined。",
+  "transfer": "安全练习：在固定fixture增加第三页并同步测试期望，验证do/while cursor；不要直接连接带写权限的真实服务试验。OAuth与重连需独立实现，当前spec.headers不是刷新流程。",
+  "wiring": "033已经通过真实MCP进程调用Tools，但当前章没有模型。051 capabilities未调用mountMCP，最终Host没有自动装配MCP配置；后续没有证明Agent→MCP→服务的完整产品链。",
+  "implemented": [
+    "官方MCP SDK stdio/HTTP传输选择",
+    "分页工具目录与前缀命名",
+    "Scope撤销、generation刷新顺序",
+    "调用signal和isError处理",
+    "资源/模板/读取包装入口"
+  ],
+  "missing": [
+    "原版mcp-client接入Loader配置、调用作用域、协议探测、服务指令快照与产品运行时；教程没有完整组合。",
+    "原版共享mcp-resources提供模型资源发现/读取路径；本章只返回辅助方法，没有相应工具/上下文接线。",
+    "当前测试仅stdio固定样本，尚未覆盖HTTP/OAuth、动态更新与故障恢复；不能因使用同一SDK宣称全功能相同。"
+  ],
+  "testEvidence": "033-mcp.test.mjs启动真实官方SDK fixture，验证两页listTools、callTool和close卸载；固定样本替换外部服务而非MCP适配器。",
+  "sources": [
+    "packages/mcp/mcp-client/README.zh.md",
+    "packages/mcp/mcp-client/src/index.ts",
+    "packages/mcp/mcp-resources/README.zh.md"
+  ]
+}
