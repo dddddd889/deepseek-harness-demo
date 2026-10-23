@@ -106,3 +106,7 @@ Electron Main 使用 Electron 自带的运行时；领域 Host 改由独立 Bun 
 旧 Node 24 验证原样归档在 [历史记录](evidence/node24-history/VERIFICATION.md)，不作为当前 Bun 结果。迁移同时替换了测试入口、调试协议、SQLite、PTY、桌面 Host 和依赖锁，不是仅替换命令文字。
 
 收费模型请求、真实外部 SSH/LSP、操作系统隔离、完整产品界面、V4 数据/Typert 公共协议、完整 PTC、捆绑工具运行时、签名/公证/安装/升级和跨平台资格仍未全部验收。学习者本人能否闭卷重建也需亲手练习。全部原版目标仍由 [COVERAGE.md](COVERAGE.md) 约束，`audit.py --require-complete` 仍须拒绝完整复刻完成声明。
+
+## 027新增Vim按键演示的单独验证
+
+在独立累计到027的临时工程`/var/folders/hw/tv2bjdwx6fxgmmkdzzvw1zhm0000gn/T/harness-vim-027-5oz4emho`使用Bun 1.3.14运行`bun test ./tests/027-terminal.test.mjs`，2项通过、0失败：TTY与游标检查、真实Vim输入保存退出。新增测试后未重跑000～069；上面的86项完整回归及verification.json是新增Vim测试之前的历史证据，不覆盖此次新增测试。VS Code断点方法仅做静态说明，未交互验收。

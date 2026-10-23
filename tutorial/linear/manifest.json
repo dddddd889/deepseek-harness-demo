@@ -387,7 +387,7 @@
   {
     "step": "027",
     "path": "tests/027-terminal.test.mjs",
-    "sha256": "587f403ef4d75a0be39f22183a200f6ebff3d7018fdbbdb603951158da583ced"
+    "sha256": "ae1257f57264d32fc6132bd56063424848ea9b69905f0036d381a420174ec6aa"
   },
   {
     "step": "028",
