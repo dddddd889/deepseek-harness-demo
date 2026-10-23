@@ -281,17 +281,17 @@
   },
   {
     "id": "020",
-    "title": "通过真实 pi-ai 替换提供方",
+    "title": "把PiModel接进Routes，仍调用DeepSeek跑通工具续轮",
     "phase": "R03",
-    "try": "不改Loop，尝试让同一Part接口接收pi-ai事件。",
-    "why": "安装固定第三方pi-ai，自己写历史转换和事件映射，保留完整assistant replay。默认示例用OpenAI协议测试pi-ai边界，DeepSeek继续走第016步自写的OpenAI兼容适配。",
-    "run": "bun install --ignore-scripts\nbun test ./tests/020-pi.test.mjs",
+    "try": "先画两条链：Loop经手写DeepSeekModel访问模型，以及Loop经PiModel和pi-ai访问模型。假设远端仍是DeepSeek，指出究竟替换了哪层，再对照本步固定HTTP测试。",
+    "why": "pi-ai是访问模型的SDK，DeepSeek是远端模型服务。新增pi-demo真正向Routes注册PiModel，Agent持有Routes；SDK承担HTTP和流解析，Harness仍拥有Loop、工具与会话。先跑固定HTTP贯通，再沿用016的.env加--live请求DeepSeek；只有显式live才访问网络。",
+    "run": "bun install --ignore-scripts\nbun src/pi-demo.mjs\nbun test ./tests/020-pi-demo.test.mjs\nbun test ./tests/020-pi.test.mjs",
     "test": "tests/020-pi.test.mjs",
-    "accept": "真正SDK解析固定HTTP流，收到你好、usage、replay和stop；Loop接口完全不变。",
-    "debug": "断在context与done；删replay后下一轮provider私有字段将无法恢复，添加对应断言。",
-    "recall": "合上材料说出SDK替你处理什么、Harness仍负责什么。",
-    "transfer": "固定HTTP停止原因改length，应返回length而非stop。",
-    "original": "llm-pi-ai 完整提供方接入的基础；其他API通过注册对应SDK stream函数，不能把单个协议示例记为所有provider已等价。"
+    "accept": "新CLI入口实际走通两次模型请求和一次sum执行，第二次历史含SDK replay、推理及关联工具结果，最终5、completed，清理后路由/工具/监听归零。自动测试运行固定HTTP，真实请求以mode=live的独立记录验收。",
+    "debug": "用本页020 pi-ai附加配置连接终端启动的pi-demo，断在Routes查找、PiModel.context及done、sum.run和第二次HTTP观察点。确认路由对象是PiModel，远端provider仍是deepseek。下面原有当前测试步骤只调适配器单测，不自动附加到CLI子进程。",
+    "recall": "合上材料说清DeepSeek、DeepSeekModel、pi-ai和PiModel各负责什么；解释换SDK为何不一定换模型，以及SDK为何不接管Loop和工具执行。",
+    "transfer": "先预测删除toolResult回传会在哪一步失败，再在自己的工程临时改坏并运行固定demo，必须由第二次HTTP校验拒绝，恢复后重跑。真实模式缺Key必须失败，不回退固定响应。",
+    "original": "PiModel已经接入独立Routes/Agent入口，并有真实DeepSeek两轮工具链证据。其他协议、提供方、跨适配器旧历史、完整取消和产品发布矩阵仍需专门验收，不把当前样本记为全provider等价。"
   },
   {
     "id": "021",
@@ -309,17 +309,17 @@
   },
   {
     "id": "022",
-    "title": "把唯一替换接入统一工具入口",
+    "title": "文件编辑默认唯一匹配，显式replaceAll才全部替换",
     "phase": "R04",
-    "try": "目标文字出现两次，先决定是否应该替你全替换。",
-    "why": "read/write/edit是工具消费者，依赖LocalFS契约；schema、观察版本和唯一匹配一起决定能不能修改。",
-    "run": "bun test ./tests/022-edit.test.mjs",
+    "try": "文件内容为x x，预测不传replaceAll、传false、传true三次独立编辑的结果。再想一想，全量替换能不能沿用已经写过一次的旧version。",
+    "why": "read/write/edit仍经过统一工具入口。replaceAll是可选boolean，省略或false要求唯一匹配，true允许全部非重叠匹配；空查找串、零匹配和旧版本仍拒绝。新文本按字面构造后只写一次，保留LocalFS的版本与串行化边界。",
+    "run": "bun src/edit-demo.mjs\nbun test ./tests/022-edit.test.mjs",
     "test": "tests/022-edit.test.mjs",
-    "accept": "通过Tools.execute执行真实edit；多匹配拒绝，文件保持x x。",
-    "debug": "断在split计数；删掉唯一匹配判断，测试会发现文件被改。",
-    "recall": "合上材料写出edit的验证顺序，再指出哪些代码属于Provider。",
-    "transfer": "删除被读取的文件后编辑，应明确失败，不新建一个同名文件。",
-    "original": "fs-tools 的edit/str_replace语义。"
+    "accept": "edit-demo实际展示默认拒绝、全量成功、旧版本拒绝、重新读后唯一替换。6项文件测试覆盖可选/false兼容、true多处替换、字面$&及删除、错误类型、空串/零匹配及外部修改保护。",
+    "debug": "断在file-tools.mjs的版本比较、split后的matches和fs.write。观察同样两个匹配在默认模式被拒绝、true时继续，写后旧version仍被拒绝。实际demo的Bun附加命令和配置见本页。",
+    "recall": "闭卷解释为什么replaceAll不能变成必填，为什么全部替换仍需要版本，以及pieces.join如何保留after里的字面$&。",
+    "transfer": "把before改为不存在的字符串，或把replaceAll改成字符串true，应明确失败且文件不变；恢复后重跑。删除文件后的旧版本编辑仍应失败，不能悄悄新建同名文件。",
+    "original": "fs-tools的统一执行、字符串匹配与版本边界。本步增加显式全量替换；不据此声称支持自动冲突合并、多文件事务或跨进程CAS。"
   },
   {
     "id": "023",

@@ -291,8 +291,18 @@
   },
   {
     "step": "020",
+    "path": "src/pi-demo.mjs",
+    "sha256": "0ff7b931ae20c7e911d39b34acd0194cb10dea494e7d8f215ab1f7fe077b94f7"
+  },
+  {
+    "step": "020",
     "path": "src/pi.mjs",
-    "sha256": "a77f0f12eabf5d5da667c151c190b22b0af27adfeaff1438eb9ca50006886518"
+    "sha256": "3ca2f6f3d0eb698bded7afc9c9e4bf1c87718b59c1126bd13b6b03164659a57b"
+  },
+  {
+    "step": "020",
+    "path": "tests/020-pi-demo.test.mjs",
+    "sha256": "1a5d70b5f7456d8a61627a96c709eb87735eb5c6b18c0f652422934c2a7ed61f"
   },
   {
     "step": "020",
@@ -311,13 +321,18 @@
   },
   {
     "step": "022",
+    "path": "src/edit-demo.mjs",
+    "sha256": "304d77879e784f958e9515eac52ccc38e6a213c017f9bd892ed6cc9dd04ac658"
+  },
+  {
+    "step": "022",
     "path": "src/file-tools.mjs",
-    "sha256": "582555721fa9aad9c087574b5020d4ddeefee39f1ffb37f6781deaa62b201dd3"
+    "sha256": "f1f6cb7b8e5db53dd2e3c224e0952b02d52775faf442de53ed3833854a26a8bf"
   },
   {
     "step": "022",
     "path": "tests/022-edit.test.mjs",
-    "sha256": "b2936f58337788a38da424a75837dd269ac5be8977ddcf12f30d9094c5e7b2a3"
+    "sha256": "57be54d024ba091c5a5637f444285c1ff43af1779f4d4d240acbe7a4d831d208"
   },
   {
     "step": "023",

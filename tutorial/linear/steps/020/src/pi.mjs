@@ -17,12 +17,18 @@ export class PiModel {
   }
   /** 接口事件转回自己定义的 Part，Loop 不依赖任何 pi-ai 字段。 */
   async *stream(request) {
+    request.signal.throwIfAborted()
+    if (request.config?.model && request.config.model !== this.model.id) throw Error('PiModel配置与路由模型不一致')
     let ended = false
-    for await (const event of this.start(this.model, this.context(request), { apiKey: this.key, signal: request.signal, fetch: this.fetcher, maxTokens: request.config?.maxTokens ?? 2048 })) {
+    // 重试交给Routes统一管理，SDK不再叠加重试；推理设置沿用本轮配置快照。
+    for await (const event of this.start(this.model, this.context(request), { apiKey: this.key, signal: request.signal, fetch: this.fetcher,
+      maxTokens: request.config?.maxTokens ?? 2048, reasoning: request.config?.reasoning ?? 'off', maxRetries: 0,
+      timeoutMs: request.config?.timeoutMs ?? 30_000 })) {
       request.signal.throwIfAborted()
       if (event.type === 'text_delta') yield { kind: 'text', text: event.delta }
       if (event.type === 'error') throw Error(event.error.errorMessage ?? 'pi-ai 请求失败')
       if (event.type === 'done') {
+        if (!['toolUse', 'stop', 'length'].includes(event.reason)) throw Error('pi-ai异常停止原因：' + event.reason)
         ended = true
         for (const block of event.message.content) {
           if (block.type === 'toolCall') yield { kind: 'tool', id: block.id, name: block.name, arguments: block.arguments }

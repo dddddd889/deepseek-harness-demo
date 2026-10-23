@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-23",
+  "project": "/private/tmp/harness-pi-020-tbrp2h3x",
+  "command": "bun --env-file=本机练习工程/.env src/pi-demo.mjs --live",
+  "sdk": "@earendil-works/pi-ai@1.1.0",
+  "actualNetworkRequests": true,
+  "summary": {
+    "mode": "live",
+    "route": "deepseek-pi",
+    "provider": "deepseek",
+    "model": "deepseek-flash",
+    "api": "openai-completions",
+    "reason": "completed",
+    "requests": 2,
+    "http": 2,
+    "toolRuns": 1,
+    "historyChecked": true,
+    "reasoningReplayed": true,
+    "usageEvents": 2,
+    "replayProviders": [
+      "pi",
+      "pi"
+    ],
+    "finalText": "5",
+    "cleanup": {
+      "agentClosed": true,
+      "routes": 0,
+      "tools": 0,
+      "listeners": 0
+    }
+  },
+  "evidenceKind": "实际CLI运行输出中的验收摘要；未保存凭据、鉴权头或推理正文"
+}

@@ -30,6 +30,8 @@ cd "$PROJECT"
 
 第005步已补上前四步的真实装配场景：[读文件、记录事实、展示端退出与补读](lessons/005.md)。它使用自己的Plugins/Services/Scope/Settings，而不是单独展示Events方法；最小JSONL写入器的恢复能力尚未接入。
 
+第020步通过新的`pi-demo.mjs`把PiModel注册进Routes并交给Agent：[仍用DeepSeek跑通模型→工具→模型](lessons/020.md)。先运行固定HTTP场景，再显式加`--live`调用真实DeepSeek；两者都实际执行sum，并核对第二次请求中的工具结果和推理回放。
+
 ## 每一步怎么做
 
 只读当前小步，按这个顺序完成，不另选路线：

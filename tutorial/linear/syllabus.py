@@ -124,9 +124,25 @@ add('把模型路由、重试和凭据刷新真正装进Agent', 'R03',
     '模型路由、有限重试及鉴权前的RefreshToken已接入demo并由实际模型请求头验收。远端OAuth刷新服务仍由本地回调固定提供，没有真实授权登录或加密存储；错误分类、持久attempt与完整鉴权矩阵仍待补齐。',
     run='bun src/routes-demo.mjs\nbun test ./tests/018-routes-demo.test.mjs\nbun test ./tests/018-routes.test.mjs', test='tests/018-routes.test.mjs')
 add('上下文压缩与大结果原文', 'R03', '读一份大结果后，尝试只给模型短预览，同时保留原文可读取位置。', '压缩只改变模型可见副本，历史不变；保留当前完整轮次。Spill以内容hash定位原文，读取时再次核验完整性。', '旧历史仍500字符，当前轮保留；原文读回一致，篡改文件被发现。', '断在split和Spill.get；把recent裁掉半条工具消息，设计断言拒绝孤立结果。', '闭卷解释模型上下文、持久事实与Spill原文三者关系。', '当前轮自己就超预算时拒绝，不截掉工具调用组蒙混过去。', 'compaction/token-meter/spill；本步measure由调用方提供，字符数测试不代表生产token估计。')
-add('通过真实 pi-ai 替换提供方', 'R03', '不改Loop，尝试让同一Part接口接收pi-ai事件。', '安装固定第三方pi-ai，自己写历史转换和事件映射，保留完整assistant replay。默认示例用OpenAI协议测试pi-ai边界，DeepSeek继续走第016步自写的OpenAI兼容适配。', '真正SDK解析固定HTTP流，收到你好、usage、replay和stop；Loop接口完全不变。', '断在context与done；删replay后下一轮provider私有字段将无法恢复，添加对应断言。', '合上材料说出SDK替你处理什么、Harness仍负责什么。', '固定HTTP停止原因改length，应返回length而非stop。', 'llm-pi-ai 完整提供方接入的基础；其他API通过注册对应SDK stream函数，不能把单个协议示例记为所有provider已等价。', 'bun install --ignore-scripts\nbun test ./tests/020-pi.test.mjs')
+add('把PiModel接进Routes，仍调用DeepSeek跑通工具续轮', 'R03',
+    '先画两条链：Loop经手写DeepSeekModel访问模型，以及Loop经PiModel和pi-ai访问模型。假设远端仍是DeepSeek，指出究竟替换了哪层，再对照本步固定HTTP测试。',
+    'pi-ai是访问模型的SDK，DeepSeek是远端模型服务。新增pi-demo真正向Routes注册PiModel，Agent持有Routes；SDK承担HTTP和流解析，Harness仍拥有Loop、工具与会话。先跑固定HTTP贯通，再沿用016的.env加--live请求DeepSeek；只有显式live才访问网络。',
+    '新CLI入口实际走通两次模型请求和一次sum执行，第二次历史含SDK replay、推理及关联工具结果，最终5、completed，清理后路由/工具/监听归零。自动测试运行固定HTTP，真实请求以mode=live的独立记录验收。',
+    '用本页020 pi-ai附加配置连接终端启动的pi-demo，断在Routes查找、PiModel.context及done、sum.run和第二次HTTP观察点。确认路由对象是PiModel，远端provider仍是deepseek。下面原有当前测试步骤只调适配器单测，不自动附加到CLI子进程。',
+    '合上材料说清DeepSeek、DeepSeekModel、pi-ai和PiModel各负责什么；解释换SDK为何不一定换模型，以及SDK为何不接管Loop和工具执行。',
+    '先预测删除toolResult回传会在哪一步失败，再在自己的工程临时改坏并运行固定demo，必须由第二次HTTP校验拒绝，恢复后重跑。真实模式缺Key必须失败，不回退固定响应。',
+    'PiModel已经接入独立Routes/Agent入口，并有真实DeepSeek两轮工具链证据。其他协议、提供方、跨适配器旧历史、完整取消和产品发布矩阵仍需专门验收，不把当前样本记为全provider等价。',
+    run='bun install --ignore-scripts\nbun src/pi-demo.mjs\nbun test ./tests/020-pi-demo.test.mjs\nbun test ./tests/020-pi.test.mjs', test='tests/020-pi.test.mjs')
 add('真实文件与观察版本', 'R04', '两次读取相同文件，再用旧版本写入，先预测哪一次应拒绝。', '文件路径、真实链接和内容版本组成读写边界。写后观察失效，下一次修改必须再读；本步只保证同进程串行，不伪称跨进程CAS。', '中文空格路径可写读；旧版本失败；指向工作区外的链接不能读。', '断在realpath和current比较；删版本检查，stale写入测试应失败。', '闭卷画出先读、外部变化、条件写的时序。', '真实创建指向外部目录的链接，在链接下新建文件也必须拒绝。', 'fs seam/observed-version；路径检查不是OS沙箱，TOCTOU仍由更强执行边界解决。')
-add('把唯一替换接入统一工具入口', 'R04', '目标文字出现两次，先决定是否应该替你全替换。', 'read/write/edit是工具消费者，依赖LocalFS契约；schema、观察版本和唯一匹配一起决定能不能修改。', '通过Tools.execute执行真实edit；多匹配拒绝，文件保持x x。', '断在split计数；删掉唯一匹配判断，测试会发现文件被改。', '合上材料写出edit的验证顺序，再指出哪些代码属于Provider。', '删除被读取的文件后编辑，应明确失败，不新建一个同名文件。', 'fs-tools 的edit/str_replace语义。')
+add('文件编辑默认唯一匹配，显式replaceAll才全部替换', 'R04',
+    '文件内容为x x，预测不传replaceAll、传false、传true三次独立编辑的结果。再想一想，全量替换能不能沿用已经写过一次的旧version。',
+    'read/write/edit仍经过统一工具入口。replaceAll是可选boolean，省略或false要求唯一匹配，true允许全部非重叠匹配；空查找串、零匹配和旧版本仍拒绝。新文本按字面构造后只写一次，保留LocalFS的版本与串行化边界。',
+    'edit-demo实际展示默认拒绝、全量成功、旧版本拒绝、重新读后唯一替换。6项文件测试覆盖可选/false兼容、true多处替换、字面$&及删除、错误类型、空串/零匹配及外部修改保护。',
+    '断在file-tools.mjs的版本比较、split后的matches和fs.write。观察同样两个匹配在默认模式被拒绝、true时继续，写后旧version仍被拒绝。实际demo的Bun附加命令和配置见本页。',
+    '闭卷解释为什么replaceAll不能变成必填，为什么全部替换仍需要版本，以及pieces.join如何保留after里的字面$&。',
+    '把before改为不存在的字符串，或把replaceAll改成字符串true，应明确失败且文件不变；恢复后重跑。删除文件后的旧版本编辑仍应失败，不能悄悄新建同名文件。',
+    'fs-tools的统一执行、字符串匹配与版本边界。本步增加显式全量替换；不据此声称支持自动冲突合并、多文件事务或跨进程CAS。',
+    run='bun src/edit-demo.mjs\nbun test ./tests/022-edit.test.mjs')
 add('一次审批只唤醒一次调用', 'R04', '取消一个等待中的问题后，试着用旧ID点允许。', '审批身份和owner共同定位等待对象。先挂pending和取消监听再publish，才能处理同步答复；取消、超时、迟答必须清理同一状态。', '其他会话拒绝，取消后pending清零，迟答失效；同步publish内允许也正常完成。', '断在finish；把pending.delete移到最后，观察双答复是否重复结算。', '闭卷写出审批的创建、答复、取消、过期四条路径。', '两个不同审批交错答复，不得唤醒错误Promise。', 'interaction/user-approval 的关联和清理。')
 add('所有工具执行前都过权限门', 'R04', '把读写工具分别放在read-only下，尝试找到绕行入口。', '效果read/write/execute/network和会话策略共同决策。权限事实先记录，等待审批后再次检查signal；OS confinement仍另有执行边界。', '拒绝write后计数为0；只读策略在执行之前拒绝；日志记录决策。', '断在Tools.guard与审批返回处；直接调用run会绕过守卫，正式入口不能这么做。', '闭卷解释审批允许后为什么还要检查signal。', '在允许按钮与真实执行之间取消，工具副作用不得开始。', 'permission-presets、user-approval和执行守卫分层。')
 add('运行真实进程并收回进程树', 'R04', '执行退出码3的程序，区分成功启动和成功执行。', 'Subprocess接受显式Spec与argv，输出、超时、取消、进程树由提供方负责；不通过shell字符串拼接。', '真实code3和ok被保留；100KB输出被拒绝；等待程序可超时和取消。', '断在spawn、stop、close；删掉signal监听，取消场景会等超时。', '闭卷讲出发SIGTERM与真正收到close的区别。', '创建子进程的程序被取消后，在目标OS核对整个树已退出。', 'subprocess-local 的Spec与进程生命周期；Windows进程树需要真实目标机验收。')

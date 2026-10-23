@@ -12,11 +12,11 @@
 | G04 Inbox 与输入调度 | 两个目的地、队列编辑删除、下一轮调度；009,013,049–050 | 崩溃后的认领/执行恢复、原版代次与完整durable splice语义 |
 | G05 Loop 扩展点、重试尝试和并发 | 循环、取消、并发屏障、有限重试；012–014,018 | 全部拦截/driver接口、attempt重放、所有持久化失败与并发边界 |
 | G06 原生 DeepSeek 适配 | OpenAI兼容Chat Completions、工具参数分片、推理回传；独立Files缓存示例；015–017 | 原版Messages/推理签名对齐、图片与Files协议接入、系统/工具更新、Files配额回收与真API样本 |
-| G07 pi-ai 提供方与鉴权 | 真实pi-ai边界、路由、刷新single-flight；018,020 | 全provider/API/目录/OAuth/UI接线及原版opaque replay契约 |
+| G07 pi-ai 提供方与鉴权 | PiModel/Routes/Agent接线、真实DeepSeek工具续轮、鉴权前刷新single-flight；018,020 | 全provider/API/目录/OAuth/UI接线及原版opaque replay契约 |
 | G08 Token、上下文压缩和 Spill | 可见历史副本压缩、Spill完整性；019 | replay-aware token-meter、自动摘要接线、图片卸载、原版压缩契约 |
 | G09 日志格式、Checkpoint、恢复与迁移 | 真实JSONL、锁、恢复、代次发布；006–007,041 | 原版V4 writer/相邻历史迁移/zstd/generation/checkpoint格式与关系校验 |
 | G10 会话产品管理与检索 | fork、冷列表、归档、重命名、FTS和ZIP；008,041,066 | 原版完整lineage、分页/检索/ZIP互操作和历史数据接纳 |
-| G11 文件工具与编辑语义 | 先读后改、唯一替换、链接拒绝、文件面板；021–022,050 | 原版所有文件操作、glob/grep、图片、跨进程/远端版本保证与TOCTOU补强 |
+| G11 文件工具与编辑语义 | 先读后改、默认唯一/显式全量替换、链接拒绝、文件面板；021–022,050 | 原版所有文件操作、glob/grep、图片、跨进程/远端版本保证与TOCTOU补强 |
 | G12 进程、Shell 与持久终端 | 真实进程树、Bash、PTY、输出游标；025–027 | Pwsh、完整进程读取Spec、终端UI/所有权/平台策略及协议 |
 | G13 OS 沙箱与远程 SSH | Seatbelt/bwrap Spec、SSH读写/执行边界；028–029 | 真实OS效果验证、Windows ACL/Landlock、完整远端提供方成套契约 |
 | G14 权限策略与人机交互 | 审批一次结算、迟答失效、预设、ACP反向审批；023–024,046,049 | ask_user_question、计划评审、人机命令目录、完整预设与重连语义 |

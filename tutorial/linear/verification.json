@@ -1,75 +1,192 @@
 {
   "bun": "1.3.14",
-  "project": "/private/tmp/harness-own-bun-r0fuc84j",
+  "project": "/private/tmp/harness-own-bun-qd3jmykr",
   "steps": [
     {
       "step": "000",
       "implementationHash": "1722c7d648e58e95407b56e85691f3e5a49e2fd02ab84464ffb2060c50a75c22",
       "exitCode": 0,
-      "seconds": 0.05,
+      "seconds": 0.028,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "001",
       "implementationHash": "6ca4cf11ea8ed1e3300a1d85c9f4e7abda31b102ac38b4ae77fe9e02eff64c42",
       "exitCode": 0,
-      "seconds": 0.044,
+      "seconds": 0.025,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "002",
       "implementationHash": "defaa100e34237793c90f343ce8c5a5b2f9482fc3fe89899ef5b60a797998aaa",
       "exitCode": 0,
-      "seconds": 0.049,
+      "seconds": 0.025,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "003",
       "implementationHash": "493f5d936775b7e08160c087982483cd2cc0ea351432f37a1a687d703d1797ba",
       "exitCode": 0,
-      "seconds": 0.055,
+      "seconds": 0.027,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "004",
       "implementationHash": "1d1d1de4b25915d1a31fefc224bb1a66d1b9fc21e5e763aebd24fbc3e1dd15a3",
       "exitCode": 0,
-      "seconds": 0.047,
+      "seconds": 0.028,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "005",
       "implementationHash": "52e55c7d920893a846a083f9c4cc2657b0964c0d4948721f7a272826984a54d9",
+      "exitCode": 0,
+      "seconds": 0.032,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "006",
+      "implementationHash": "21c1512390ac9763d58402f345926f4c59e4219ee49a1cd5fe21cbd13f5deeb9",
+      "exitCode": 0,
+      "seconds": 0.033,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "007",
+      "implementationHash": "945a317bed9765e4791dcbd23c366966936776d28f1eb7f62b26aed3c9d649d1",
+      "exitCode": 0,
+      "seconds": 0.034,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "008",
+      "implementationHash": "78d6e022c17cf44638fa995d298514ed5f4dbb83daa300f2f6ea399eb999274e",
+      "exitCode": 0,
+      "seconds": 0.034,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "009",
+      "implementationHash": "a3c96ff38828cb3c029cc475f890039c79d36de81fd171066032ef7fa6b2a913",
+      "exitCode": 0,
+      "seconds": 0.035,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "010",
+      "implementationHash": "d2b5c892b5a7578ece257859dc4844a10559e47a92b8393b95596ba55e52446f",
+      "exitCode": 0,
+      "seconds": 0.035,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "011",
+      "implementationHash": "b8616830e957cd7ec6db877ddfa50de1962fe70851876ad747111fd7362c2b0e",
+      "exitCode": 0,
+      "seconds": 0.036,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "012",
+      "implementationHash": "a4d05aa322ba2fe4ee8d3c1d7bccae7d9dd6febe374db343c68496d01990ee99",
+      "exitCode": 0,
+      "seconds": 0.037,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "013",
+      "implementationHash": "7b882afe689a8c499483cb19ac1c7ef70df2ee57a1fc923539c01dac2c020b3f",
+      "exitCode": 0,
+      "seconds": 0.039,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "014",
+      "implementationHash": "57988f624981dc728308d7781340d00bb0ce8e9e9ef46cebc45215de291ecdee",
       "exitCode": 0,
       "seconds": 0.058,
       "command": [
@@ -77,77 +194,12 @@
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
-      "step": "006",
-      "implementationHash": "21c1512390ac9763d58402f345926f4c59e4219ee49a1cd5fe21cbd13f5deeb9",
-      "exitCode": 0,
-      "seconds": 0.05,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "007",
-      "implementationHash": "945a317bed9765e4791dcbd23c366966936776d28f1eb7f62b26aed3c9d649d1",
-      "exitCode": 0,
-      "seconds": 0.06,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "008",
-      "implementationHash": "78d6e022c17cf44638fa995d298514ed5f4dbb83daa300f2f6ea399eb999274e",
-      "exitCode": 0,
-      "seconds": 0.056,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "009",
-      "implementationHash": "a3c96ff38828cb3c029cc475f890039c79d36de81fd171066032ef7fa6b2a913",
-      "exitCode": 0,
-      "seconds": 0.065,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "010",
-      "implementationHash": "d2b5c892b5a7578ece257859dc4844a10559e47a92b8393b95596ba55e52446f",
-      "exitCode": 0,
-      "seconds": 0.059,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "011",
-      "implementationHash": "b8616830e957cd7ec6db877ddfa50de1962fe70851876ad747111fd7362c2b0e",
+      "step": "015",
+      "implementationHash": "1c954e39c57d437ab9a2898e7664bc51bf0c57b2a767bac7ff3469b071aac9a3",
       "exitCode": 0,
       "seconds": 0.062,
       "command": [
@@ -155,12 +207,12 @@
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
-      "step": "012",
-      "implementationHash": "a4d05aa322ba2fe4ee8d3c1d7bccae7d9dd6febe374db343c68496d01990ee99",
+      "step": "016",
+      "implementationHash": "20d247e841a5de311a47285450bd7103325b21982002d283e14a4426cde7cc0b",
       "exitCode": 0,
       "seconds": 0.065,
       "command": [
@@ -168,207 +220,142 @@
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "013",
-      "implementationHash": "7b882afe689a8c499483cb19ac1c7ef70df2ee57a1fc923539c01dac2c020b3f",
-      "exitCode": 0,
-      "seconds": 0.115,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "014",
-      "implementationHash": "57988f624981dc728308d7781340d00bb0ce8e9e9ef46cebc45215de291ecdee",
-      "exitCode": 0,
-      "seconds": 0.082,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "015",
-      "implementationHash": "1c954e39c57d437ab9a2898e7664bc51bf0c57b2a767bac7ff3469b071aac9a3",
-      "exitCode": 0,
-      "seconds": 0.086,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "016",
-      "implementationHash": "20d247e841a5de311a47285450bd7103325b21982002d283e14a4426cde7cc0b",
-      "exitCode": 0,
-      "seconds": 0.103,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "017",
       "implementationHash": "4ea84ed0619999e566079af47d4ce1ad7b14fad708aebed34c82cec9a5bb63b4",
       "exitCode": 0,
-      "seconds": 0.109,
+      "seconds": 0.065,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "018",
       "implementationHash": "29aa218a34fe160201c2df853591da985a85a7a247cee1ae9fbc1da64859e2b0",
       "exitCode": 0,
-      "seconds": 0.177,
+      "seconds": 0.128,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "019",
       "implementationHash": "976ef8e63f61f8919efd4b32e06315a8d445350472e67a574eabb27a9cb3f354",
       "exitCode": 0,
-      "seconds": 0.183,
+      "seconds": 0.129,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "020",
-      "implementationHash": "8d56331efe0c231f99ae1edd031f1b3424edcb253907ab0a98b848490734980d",
+      "implementationHash": "603d644f9796c0a2e28129500a59495893cf0c981a1b3a50584adb1e2374a6b6",
       "exitCode": 0,
-      "seconds": 0.31,
+      "seconds": 0.336,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "021",
-      "implementationHash": "ef0ea9242552a12b8ac1d7b0dc8771cae1b6abe4bc2e94940236714e226d00cb",
+      "implementationHash": "e4769a0f90d9733789dd7b39020981d0647f16a139cfb93c003510b461958c9a",
       "exitCode": 0,
-      "seconds": 0.288,
+      "seconds": 0.328,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "022",
-      "implementationHash": "8b4dcf81e6127755c55064749c1c58bcb4f4b414471472eb3f37cf433479d7a5",
+      "implementationHash": "58e174e9f54ab56132f674e6a622041ae394e5823819ff10d2c0d11ed03f1885",
       "exitCode": 0,
-      "seconds": 0.28,
+      "seconds": 0.334,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "023",
-      "implementationHash": "d7d9af553c1fea0ea7b9cf06de2e992077b8af3f0d732dc1fa5294ce0b2e2274",
+      "implementationHash": "6eb81686be70b73cd285479b9c361b8d47d3d28031afb2f8e05219efb96f53fb",
       "exitCode": 0,
-      "seconds": 0.278,
+      "seconds": 0.346,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "024",
-      "implementationHash": "6efd35b6d376c78c18440511761ac12be287048eb395bad9907d592212468a34",
+      "implementationHash": "c361f647976f24eff7e1c0817e4382d909d0a73c75beb36b31867091ad50f6d8",
       "exitCode": 0,
-      "seconds": 0.278,
+      "seconds": 0.335,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "025",
-      "implementationHash": "d65aa838d632af8d2b9b619fae26c9b4cc56842e5c8b33fb3f5efd8785bbb6fb",
+      "implementationHash": "b7dd4c439ecdc7703a6d659c74bc1c9b76bbdbcc7a5f71f09bc64a4b2b8723f4",
       "exitCode": 0,
-      "seconds": 0.375,
+      "seconds": 0.391,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "026",
-      "implementationHash": "71658fa2c02f0977c1ddff2cb88fef5b90c55652abd48c069dbf6d7a3f67a4f4",
+      "implementationHash": "3df7d5bf792c8e38637159a4a4cc42479c6463bb186714f9dffc34fe55ffe50f",
       "exitCode": 0,
-      "seconds": 0.376,
+      "seconds": 0.423,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "027",
-      "implementationHash": "eb586591f50aa801a6e5a11a2f53774ea064c07d15457d482c71a62eeb046813",
-      "exitCode": 0,
-      "seconds": 0.511,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "028",
-      "implementationHash": "9ee305ba3901967d0e44dc959a712e6f7cd0d20e199d7732c7e827f56d37a58d",
+      "implementationHash": "28558e7e6275d0e7026e45eb86c5e963421ccd0cacbc68a8cce4d6c89f10a292",
       "exitCode": 0,
       "seconds": 0.492,
       "command": [
@@ -376,129 +363,129 @@
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "028",
+      "implementationHash": "ca263177f44abdd0732c3bc5c951c367437c54ab266067053d1ee27b0ef374ff",
+      "exitCode": 0,
+      "seconds": 0.496,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "029",
-      "implementationHash": "7396f8933c11111f594661d8ffce2430088053a585902c313326903f01fd5655",
+      "implementationHash": "5f22e69f8d765cd4491553cce2c711f47f4b7cf8dc0059d62448cca6dce6a2c3",
       "exitCode": 0,
-      "seconds": 0.498,
+      "seconds": 0.509,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "030",
-      "implementationHash": "c1837b48876b2eb3518ed499b514fc3d1207dc9758fd00cee71ec6a3fed3b2c7",
+      "implementationHash": "4bdbda079774b89ca9bebe1b7c75e8e77326844cfffd9e15c0a2ddaa3c8d1cd2",
       "exitCode": 0,
-      "seconds": 0.499,
+      "seconds": 0.504,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "031",
-      "implementationHash": "7fd5409b79f2d27fff31b2d01c798680bd25cfc8c52dbef8db6a127fe46adcc2",
+      "implementationHash": "064a2100709cd536371702ae9b1292fce2f5f76008e5864fc3bbd96d76fab265",
       "exitCode": 0,
-      "seconds": 0.54,
+      "seconds": 0.508,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "032",
-      "implementationHash": "6304541688953924fcd93482e34a7e35903bc809361344d535477897858e5733",
+      "implementationHash": "9df7d9902fa571d1988b3f09d4072ef39e34073ca715a00607297dd55b3bca3e",
       "exitCode": 0,
-      "seconds": 0.451,
+      "seconds": 0.511,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "033",
-      "implementationHash": "9ed1d951220f7ff0a00e85a330cf0c694e44b8d673c96ae218d4b20e364c7cb0",
+      "implementationHash": "a211a1978c59d4d4594a7c05501a5b452c8e6f87fbf36781d438739c1953f034",
       "exitCode": 0,
-      "seconds": 0.612,
+      "seconds": 0.617,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "034",
-      "implementationHash": "2b5ed6e455eb19aeef9ce570c2ac576cda34f866a5fd90a55ea62b695cf16110",
+      "implementationHash": "460aed62e767350d2d4dccfca2f9bbd8b79d913a9edddf5cd9f3146f3e05878c",
       "exitCode": 0,
-      "seconds": 0.595,
+      "seconds": 0.613,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "035",
-      "implementationHash": "ccd085dc42274e4e703bb08b9245a38bd45a7c6a0eb28015fdf2834d4cf7646f",
+      "implementationHash": "0fc2d67bfa695c746dd1965277d67ca146172a7c7328d47fc3987675ffa254d3",
       "exitCode": 0,
-      "seconds": 0.612,
+      "seconds": 0.632,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "036",
-      "implementationHash": "c3cecd2b551d73eb3fda885666dea8c93fe83812b2a4513a1438168aaea7721f",
+      "implementationHash": "695f76f22d3ee4d74c47752711cee075203fb46b2d2d336b51c0debd182c3bae",
       "exitCode": 0,
-      "seconds": 0.594,
+      "seconds": 0.625,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "037",
-      "implementationHash": "77744c013a829a107082a7d8618797fc484a3f2413de69d919a97926a56955fe",
-      "exitCode": 0,
-      "seconds": 0.591,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "038",
-      "implementationHash": "3a1a03b7a8f9bc391e3208ca6af8846275977dadc56c93b63187be732e7b319e",
+      "implementationHash": "4412e517b1e1e1731a42bcc06aec67dd01865ea0d93e6e84914dd3012bcd08b1",
       "exitCode": 0,
       "seconds": 0.634,
       "command": [
@@ -506,12 +493,90 @@
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "038",
+      "implementationHash": "e0c965b95f14e4f29944dd17928dd99b0c0f3f77503a7102c5bcd45d17d4e610",
+      "exitCode": 0,
+      "seconds": 0.619,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "039",
-      "implementationHash": "51f65c9c0818459e540e0d8cd99218d1016fff669cb9443b4b2b385ed715cf08",
+      "implementationHash": "a9cb22a3fbef346f8128b33108108a5d426b91172fbe494aa0037592715ef5f1",
+      "exitCode": 0,
+      "seconds": 0.631,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "040",
+      "implementationHash": "9ffb63d4860c03d9431eafda90624edf6e62605842a3ee070f20bde81f295f39",
+      "exitCode": 0,
+      "seconds": 0.626,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "041",
+      "implementationHash": "0944a43aa8adef4068faa9c3d906156ebe3b1f68e7d99dc170d81cbb9818a90d",
+      "exitCode": 0,
+      "seconds": 0.632,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "042",
+      "implementationHash": "4738cab96b922d3dc5e59dac959469ad2717c33074402f5926a995c1590afcad",
+      "exitCode": 0,
+      "seconds": 0.634,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "043",
+      "implementationHash": "29360322174f1e8284f5f396e73747a9fec331d76ccc9adde8243e90c34bc3c1",
+      "exitCode": 0,
+      "seconds": 0.639,
+      "command": [
+        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
+        "test",
+        "./tests"
+      ],
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
+      "role": "independent-tutorial-implementation"
+    },
+    {
+      "step": "044",
+      "implementationHash": "0ed2ec5af0245588197d075439b68f70dac092e348875fabc33fe33d7ef7c25b",
       "exitCode": 0,
       "seconds": 0.658,
       "command": [
@@ -519,397 +584,332 @@
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "040",
-      "implementationHash": "ee4cb467c1a6ba16699345cc0756286fa101b5899d318402a39bd222bfac44eb",
-      "exitCode": 0,
-      "seconds": 0.618,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "041",
-      "implementationHash": "f2def88857843f19b19d14ccc6f7264812efa15387edde2e1863375a6297bedb",
-      "exitCode": 0,
-      "seconds": 0.588,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "042",
-      "implementationHash": "4c0be1f62551e8bc23c6917b55aaa6306d86f054cf039d0425746e5cb7ad6552",
-      "exitCode": 0,
-      "seconds": 0.559,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "043",
-      "implementationHash": "db7152f96b671167813ecda0b3f97b030b15b2b654819e7b3ca47f51648f9f28",
-      "exitCode": 0,
-      "seconds": 0.587,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
-      "role": "independent-tutorial-implementation"
-    },
-    {
-      "step": "044",
-      "implementationHash": "987479513c52f7066abe0d2051af2311356d93210d4ed66c325d9c3e508ce3a3",
-      "exitCode": 0,
-      "seconds": 0.634,
-      "command": [
-        "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
-        "test",
-        "./tests"
-      ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "045",
-      "implementationHash": "95c9362c040d26ce01afb58c91092ebe2c4334864a46d769a43b97e412366af4",
+      "implementationHash": "5daa1474eee9514781264f6ae889728c2c1ef36d070215df6a01a547e79fa5af",
       "exitCode": 0,
-      "seconds": 0.693,
+      "seconds": 0.716,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "046",
-      "implementationHash": "59a7b7e4ccba9b54ab940bc9ea3a9dc1ee770c56bbd62d1c450830cad88bae6a",
+      "implementationHash": "8694b11def3041e6ac9cc50d0908615bcedf5a86824248e5ad1c23ab62654cb5",
       "exitCode": 0,
-      "seconds": 0.849,
+      "seconds": 0.835,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "047",
-      "implementationHash": "57524a4a4bef16516238ba438aa36b8d813cf08aa037fec28fe957e4060fa8b1",
+      "implementationHash": "aa1620ba6244b820ca1046fba8cab18ed0bef71ee90b8d5a7bde02549b2aa9e5",
       "exitCode": 0,
-      "seconds": 0.828,
+      "seconds": 0.838,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "048",
-      "implementationHash": "dae70cb9b8d9633c012c6a398404301348aa572e8c7137f9578e4d74d69f93f1",
+      "implementationHash": "d31ea4c48225e1ae1b64eb1f83a36c3c74799119b304ac2710453f042f431116",
       "exitCode": 0,
-      "seconds": 0.875,
+      "seconds": 0.835,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "049",
-      "implementationHash": "c23f805f932265d6e88e42a63f2addc355c31bf276024993359a030e04e2a9f9",
+      "implementationHash": "7376e4b6e7623d26294c85fb684261d33fb3e723b9ba89849a43a719bfbdc2b5",
       "exitCode": 0,
-      "seconds": 0.938,
+      "seconds": 0.844,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "050",
-      "implementationHash": "41401784bf80394ffd55a1d6910d91fb2c5a6850842d5b488d32726fb1bb0ead",
+      "implementationHash": "04c37778ed4fe05f0cead126f094247ba1a717e7b0ee892e19fde05f8fcb94ab",
       "exitCode": 0,
-      "seconds": 0.979,
+      "seconds": 0.838,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "051",
-      "implementationHash": "b204c06feb358e61d9f155319d69853667342b27ac29d8ecdf9695b49640107c",
+      "implementationHash": "773dbfee731de29c49d3c2e63a9066cbbbecd71f15fdabc57d1dba933668aa76",
       "exitCode": 0,
-      "seconds": 0.886,
+      "seconds": 0.863,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "052",
-      "implementationHash": "008299f0718ae1b861900417b13ff34a72172e0473f502f16867325e79cb8419",
+      "implementationHash": "4ead2598afc0b23a108f603475d2dde0eb2aa8a6f511c86abd3d03c23f3eb9c4",
       "exitCode": 0,
-      "seconds": 0.79,
+      "seconds": 0.842,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "053",
-      "implementationHash": "52fb72597159f059069715baf05b9c7cab8ff36fedd8bd6a3020dbb88117dcbf",
+      "implementationHash": "cc6c5eca8d710daaae8c678fd4a3d1e642f9b674c9247f2d9c1382d6df8d5f6f",
       "exitCode": 0,
-      "seconds": 0.823,
+      "seconds": 0.843,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "054",
-      "implementationHash": "712d2118e79a14e83ff584d3c4596c36a66f1703d2de49cb94893e63530482e7",
+      "implementationHash": "ca5df831ba6f4ff6342a7f5fd99d55636a2eca0fa01afc974c0789bb8c357c5f",
       "exitCode": 0,
-      "seconds": 0.865,
+      "seconds": 0.85,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "055",
-      "implementationHash": "347f693969c5def5cc6ce408464e7aad1b0bdd3bfc334a5c08cf3c0584c4ac3c",
+      "implementationHash": "7eda2a186a028d6103efef752cb2a4be34903273ee2cf753cfe69a9c9c0c4e61",
       "exitCode": 0,
-      "seconds": 0.83,
+      "seconds": 0.862,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "056",
-      "implementationHash": "58bec7e1a3c26eb4a84486d79f39300535b22757396b1c0231afe22307c98323",
+      "implementationHash": "c4b1d396b1b4cee8b022b3869f20775843ccf4444fb736fb4009c073b2baeb36",
       "exitCode": 0,
-      "seconds": 0.799,
+      "seconds": 0.884,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "057",
-      "implementationHash": "86bb86960240b03b2fb987922888c4a86b08ceb78c998cdaaed96bfb1bcb4e67",
+      "implementationHash": "cb93795d78438978fda19b786e01cc01c24e692e54cf0af868182fcc994be354",
       "exitCode": 0,
-      "seconds": 0.898,
+      "seconds": 0.862,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "058",
-      "implementationHash": "571a273b459a52d8e89a255ba3e4a2599c094f5790288eb8a23e358fb6d196d8",
+      "implementationHash": "db2ab3e2ffdad1001dec46aebdd6c6c18a4cc15a7139b77cf8774cab00e16c13",
       "exitCode": 0,
-      "seconds": 0.853,
+      "seconds": 0.871,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "059",
-      "implementationHash": "19aac389c00cea73e885aae71c1e383300887594bdc1fff69abd5f75e71da661",
+      "implementationHash": "9cabcec73e341cf3f5c658df55498db882f38a757fed721e801203dbe2a74ee1",
       "exitCode": 0,
-      "seconds": 2.018,
+      "seconds": 2.296,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "060",
-      "implementationHash": "2b24f823b1d30abe28aeb706eb07f41fa8f63f2e691a57c7a0daa27145aae487",
+      "implementationHash": "28ef8351ad2f160ede3f9d1ed38755502b664f9445c01d8a35ca8ea3c4dcdd57",
       "exitCode": 0,
-      "seconds": 1.552,
+      "seconds": 1.447,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "061",
-      "implementationHash": "029260390def330c838f0e0cd63cc37467dd9e0ab6763a364b796c95602f672f",
+      "implementationHash": "3bedf0d67cb2620984522a9bac67afbad4485bae30965c7e5610aaa6d4290607",
       "exitCode": 0,
-      "seconds": 1.598,
+      "seconds": 1.424,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "062",
-      "implementationHash": "ffddeb217af221d5b72d6408c7253db9ffc54caac02442b1dbfd9814b2e34a1e",
+      "implementationHash": "a3f856b32cebab5ee7975d5e18033abf085c305ead98e2edec1bdc532f801d88",
       "exitCode": 0,
-      "seconds": 1.558,
+      "seconds": 1.45,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "063",
-      "implementationHash": "ee127459cc5ca923e722b47bb5be4e66d02c84b6b44de490f78db82072b15405",
+      "implementationHash": "8a4bceb42709af97d15cf52ec88955f04e40d8ae5f020d69bfe6ab873e44ccfd",
       "exitCode": 0,
-      "seconds": 1.636,
+      "seconds": 1.449,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "064",
-      "implementationHash": "51e935dc0d1f0d204683adfb22161e0e2ab7e1de7cf78f39f7a6a99d6dad1e65",
+      "implementationHash": "5214f47219679cdb97498071e2b4bb4c986da57d85755631d74bb2d67f87350f",
       "exitCode": 0,
-      "seconds": 1.67,
+      "seconds": 1.453,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "065",
-      "implementationHash": "9a09032bf7313d2a6a2089314a374c481e4adafa116ee52f21b24319da991447",
+      "implementationHash": "132702f7f7185a23b3a2ec931ac8179ede69e89f81bf37589e102414bf56613f",
       "exitCode": 0,
-      "seconds": 1.564,
+      "seconds": 1.468,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "066",
-      "implementationHash": "23a6f5a3b91e0c0de20d32582875e8056e9628277d185fbb8155b7559b1e164f",
+      "implementationHash": "98c11bfc3e96632b8852515bc2951575638b60fdcc8b57e8242a94d66f239876",
       "exitCode": 0,
-      "seconds": 2.259,
+      "seconds": 1.737,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "067",
-      "implementationHash": "7f4cc5b14cfb1ca69bad56f40945137e2b0c801bf4eac15664bd12ed0189e7fa",
+      "implementationHash": "59f90dde0f229bf92b4d2288e387c543877f77c3afb64390de2439e988908605",
       "exitCode": 0,
-      "seconds": 2.117,
+      "seconds": 1.993,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "068",
-      "implementationHash": "16e523a2f4fb3459e8bd0f8f1444b73999579eef0f99affbcd2003cfe293147c",
+      "implementationHash": "7fd31922a3d766ee874e4e4fdbbbc644a166b346d804ee9624d857a9b1648114",
       "exitCode": 0,
-      "seconds": 3.136,
+      "seconds": 2.659,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     },
     {
       "step": "069",
-      "implementationHash": "785596e51b216f6d71d7e1785572ae807aafd7c7890bac1fd59b09dc44dd1c92",
+      "implementationHash": "132294b23f1dcf7034c8f450b4a1d779ab5501768a0a6e8ca13ed533a075aa4f",
       "exitCode": 0,
-      "seconds": 3.027,
+      "seconds": 2.624,
       "command": [
         "/Users/yhding/.bunvm/versions/bun-1.3.14/bin/bun",
         "test",
         "./tests"
       ],
-      "project": "/private/tmp/harness-own-bun-r0fuc84j",
+      "project": "/private/tmp/harness-own-bun-qd3jmykr",
       "role": "independent-tutorial-implementation"
     }
   ]

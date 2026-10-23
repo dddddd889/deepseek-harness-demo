@@ -1,12 +1,12 @@
 # Bun 验证记录
 
-日期：2026-10-23。环境：macOS ARM64、Bun 1.3.14。独立工程：`/private/tmp/harness-own-bun-r0fuc84j`。从新空目录逐步叠加自己的实现，没有覆盖学习者工程，没有导入原版产品实现，也没有自动提交。
+日期：2026-10-23。环境：macOS ARM64、Bun 1.3.14。独立工程：`/private/tmp/harness-own-bun-qd3jmykr`。从新空目录逐步叠加自己的实现，没有覆盖学习者工程，没有导入原版产品实现，也没有自动提交。
 
 ## 逐步运行结果
 
 [verification.json](verification.json) 记录了 000～069 共 **70 个检查点**，全部 exit=0。每步运行当时累计的 `bun test ./tests`；引入依赖时用 Bun 独立安装，最后一次完整复验使用固定 Bun 锁文件和 `--frozen-lockfile --ignore-scripts`。未借用原版 node_modules。各检查点源码 hash 与当前增量、实际累计工程一致。
 
-最终累计 **79 项测试通过，0 项失败**，未使用 skip/todo 跳过验收。见[最终测试日志](evidence/final-test-summary.txt)。这些是课程具体行为的证据，不是原版全功能等价证明。
+最终累计 **86 项测试通过，0 项失败**，未使用 skip/todo 跳过验收。见[最终测试日志](evidence/final-test-summary.txt)。这些是课程具体行为的证据，不是原版全功能等价证明。
 
 实际执行包括：文件版本与越界拒绝、日志恢复、资源清理、并发与取消、真实子进程、持久 Bash、Bun 原生 PTY、真正 pi-ai/MCP/ACP SDK、Python 启动 Bun Host、认证 HTTP/WebSocket、Bun SQLite FTS、ZIP 与通过 Bun 执行 TypeScript 编译器的类型消费者。
 
@@ -47,6 +47,24 @@ python3 tutorial/linear/verify.py --install
 CLI集成测试实际启动同一演示入口检查上述行为，原有Routes与RefreshToken测试保留。另外仅在临时工程将pending ??=改成pending =、将模型key改回过期凭据，两种错误均被demo拒绝，随后恢复临时源码；见[反向验收记录](evidence/018-oauth-negative-checks.json)。018文档提供运行计数和VS Code附加到demo的配置及刷新断点；方法已做静态核对，本次未交互执行该配置，不扩大第000步已有F5证据。
 
 前一轮仅含五个场景时，完整回归曾在第059步遇到现有Chrome测试的5秒启动超时，日志保留在`/private/tmp/harness-own-bun-bafpkjk6/evidence-059.log`。保持断言、源码和超时不变，单独复核通过后重新跑全套；本次加入鉴权刷新后继续从空目录回归，没有跳过浏览器验收。
+
+## 第020步实际通过pi-ai调用DeepSeek
+
+新增`src/pi-demo.mjs`向Routes注册PiModel，并把Routes交给Agent。SDK model.provider仍为deepseek，api为openai-completions，默认模型deepseek-flash；没有使用第016步DeepSeekModel代替SDK执行。PiModel在每轮快照边界传递推理选项、限制请求超时，并关闭SDK内部重试，将有限重试留给Routes。
+
+仅叠加000～020并按固定Bun锁独立安装依赖的工程`/private/tmp/harness-pi-020-tbrp2h3x`先通过默认固定HTTP演示：真实SDK拼接工具参数，Tools真实计算2加3，第二次请求检查tool_call_id、工具结果及reasoning_content，最终5、completed，路由/工具/监听归零。新增两个CLI测试验证完整流程和--live缺Key拒绝，不拿离线成功替代真实模式。
+
+随后使用学习者练习工程已有.env配置，在该独立工程实际运行--live，经Routes→PiModel→pi-ai向DeepSeek发送两次HTTP，sum仅执行一次，最终返回5；请求历史关联、推理字段回传、两条pi replay和退出清理均通过。见[真实模型验收摘要](evidence/020-pi-live.json)。没有覆盖学习者源码或.env，没有将Key、鉴权头或推理正文写入证据。真实模型调用单独执行一次，不进入自动化测试批量运行。
+
+020文档已补齐两条调用链、注册位置、离线后真实运行的顺序、验收标准及Bun attach调试配置。新attach方法按已使用的Bun字段做静态核对，本次未交互执行该配置；不扩大已有第000步F5记录。当前例子不维护模型价格，SDK中的零成本系数是占位，不能当成真实费用；也不宣称所有提供方、历史迁移、完整取消矩阵或发布资格通过。
+
+## 第022步显式全量替换
+
+edit新增可选布尔参数replaceAll：省略或false仍要求唯一匹配，仅true允许替换全部非重叠字符串匹配。空before、找不到内容、参数类型错误及旧版本均拒绝；after中的$&保持字面值，空after可删除内容。替换结果通过原有LocalFS版本检查一次写入，不扩大为跨进程CAS保证。
+
+在仅叠加到022的独立工程`/private/tmp/harness-edit-022-9vnfbpu2`运行`bun src/edit-demo.mjs`，实际验证默认拒绝x x、全量改成y y、拒绝旧版本、重新读取后唯一替换为z y，并清理临时文件。见[022演示原始输出](evidence/022-edit-demo.txt)。6项真实文件测试覆盖默认兼容、全量替换、字面量与删除、参数类型、空值与无匹配、版本冲突；完整000～069回归全部通过。
+
+022文档已补齐具体调用、运行命令、验收结果及VS Code attach配置。调试配置做静态核对，本次未交互执行该配置。
 
 ## VS Code Debug 的真实验证
 

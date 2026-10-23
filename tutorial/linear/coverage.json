@@ -92,7 +92,7 @@
         "credentials"
       ],
       "steps": "018,020",
-      "implemented": "真实pi-ai边界、路由、刷新single-flight",
+      "implemented": "PiModel/Routes/Agent接线、真实DeepSeek工具续轮、鉴权前刷新single-flight",
       "remaining": "全provider/API/目录/OAuth/UI接线及原版opaque replay契约",
       "parity": "incomplete"
     },
@@ -142,7 +142,7 @@
         "fs"
       ],
       "steps": "021–022,050",
-      "implemented": "先读后改、唯一替换、链接拒绝、文件面板",
+      "implemented": "先读后改、默认唯一/显式全量替换、链接拒绝、文件面板",
       "remaining": "原版所有文件操作、glob/grep、图片、跨进程/远端版本保证与TOCTOU补强",
       "parity": "incomplete"
     },

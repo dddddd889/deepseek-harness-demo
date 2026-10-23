@@ -1,0 +1,9 @@
+仅叠加000～022的独立工程：/private/tmp/harness-edit-022-9vnfbpu2
+命令：bun src/edit-demo.mjs
+
+演示目录：/private/tmp/edit-022-fTzGy8
+默认多匹配：拒绝；文件仍为 x x
+replaceAll=true：成功；文件变为 y y
+沿用旧版本：拒绝；文件仍为 y y
+重新读取后唯一替换：成功；文件变为 z y
+演示完成，临时文件及工具注册已清理。
