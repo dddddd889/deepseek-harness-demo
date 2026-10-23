@@ -16,6 +16,7 @@ export async function runTurn({ session, model, tools, signal, config = {}, inbo
       const requestId = id('request'), history = messages(session.read()), catalog = tools.catalog()
       session.append('request/start', { turnId, requestId, step, config, messages: history, tools: catalog })
       const calls = [], thinking = []
+      let replay
       let finish
       partial = ''
       for await (const part of model.stream({ messages: history, tools: catalog, config, signal, requestId })) {
@@ -27,12 +28,12 @@ export async function runTurn({ session, model, tools, signal, config = {}, inbo
           calls.push(part)
         }
         if (part.kind === 'usage') session.append('request/usage', { requestId, ...part })
-        if (part.kind === 'replay') session.append('request/replay', { requestId, value: part.value })
+        if (part.kind === 'replay') { replay = part.value; session.append('request/replay', { requestId, value: part.value }) }
         if (part.kind === 'finish') finish = part.reason
       }
       if (!finish) throw Error('模型流提前结束')
       if (calls.length && finish !== 'tools') throw Error('工具组与停止原因不匹配')
-      session.append('message/assistant', { role: 'assistant', content: partial, calls, thinking })
+      session.append('message/assistant', { role: 'assistant', content: partial, calls, thinking, replay })
       partial = ''
       session.append('request/end', { requestId, reason: finish })
       if (finish !== 'tools') { ending = finish === 'stop' ? 'completed' : 'length'; break }
