@@ -24,6 +24,34 @@
       ],
       "cwd": "${workspaceFolder}",
       "runtime": "bun"
+    },
+    {
+      "name": "Bun：035 LSP父测试",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6499/lsp-parent-035"
+    },
+    {
+      "name": "Bun：035 LSP子进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6502/lsp-035"
+    },
+    {
+      "name": "Bun：032当前传输示例",
+      "type": "bun",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "env": {
+        "RPC_DEMO_TIMEOUT_MS": "3600000"
+      },
+      "stopOnEntry": false
     }
   ]
 }

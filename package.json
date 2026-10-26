@@ -8,7 +8,10 @@
   },
   "scripts": {
     "start": "bun src/main.mjs",
-    "test": "bun test ./tests"
+    "test": "bun test ./tests",
+    "rpc:memory": "bun scripts/rpc-pass-through-demo.mjs",
+    "rpc:tcp": "bun scripts/rpc-tcp-demo.mjs",
+    "rpc:ws": "bun scripts/rpc-websocket-demo.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.1.0",
