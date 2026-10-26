@@ -168,3 +168,11 @@ Electron Main 使用 Electron 自带的运行时；领域 Host 改由独立 Bun 
 直接从文档提取新scripts/lsp-lifecycle-demo.mjs与既有完整文件2/4/6/7，在独立临时最小工程用Bun 1.3.14运行，普通与文件日志模式均退出0；用JSON.stringify完整输出first/second，两者都为固定fixture的0:0到0:5。实际日志确认initialize请求1次、definition两次、shutdown1次，4个ID不同，两次定义处理均为同一子PID，didOpen版本1、didChange版本2；另在脚本结束后确认子PID已退出。关闭后小验证确认query拒绝RPC已关闭、open/change不新增通知或发送、重复关闭Scope不重复shutdown。见[客户端生命周期验证记录](evidence/035-client-lifecycle-2026-10-26.json)。
 
 原lab全部内容、7份完整代码、3张图与203份steps源码保留。重新生成、check_docs.py、audit.py与git diff --check通过；本次未修改harness-own、重跑000～069、交互操作VS Code或自动提交。新增示例验收不证明真实TypeScript语义分析，也不证明关闭期间已具备并发门禁。
+
+## 2026-10-26：032不限stdio的三种传输接线
+
+新增032文档补充与三份完整可复制脚本：PassThrough两条内存流交叉接framing，node:net TCP两端各用Duplex socket接framing，Bun WebSocket双方通过JSON.stringify/parse直接连接Peer。明确WebSocket完整消息与底层协议帧的区别、每条消息放一个JSON-RPC对象的应用约定、文本消息限制、Peer.close与传输清理的分工；保留原工具/反向审批、NDJSON与Content-Length全部说明和步骤源码。三份示例仅注册sum等演示方法，没有替换MCP/ACP或047协议，也没有实现完整LSP语义。
+
+直接提取三份代码到独立最小工程，复用原032的rpc.mjs。Bun 1.3.14在默认5000毫秒和调试3600000毫秒预算下共6次运行全部退出0，约16～22毫秒完成；sum为5、未知方法返回错误、关闭或断连拒绝pending、双方pending为0，内存流或socket回收，WebSocket中文文本往返成功。TCP/WebSocket退出后的四个本轮端口均拒连；0预算在三例启动前均被拒绝。当前Bun的服务端error回调通过探针确认首参是Error；stop(true) Promise在本版有不结束情况，示例用两侧close与实际端口回收验收，不靠总期限结束清理。见[三种传输实测记录](evidence/032-transports-2026-10-26.json)。
+
+新增接线图经Mermaid11.12.0解析、独立Chrome渲染和截图目检，文字无越界；VS Code当前文件配置做JSON与预算接线核对，未交互操作界面。重新生成、check_docs.py、audit.py与git diff --check通过，只有032元数据更新，203份steps源码未改；032既有场景内容保留，并补充接收半包与主动切块发送的能力边界。本次没有修改harness-own、重跑000～069或自动提交；未穷尽WebSocket二进制/畸形消息、底层分片、生产流控或重连矩阵。

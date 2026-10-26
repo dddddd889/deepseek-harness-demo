@@ -1,0 +1,218 @@
+{
+  "date": "2026-10-26",
+  "scope": "032文档补充：Peer/framing不限stdio；PassThrough、TCP、WebSocket完整可复制Bun接线示例；未改steps和harness-own，未提交。",
+  "labSha256": "3bd0bac18226d913994c4e3a170c79fd3f52cb41e122c90959eec1fce1dd9b28",
+  "bun": "1.3.14",
+  "runtimeVerification": {
+    "bunVersion": "1.3.14",
+    "project": "/private/tmp/harness-032-transports/project",
+    "sourceRpcPath": "/Users/yhding/ws/github.com/deepseek-harness-demo/tutorial/linear/steps/032/src/rpc.mjs",
+    "sourceRpcSha256": "39c30c1bce7df5ec217ed1caf5c701c786f1dc8338d6e8225f42d90648fb4437",
+    "examples": [
+      {
+        "source": "/private/tmp/harness-032-transports/pass-through.mjs",
+        "script": "scripts/rpc-pass-through-demo.mjs",
+        "codeSha256": "111f6e05e732a7ffa583fde03bad1b1453cba3f52dc4191dfc405bcdf9468cca",
+        "runs": [
+          {
+            "budgetMs": 5000,
+            "exitCode": 0,
+            "elapsedSeconds": 0.016396499999999998,
+            "stdout": "{\"transport\":\"PassThrough\",\"sum\":5,\"unknownMethodRejected\":true,\"pendingRejectedOnClose\":true,\"pending\":[0,0],\"streamsDestroyed\":true}\n",
+            "stderr": "",
+            "checks": {
+              "transport": "PassThrough",
+              "sum": 5,
+              "unknownMethodRejected": true,
+              "pendingRejectedOnClose": true,
+              "pending": [
+                0,
+                0
+              ],
+              "streamsDestroyed": true
+            }
+          },
+          {
+            "budgetMs": 3600000,
+            "exitCode": 0,
+            "elapsedSeconds": 0.016679125000000003,
+            "stdout": "{\"transport\":\"PassThrough\",\"sum\":5,\"unknownMethodRejected\":true,\"pendingRejectedOnClose\":true,\"pending\":[0,0],\"streamsDestroyed\":true}\n",
+            "stderr": "",
+            "checks": {
+              "transport": "PassThrough",
+              "sum": 5,
+              "unknownMethodRejected": true,
+              "pendingRejectedOnClose": true,
+              "pending": [
+                0,
+                0
+              ],
+              "streamsDestroyed": true
+            }
+          }
+        ],
+        "zeroBudgetRejected": true
+      },
+      {
+        "source": "/private/tmp/harness-032-transports/tcp.mjs",
+        "script": "scripts/rpc-tcp-demo.mjs",
+        "codeSha256": "66c6a45e1e027a8e690d129fd144ca3747eb7418789d799dbf0c9a047a50d6c6",
+        "runs": [
+          {
+            "budgetMs": 5000,
+            "exitCode": 0,
+            "elapsedSeconds": 0.021906292000000008,
+            "stdout": "{\"transport\":\"TCP\",\"port\":60191,\"sum\":5,\"unknownMethodRejected\":true,\"pendingRejectedOnDisconnect\":true,\"pending\":[0,0],\"socketsDestroyed\":true,\"serverListening\":false}\n",
+            "stderr": "",
+            "checks": {
+              "transport": "TCP",
+              "port": 60191,
+              "sum": 5,
+              "unknownMethodRejected": true,
+              "pendingRejectedOnDisconnect": true,
+              "pending": [
+                0,
+                0
+              ],
+              "socketsDestroyed": true,
+              "serverListening": false
+            },
+            "portRefusedAfterExit": true
+          },
+          {
+            "budgetMs": 3600000,
+            "exitCode": 0,
+            "elapsedSeconds": 0.021337374999999992,
+            "stdout": "{\"transport\":\"TCP\",\"port\":60194,\"sum\":5,\"unknownMethodRejected\":true,\"pendingRejectedOnDisconnect\":true,\"pending\":[0,0],\"socketsDestroyed\":true,\"serverListening\":false}\n",
+            "stderr": "",
+            "checks": {
+              "transport": "TCP",
+              "port": 60194,
+              "sum": 5,
+              "unknownMethodRejected": true,
+              "pendingRejectedOnDisconnect": true,
+              "pending": [
+                0,
+                0
+              ],
+              "socketsDestroyed": true,
+              "serverListening": false
+            },
+            "portRefusedAfterExit": true
+          }
+        ],
+        "zeroBudgetRejected": true
+      },
+      {
+        "source": "/private/tmp/harness-032-transports/websocket.mjs",
+        "script": "scripts/rpc-websocket-demo.mjs",
+        "codeSha256": "7d398bc84dceb9448cae0ff0f3dd5244b583d7868a29abd9d789c6a98c9d7fe0",
+        "runs": [
+          {
+            "budgetMs": 5000,
+            "exitCode": 0,
+            "elapsedSeconds": 0.021611666,
+            "stdout": "{\"transport\":\"WebSocket\",\"port\":60197,\"sum\":5,\"echo\":\"中文🙂\",\"unknownMethodRejected\":true,\"pendingRejectedOnDisconnect\":true,\"pending\":[0,0],\"clientClosed\":true,\"serverSocketClosed\":true,\"serverStopRequested\":true}\n",
+            "stderr": "",
+            "checks": {
+              "transport": "WebSocket",
+              "port": 60197,
+              "sum": 5,
+              "echo": "中文🙂",
+              "unknownMethodRejected": true,
+              "pendingRejectedOnDisconnect": true,
+              "pending": [
+                0,
+                0
+              ],
+              "clientClosed": true,
+              "serverSocketClosed": true,
+              "serverStopRequested": true
+            },
+            "portRefusedAfterExit": true
+          },
+          {
+            "budgetMs": 3600000,
+            "exitCode": 0,
+            "elapsedSeconds": 0.01863816700000001,
+            "stdout": "{\"transport\":\"WebSocket\",\"port\":60200,\"sum\":5,\"echo\":\"中文🙂\",\"unknownMethodRejected\":true,\"pendingRejectedOnDisconnect\":true,\"pending\":[0,0],\"clientClosed\":true,\"serverSocketClosed\":true,\"serverStopRequested\":true}\n",
+            "stderr": "",
+            "checks": {
+              "transport": "WebSocket",
+              "port": 60200,
+              "sum": 5,
+              "echo": "中文🙂",
+              "unknownMethodRejected": true,
+              "pendingRejectedOnDisconnect": true,
+              "pending": [
+                0,
+                0
+              ],
+              "clientClosed": true,
+              "serverSocketClosed": true,
+              "serverStopRequested": true
+            },
+            "portRefusedAfterExit": true
+          }
+        ],
+        "zeroBudgetRejected": true
+      }
+    ],
+    "errorCallbackProbe": {
+      "argsLength": 1,
+      "firstIsError": true,
+      "firstMessage": "032-error-signature-probe",
+      "secondArgumentAbsentInBun1_3_14": true
+    },
+    "runtimeNotes": [
+      "默认沙箱禁止127.0.0.1监听，真实TCP/WebSocket运行在授权的独立本机进程。",
+      "本版Bun的server.stop(true)在WebSocket关闭后返回的Promise没有结束；示例不await它，挂catch并以两侧close、pending清理和端口拒连验收。"
+    ],
+    "ok": true
+  },
+  "newDiagram": {
+    "sourcePath": "/Users/yhding/ws/github.com/deepseek-harness-demo/tutorial/linear/labs/032.md",
+    "codePath": "/private/tmp/harness-032-transports-diagram.mmd",
+    "imagePath": "/private/tmp/harness-032-transports-diagram.png",
+    "sourceSha256": "8e3cee2042bfb9f1398123e74462cad8e9a63a8051e79bdacda097fbbd0f53eb",
+    "mermaidVersion": "11.12.0",
+    "browser": "Google Chrome independent headless",
+    "parsed": true,
+    "diagramType": "flowchart-v2",
+    "width": 1087.875,
+    "height": 246,
+    "textCount": 9,
+    "clipped": [],
+    "ok": true,
+    "visualInspection": {
+      "inspected": true,
+      "result": "Peer分成字节流分帧与WebSocket完整消息两条接线；节点文字、连线标签均完整可读，四边界无截断，未见重叠。"
+    }
+  },
+  "documentationChecks": {
+    "completeExampleFiles": 3,
+    "extractedCodeMatchesRuntimeSha256": true,
+    "websocketUsesPeerWithoutFraming": true,
+    "currentFileLaunchConfigParses": true,
+    "debugBudgetMs": 3600000,
+    "onlyLesson032MetadataChanged": true,
+    "sourceDeltasUnchanged": 203,
+    "checkDocsPassed": true,
+    "auditScopeIntact": true,
+    "diffCheckPassed": true,
+    "existingScenarioContentPreserved": true,
+    "scenario032ReceiveSendBoundaryAdded": true
+  },
+  "primaryReferences": [
+    "https://bun.sh/docs/runtime/http/websockets",
+    "https://www.rfc-editor.org/rfc/rfc6455.html#section-5.4",
+    "https://nodejs.org/api/net.html#class-netsocket"
+  ],
+  "limits": [
+    "六次实跑为三份示例各默认5秒及一小时预算；没有实际等待一小时，也未交互验收VS Code。",
+    "所有服务端和客户端在同一Bun进程；TCP/WebSocket经过真实127.0.0.1网络连接，未证明跨机器部署。",
+    "未知方法、正常中文文本和断连pending清理已验收；未穷尽二进制、畸形JSON、底层WebSocket分片、背压和重连矩阵。",
+    "TCP与PassThrough沿用Content-Length帧格式，但sum RPC不是完整LSP语言服务；示例也未替换MCP/ACP或047 Remote协议。",
+    "没有重跑000～069；本次只提供文档例子，不更新步骤实现或声称完整复刻完成。"
+  ]
+}
