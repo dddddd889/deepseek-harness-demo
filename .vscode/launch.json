@@ -12,6 +12,18 @@
       "type": "bun",
       "request": "attach",
       "url": "ws://127.0.0.1:6500/rpc-worker-032"
+    },
+    {
+      "name": "Bun：调试当前文件",
+      "type": "bun",
+      "request": "launch",
+      "program": "${file}",
+      "runtimeArgs": [
+        "--timeout",
+        "0"
+      ],
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun"
     }
   ]
 }
