@@ -1,0 +1,165 @@
+{
+  "date": "2026-10-26",
+  "scope": "仅035角色/生命周期文档与可复制脚本示例；未修改steps或harness-own，未提交。",
+  "bun": "1.3.14",
+  "labSha256": "22788aab2def44950bc29b7f3601248de27ce6f1d38c652c089c11bf2482c68c",
+  "codeSha256": {
+    "scripts/lsp-lifecycle-demo.mjs": "7c4948dc7c198243dde8a4dcabe3b7d1fb42db307c361781a31ef5faef4b1d82",
+    "src/lsp.mjs": "d11e2cc6372ca823fb1bb87363200fb6d571b6376c527af92e19fedb6f1d5aeb",
+    "tests/fixtures/lsp.mjs": "f9212679d194e1086bf147c08a4882a928dbba0e680a67ed85af173acc225474",
+    "src/rpc-trace.mjs": "64ee845f01cce905e4ab71f86d4b6ddb2115160f53b682b7c7cec34f1c612464",
+    "src/rpc.mjs": "7c103cd5626c40c065e47fddfb60ef4df1ec29065ec03b547e5af50b7de13fc3",
+    "src/scope.mjs": "eeef4eb2f8a88f31818ae27d08696df7e9e90b8a106d56b82f360ee367a61123",
+    "scripts/verify-lsp-close.mjs": "034e99531db9547792a0d2b439795bb13d4dbf7a271f9871b34fdfe16a5146fa"
+  },
+  "ordinaryDemo": {
+    "exitCode": 0,
+    "output": {
+      "first": {
+        "uri": "file:///private/tmp/harness-035-client-lifecycle-x9o9qkd2/project/example.ts",
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 5
+          }
+        }
+      },
+      "second": {
+        "uri": "file:///private/tmp/harness-035-client-lifecycle-x9o9qkd2/project/example.ts",
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 5
+          }
+        }
+      }
+    },
+    "defaultLogDirectoryAbsent": true
+  },
+  "tracedDemo": {
+    "exitCode": 0,
+    "output": {
+      "first": {
+        "uri": "file:///private/tmp/harness-035-client-lifecycle-x9o9qkd2/project/example.ts",
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 5
+          }
+        }
+      },
+      "second": {
+        "uri": "file:///private/tmp/harness-035-client-lifecycle-x9o9qkd2/project/example.ts",
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 5
+          }
+        }
+      }
+    },
+    "logDirectory": "/private/tmp/harness-035-client-lifecycle-x9o9qkd2/demo-json-logs"
+  },
+  "lifecycleChecks": {
+    "requestCounts": {
+      "initialize": 1,
+      "textDocument/definition": 2,
+      "shutdown": 1
+    },
+    "allFourRequestIdsUnique": true,
+    "definitionRequestIds": [
+      "9dffc66c-afd8-48b0-bbb4-eed391b79bdf",
+      "27c88073-b5ea-48b2-a5f0-a6dcce3df361"
+    ],
+    "singleChildPid": 64905,
+    "samePidForBothDefinitionHandlers": true,
+    "openedVersion": 1,
+    "changedVersion": 2,
+    "first": {
+      "uri": "file:///private/tmp/harness-035-client-lifecycle-x9o9qkd2/project/example.ts",
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 5
+        }
+      }
+    },
+    "second": {
+      "uri": "file:///private/tmp/harness-035-client-lifecycle-x9o9qkd2/project/example.ts",
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 5
+        }
+      }
+    },
+    "childExitObservedAfterScript": true,
+    "logCounts": {
+      "lsp-parent.peer.jsonl": 19,
+      "lsp-parent.framing.jsonl": 24,
+      "lsp-child.peer.jsonl": 23,
+      "lsp-child.framing.jsonl": 19
+    }
+  },
+  "postCloseChecks": {
+    "postCloseQueryRejected": "RPC已关闭",
+    "postCloseOpenChangeSentNothing": true,
+    "repeatedScopeCloseSentNoExtraShutdown": true,
+    "before": {
+      "requests": 3,
+      "shutdowns": 1,
+      "notifications": 3,
+      "sends": 6
+    },
+    "after": {
+      "requests": 3,
+      "shutdowns": 1,
+      "notifications": 3,
+      "sends": 6
+    },
+    "concurrentClosingGateTested": false
+  },
+  "postCloseChildExitObserved": true,
+  "preservation": {
+    "entirePreviousLabPreserved": true,
+    "completeFileBlocksUnchanged": 7,
+    "diagramsUnchanged": 3,
+    "sourceDeltasUnchanged": 203
+  },
+  "checks": {
+    "checkDocsPassed": true,
+    "auditScopeIntact": true,
+    "diffCheckPassed": true
+  },
+  "limits": [
+    "demo从文档直接提取到独立临时最小工程，父子trace接线按日志小节修改；不改学习者工程。",
+    "只运行本次示例和关闭后验证，没有重跑000～069，也没有交互验证VS Code。",
+    "验证scope.close完成后的行为；关闭过程中的并发门禁未实现且未宣称验收。",
+    "子进程退出在脚本完成后单独观察，不能推断scope.close自身等待了子进程退出。",
+    "全部定义结果由固定fixture返回，不是TypeScript语义分析。"
+  ]
+}

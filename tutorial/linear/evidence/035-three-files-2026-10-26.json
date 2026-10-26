@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-26",
+  "scope": "035文档补充：按三个文件划分的时序图、stdio父子通信、initialize多阶段日志；未改harness-own与steps，未提交。",
+  "labSha256": "15d3dd453099ca524ed7587cd07cccac517f3c0300a8ee15da11e38a3f568572",
+  "diagram": {
+    "sourcePath": "/Users/yhding/ws/github.com/deepseek-harness-demo/tutorial/linear/labs/035.md",
+    "codePath": "/private/tmp/harness-035-three-files.mmd",
+    "imagePath": "/private/tmp/harness-035-three-files.png",
+    "sourceSha256": "a9da4ead26322c168a9de467636b19e99a5fec1facf06ce4e6f35afce8fa481f",
+    "documentSha256": "15d3dd453099ca524ed7587cd07cccac517f3c0300a8ee15da11e38a3f568572",
+    "mermaidVersion": "11.12.0",
+    "browser": "Google Chrome independent headless",
+    "parsed": true,
+    "diagramType": "sequence",
+    "width": 1230.5,
+    "height": 2494,
+    "textCount": 51,
+    "clipped": [],
+    "ok": true,
+    "visualInspection": {
+      "inspected": true,
+      "result": "父进程双参与者与独立子进程分框清晰；通知无响应箭头，消息、注释和底部参与者均完整可读，未见文字截断或重叠。"
+    }
+  },
+  "initializeEvidence": {
+    "requestId": "2096a68f-599e-4787-8896-70e98479a6a2",
+    "parentRequestCount": 1,
+    "sameIdLogRecords": 13,
+    "countsPerFile": {
+      "lsp-child.framing.jsonl": 3,
+      "lsp-child.peer.jsonl": 4,
+      "lsp-parent.peer.jsonl": 3,
+      "lsp-parent.framing.jsonl": 3
+    },
+    "stagesPerFile": {
+      "lsp-child.framing.jsonl": [
+        "receive-frame",
+        "send-object",
+        "send-bytes"
+      ],
+      "lsp-child.peer.jsonl": [
+        "receive",
+        "handler-input",
+        "handler-result",
+        "send-response"
+      ],
+      "lsp-parent.peer.jsonl": [
+        "request",
+        "receive",
+        "resolve"
+      ],
+      "lsp-parent.framing.jsonl": [
+        "send-object",
+        "send-bytes",
+        "receive-frame"
+      ]
+    },
+    "responseOuterMethodFromPending": true,
+    "responseMessageHasNoMethod": true,
+    "initializedParentNotifyCount": 1,
+    "initializedMessageHasNoId": true,
+    "allParentRequestMethods": [
+      "initialize",
+      "textDocument/definition",
+      "shutdown"
+    ]
+  },
+  "preservation": {
+    "entirePreviousLabPreserved": true,
+    "completeFileBlocks": 7,
+    "twoEarlierLabDiagramsUnchanged": true,
+    "sourceDeltasUnchanged": 203,
+    "originalGuideExceptDebugUnchanged": true
+  },
+  "checks": {
+    "checkDocsPassed": true,
+    "auditScopeIntact": true,
+    "diffCheckPassed": true
+  },
+  "limits": [
+    "本次仅核对已有真实日志，不重新运行功能测试或Inspector。",
+    "新图实际用Mermaid解析及独立Chrome渲染，没有重新渲染两张未修改的旧图。",
+    "固定fixture没有TypeScript语义分析，日志条数不能当作网络消息数或API调用次数。"
+  ]
+}

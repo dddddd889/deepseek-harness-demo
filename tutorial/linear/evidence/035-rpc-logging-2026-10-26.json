@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-26",
+  "scope": "035文档可复制的日志扩展与真实样例；未修改steps或harness-own，未提交。",
+  "bun": "1.3.14",
+  "labSha256": "d43543e86996adbefcdcf002cdcc4b2c900560c99012e44d3d6a7c333fbeff3e",
+  "sourceSha256": {
+    "rpc.mjs": "7c103cd5626c40c065e47fddfb60ef4df1ec29065ec03b547e5af50b7de13fc3",
+    "rpc-trace.mjs": "64ee845f01cce905e4ab71f86d4b6ddb2115160f53b682b7c7cec34f1c612464"
+  },
+  "normalThreeTests": {
+    "exitCode": 0,
+    "stdout": "bun test v1.3.14 (0d9b296a)\n",
+    "stderr": "\ntests/032-rpc.test.mjs:\n(pass) 双向LSP字节帧、中文、未知方法与断连等待清理 [9.25ms]\n\ntests/032-rpc-demo.test.mjs:\n(pass) 跨进程RPC调用工具并反向审批：允许才删除，拒绝保留 [71.53ms]\n\ntests/035-lsp.test.mjs:\n(pass) 真实进程LSP握手、文档通知、定义查询、关闭 [15.66ms]\n\n 3 pass\n 0 fail\nRan 3 tests across 3 files. [184.00ms]\n"
+  },
+  "loggingOneTest": {
+    "exitCode": 0,
+    "stdout": "bun test v1.3.14 (0d9b296a)\n",
+    "stderr": "\ntests/035-lsp.test.mjs:\n(pass) 真实进程LSP握手、文档通知、定义查询、关闭 [20.60ms]\n\n 1 pass\n 0 fail\nRan 1 test across 1 file. [34.00ms]\n",
+    "directory": "/private/tmp/harness-035-logging-run-605_fp4y/final-wiring-trace"
+  },
+  "finalWiringValidation": {
+    "files": {
+      "lsp-child.framing.jsonl": 15,
+      "lsp-child.peer.jsonl": 19,
+      "lsp-parent.framing.jsonl": 20,
+      "lsp-parent.peer.jsonl": 14
+    },
+    "definitionRequestId": "2a60d174-1653-4253-8eed-8641e437bd21",
+    "sameIdAcrossFourFiles": true,
+    "bytesAndHeadersMatch": true,
+    "chunksHaveNoIdOrMethod": true,
+    "pids": {
+      "lsp-parent": [
+        8700
+      ],
+      "lsp-child": [
+        8701
+      ]
+    }
+  },
+  "isolationChecks": {
+    "disabledReturnsUndefined": true,
+    "throwingCallback": {
+      "rpcSucceeded": true,
+      "closeSucceeded": true,
+      "callbackCalls": 1
+    },
+    "callbackMutationIsolated": true,
+    "blockedDirectory": {
+      "rpcSucceeded": true,
+      "closeSucceeded": true,
+      "pathStillFile": true
+    },
+    "safeSnapshotFailureIsolated": true,
+    "loggerSerializationFailureIsolated": true,
+    "chineseDirectory": "/private/tmp/harness-035-logging-run-605_fp4y/chinese-trace",
+    "chineseRoundTrip": true,
+    "defaultDirectoryIndependentOfCwd": true,
+    "defaultDirectory": "/private/tmp/harness-035-logging-run-605_fp4y/project/tmp/rpc-035"
+  },
+  "oneWarningPerFailure": true,
+  "childLogFailureWarningVisibleWithoutInspector": {
+    "exitCode": 0,
+    "stdout": "bun test v1.3.14 (0d9b296a)\n",
+    "stderr": "\ntests/035-lsp.test.mjs:\n[RPC_TRACE] 日志已停用：EISDIR: illegal operation on a directory, open '/private/tmp/harness-035-logging-run-605_fp4y/child-append-failure/lsp-child.framing.jsonl'\n(pass) 真实进程LSP握手、文档通知、定义查询、关闭 [19.88ms]\n\n 1 pass\n 0 fail\nRan 1 test across 1 file. [31.00ms]\n",
+    "warningVisibleWithoutDebug": true,
+    "lspDebugEnabled": false
+  },
+  "sampleLogs": {
+    "lsp-child.framing.jsonl": {
+      "sha256": "00bfcfbab0d2a3c54f6633c8b944524c2bd7e934d204145660090772ed427248",
+      "lines": 15
+    },
+    "lsp-child.peer.jsonl": {
+      "sha256": "729c4fd857a6bcbfd4d7a74424083e70c92efb391d0e1dc697e0d04b5db65751",
+      "lines": 19
+    },
+    "lsp-parent.framing.jsonl": {
+      "sha256": "6eecb52d4022e4c71750573ba245f333033b225277df28ad5f1c683a46cc443d",
+      "lines": 20
+    },
+    "lsp-parent.peer.jsonl": {
+      "sha256": "e60edb55c4b3fdb89df41cdb0d2b8a0b3ffae28b44af828edf37c1109389d5f4",
+      "lines": 14
+    }
+  },
+  "documents": {
+    "completeLoggingFilesExtractedAndMatched": true,
+    "originalSourceDeltasUnchanged": 203,
+    "diagramSourcesUnchanged": true
+  },
+  "limits": [
+    "只运行032两份与035一份原测试及本次日志故障检查，未重跑000～069。",
+    "本次没有交互操作VS Code或重跑Inspector；双Attach仍由上一节说明，日志实测用普通Bun进程。",
+    "新Peer/framing代码只放在文档补充，不自动覆盖学习者代码或steps源码。",
+    "日志样例来自临时工程，UUID、PID、URI与chunk分包都随运行而变化，不作为固定输出逐字比对。"
+  ]
+}

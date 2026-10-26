@@ -136,3 +136,35 @@ Electron Main 使用 Electron 自带的运行时；领域 Host 改由独立 Bun 
 在独立临时空目录按000～033累计并用033锁文件安装依赖，直接提取文档的5份完整代码。Bun 1.3.14普通运行033测试1通过、0失败；日志实际包含两次tools/list与一次tools/call。随后以临时端口启动父、子两个真实Inspector，自动命中子服务分页handler断点，故意暂停6104毫秒后继续，原测试仍通过，工具卸载成立，文件日志没有污染stdout协议。新增Mermaid图已解析、真实渲染并检查文字边界。见[033调试实测记录](evidence/033-mcp-debug-2026-10-26.json)。
 
 本轮没有交互操作VS Code窗口或重验全部配置，也没有重跑000～069；Inspector协议连接与断点验证不冒充F5、变量窗口的交互验收。一小时预算按SDK实现核对，没有实际等待一小时；此前功能差距和验收边界保持不变。
+
+## 2026-10-26：035父子调试与Peer/framing中间结构
+
+035新增5份可手动复制到练习工程的完整调试文件，保留原有文本流、基础源码和语义导航长例子。说明父子Attach顺序、Bun单测与自有Peer两层超时、初始化失败清理、断点变量和关闭边界；另沿同一次definition请求展示业务params、RPC信封、UTF-8 Buffer、Content-Length帧、接收buffer/raw、handler入参和原id响应。紧凑JSON示例已复算为正文164字节、帧头23字节、整包187字节，实际URI/UUID变化时仍由代码计算长度。
+
+在独立累计到035的临时工程中直接提取文档5份代码，Bun 1.3.14普通测试1通过、0失败，033既有6份VS Code配置完整保留；模拟初始化子进程退出时，RPC拒绝并在约13毫秒内关闭Scope，没有额外等待一小时shutdown。随后以动态端口连接两个真实Inspector，按加载后的实际脚本定位函数体断点：在definition handler读取params与版本2正文，并在Peer.receive帧读取完整RPC信封，确认URI与0:7坐标后暂停11101毫秒；在shutdown handler核对同名RPC请求后暂停1301毫秒。继续后原测试仍1通过、0失败，父进程退出0，子调试端口释放。见[035调试实测记录](evidence/035-lsp-debug-2026-10-26.json)。
+
+两张新增Mermaid时序图已解析并用独立Chrome渲染，文字未越出画布；重新生成、check_docs.py、audit.py与git diff --check通过。203份源码增量、原035文本流与主时序图、原长场景保持不变。本轮没有修改harness-own、重跑000～069或自动提交。Inspector协议和局部变量实测不代替VS Code双Attach的界面交互验收，其余Watch表达式按源码作用域核对；固定fixture不提供真实TypeScript语义能力，一小时预算未实际等待到期。
+
+## 2026-10-26：035按父子进程与Peer/framing分开记录文件日志
+
+在035调试补充中新增两份完整的手动复制代码：同步JSONL日志器、带可选安全trace回调的展开版Peer/framing。默认不创建日志目录；RPC_TRACE=1开启后，父子各写peer与framing两份文件，保留RPC对象、发送正文/帧的UTF-8与hex、接收片段和拆帧结果。chunk不猜id；完整帧解析后按id关联，通知仍不带协议id。每次运行用mktemp新建专用目录，子stderr在日志模式也转发，日志失败不占用stdout协议通道。
+
+直接将文档两份代码与父子接线提取到独立累计临时工程，Bun 1.3.14运行032两份和035测试共3通过、0失败；开启日志后的035为1通过、0失败。四文件的definition请求ID一致，父子PID不同；逐条核对帧头长度、UTF-8字节、hex与消息内容，chunk均无id/method。另验证trace回调修改快照并抛错、JSON快照失败、目标目录是文件、子日志追加失败时，RPC和close仍完成，告警不会反复输出；仅开日志也能从父终端看到子追加失败告警。日志器的默认目录不依赖cwd，中文的字节长度单独核对。见[分文件日志实测记录](evidence/035-rpc-logging-2026-10-26.json)及其中对应的[真实四文件样例](evidence/035-rpc-logging/)。
+
+重新生成、check_docs.py、audit.py与git diff --check通过，203份steps源码和已有两张图的源码未改。本次没有修改harness-own、重跑000～069或自动提交，也没有重新交互验证VS Code/Inspector；样例里的临时路径、UUID、PID和chunk边界仅代表这次运行。
+
+## 2026-10-26：035按三个文件解释父子通信与初始化日志
+
+在035调试实操前部追加三个文件的职责与父子进程分框时序图，明确测试与src/lsp.mjs在同一父进程，fixture是spawn创建的子进程；父child.stdin通向子process.stdin，子process.stdout通向父child.stdout。图保留initialize/initialized、文档通知、definition按原ID回复、Scope触发关闭回调与shutdown/exit回收，区分基础fixture和日志版Map记录的边界。
+
+对照前轮保存的四份真实JSONL，initialize的父Peer request仅1条，原ID在四文件中共13条阶段记录；initialized是无ID通知。核对响应日志外层method来自pending关联，嵌套协议message没有method。新增图用Mermaid11.12.0解析、独立Chrome渲染及截图目检，未检测到文字越界；原有整个lab正文、7份完整代码与两张旧图保持不变，203份steps源码未改。重新生成、check_docs.py、audit.py与git diff --check通过。见[三文件时序与日志核对记录](evidence/035-three-files-2026-10-26.json)。
+
+本次仅补文档和核对已有日志，没有修改harness-own、重跑功能测试或Inspector，也没有自动提交。
+
+## 2026-10-26：035客户端角色、进程复用与Scope关闭
+
+在三文件角色表后补充src/lsp.mjs同时作为LSP客户端与子进程管理器的说明：import不启动，每次languageServer调用立即spawn并握手；返回的open/change/query通过闭包复用同一child与Peer，query仅新建请求ID；Scope负责执行已登记的shutdown/exit、关闭Peer和进程回收回调。说明关闭过程中没有额外closing门禁、关闭后query拒绝而通知可能静默不发送、握手失败仍依赖调用方finally，以及child.kill不等待退出事件的边界。
+
+直接从文档提取新scripts/lsp-lifecycle-demo.mjs与既有完整文件2/4/6/7，在独立临时最小工程用Bun 1.3.14运行，普通与文件日志模式均退出0；用JSON.stringify完整输出first/second，两者都为固定fixture的0:0到0:5。实际日志确认initialize请求1次、definition两次、shutdown1次，4个ID不同，两次定义处理均为同一子PID，didOpen版本1、didChange版本2；另在脚本结束后确认子PID已退出。关闭后小验证确认query拒绝RPC已关闭、open/change不新增通知或发送、重复关闭Scope不重复shutdown。见[客户端生命周期验证记录](evidence/035-client-lifecycle-2026-10-26.json)。
+
+原lab全部内容、7份完整代码、3张图与203份steps源码保留。重新生成、check_docs.py、audit.py与git diff --check通过；本次未修改harness-own、重跑000～069、交互操作VS Code或自动提交。新增示例验收不证明真实TypeScript语义分析，也不证明关闭期间已具备并发门禁。

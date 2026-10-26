@@ -1,0 +1,244 @@
+{
+  "date": "2026-10-26",
+  "scope": "仅035文档调试扩展；未修改steps或harness-own；未运行000～069全套测试。",
+  "bun": "1.3.14",
+  "labSha256": "631c97e5dec0d6bfa65707c6a2bb622e8152be8f4044001be89d6f0d4386927e",
+  "completeFilesExtracted": [
+    "scripts/vscode-debug.mjs",
+    "src/lsp.mjs",
+    "tests/035-lsp.test.mjs",
+    "tests/fixtures/lsp.mjs",
+    ".vscode/launch.json"
+  ],
+  "normalTest": {
+    "exitCode": 0,
+    "pass": 1,
+    "fail": 0
+  },
+  "launchConfigurationCount": 8,
+  "previousSixConfigurationsPreserved": true,
+  "initializationFailureCheck": {
+    "rejected": true,
+    "scopeClosed": true,
+    "elapsedMilliseconds": 13.328792,
+    "limitMilliseconds": 2000
+  },
+  "inspector": {
+    "attempt": 3,
+    "bun": "1.3.14",
+    "definitionHandlerBreakpointHit": true,
+    "shutdownHandlerBreakpointHit": true,
+    "debuggerLocalsEvaluated": true,
+    "vscodeUiInteractivelyVerified": false,
+    "breakpointRequests": {
+      "actualDefinition": {
+        "scriptId": "24",
+        "lineNumber": 21,
+        "columnNumber": 9
+      },
+      "actualShutdown": {
+        "scriptId": "24",
+        "lineNumber": 30,
+        "columnNumber": 4
+      },
+      "exactDefinitionBreakpoint": {
+        "breakpointId": "24:21:9",
+        "actualLocation": {
+          "scriptId": "24",
+          "lineNumber": 27,
+          "columnNumber": 0
+        }
+      },
+      "shutdownBreakpoint": {
+        "breakpointId": "24:30:4",
+        "actualLocation": {
+          "scriptId": "24",
+          "lineNumber": 30,
+          "columnNumber": 4
+        }
+      }
+    },
+    "evaluations": {
+      "params": {
+        "result": {
+          "type": "object",
+          "value": {
+            "textDocument": {
+              "uri": "file:///private/tmp/harness-035-audit-wpsvvp6j/example.ts"
+            },
+            "position": {
+              "line": 0,
+              "character": 7
+            }
+          }
+        },
+        "wasThrown": false
+      },
+      "documents": {
+        "result": {
+          "type": "object",
+          "value": [
+            [
+              "file:///private/tmp/harness-035-audit-wpsvvp6j/example.ts",
+              {
+                "uri": "file:///private/tmp/harness-035-audit-wpsvvp6j/example.ts",
+                "languageId": "typescript",
+                "version": 2,
+                "text": "const x = 2"
+              }
+            ]
+          ]
+        },
+        "wasThrown": false
+      },
+      "peerMessage": {
+        "result": {
+          "type": "object",
+          "value": {
+            "jsonrpc": "2.0",
+            "id": "6c53d831-937a-4ac2-9121-cb25061e52ff",
+            "method": "textDocument/definition",
+            "params": {
+              "textDocument": {
+                "uri": "file:///private/tmp/harness-035-audit-wpsvvp6j/example.ts"
+              },
+              "position": {
+                "line": 0,
+                "character": 7
+              }
+            }
+          }
+        },
+        "wasThrown": false
+      },
+      "shutdownMessage": {
+        "result": {
+          "type": "object",
+          "value": {
+            "jsonrpc": "2.0",
+            "id": "91847c0e-dbde-45e0-bf28-3ab29e6c6fdf",
+            "method": "shutdown",
+            "params": null
+          }
+        },
+        "wasThrown": false
+      }
+    },
+    "definitionPauseFrames": [
+      {
+        "functionName": "",
+        "location": {
+          "scriptId": "24",
+          "lineNumber": 27,
+          "columnNumber": 1
+        }
+      },
+      {
+        "functionName": "receive",
+        "location": {
+          "scriptId": "23",
+          "lineNumber": 55,
+          "columnNumber": 36
+        }
+      },
+      {
+        "functionName": "receive",
+        "location": {
+          "scriptId": "23",
+          "lineNumber": 40,
+          "columnNumber": 18
+        }
+      },
+      {
+        "functionName": "",
+        "location": {
+          "scriptId": "23",
+          "lineNumber": 126,
+          "columnNumber": 20
+        }
+      }
+    ],
+    "parentPid": 1378,
+    "childPid": 1379,
+    "parentPort": 53868,
+    "childPort": 53869,
+    "independentInspectors": true,
+    "definitionPausedMilliseconds": 11101,
+    "shutdownPausedMilliseconds": 1301,
+    "originalAssertionsPassed": true,
+    "parentExitCode": 0,
+    "childPortReleased": true,
+    "shutdownBreakpoint": {
+      "breakpointId": "24:30:4",
+      "actualLocation": {
+        "scriptId": "24",
+        "lineNumber": 30,
+        "columnNumber": 4
+      }
+    },
+    "cleanedUpOwnedProcesses": true
+  },
+  "wireExample": {
+    "id": "req-1",
+    "uri": "file:///project/example.ts",
+    "bodyUtf8Bytes": 164,
+    "headerBytes": 23,
+    "packetBytes": 187,
+    "separatorOffset": 19,
+    "bodyOffset": 23,
+    "exampleIdIsIllustrative": true
+  },
+  "diagrams": [
+    {
+      "index": 1,
+      "label": "peer-framing",
+      "parsed": true,
+      "diagramType": "sequence",
+      "width": 1736.5,
+      "height": 1121,
+      "textCount": 27,
+      "clipped": [],
+      "visualInspection": {
+        "inspected": true,
+        "result": "参与者、消息、说明与可选块均可读；截图内容完整，未见文字截断或遮挡。"
+      },
+      "sourceSha256": "9169faa023cbb417e9f2ffb26b9888d0d4005b5643d94e2dbff81f9bf8870411"
+    },
+    {
+      "index": 2,
+      "label": "debug-sequence",
+      "parsed": true,
+      "diagramType": "sequence",
+      "width": 983,
+      "height": 1777,
+      "textCount": 39,
+      "clipped": [],
+      "visualInspection": {
+        "inspected": true,
+        "result": "参与者、消息、说明与可选块均可读；截图内容完整，未见文字截断或遮挡。"
+      },
+      "sourceSha256": "76d50f36bd098bdbf9e30d8ffbe0745274fb64c467e7e7d5bd59ad05d89cdd98"
+    }
+  ],
+  "documentationChecks": {
+    "guidePages": 70,
+    "guideSequenceDiagrams": 70,
+    "originalReferences": 264,
+    "sourceDeltasUnchanged": 203,
+    "originalGuideFlowAndSequencePreserved": true,
+    "originalScenario035Preserved": true,
+    "allGuideFieldsRendered": true,
+    "allCodeBlocksMatch": true,
+    "auditScopeIntact": true,
+    "originalParityComplete": false,
+    "unclosedRequirements": 34,
+    "diffCheckPassed": true
+  },
+  "limits": [
+    "通过Bun Inspector协议自动检查真实父子进程、handler断点和局部变量，没有交互操作VS Code UI。",
+    "局部变量实测覆盖fixture的params/documents与Peer.receive的message；其余Watch按源码作用域静态核对，未逐一在VS Code变量窗口交互验证。",
+    "使用动态空闲端口，避免占用用户6499/6502；文档仍给固定Attach地址。",
+    "一小时请求预算按实现核对，只实际暂停查询11101ms、关闭1301ms；没有等待一小时。",
+    "固定fixture不分析TypeScript，不构成真实语言服务器语义导航验收。"
+  ]
+}
