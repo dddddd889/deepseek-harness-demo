@@ -24,5 +24,6 @@
     "packages/fs/fs-local/src/fsio.ts",
     "packages/fs/fs-observation-policy/src/index.ts",
     "packages/fs/fs-sandbox/src/containment.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant L as LocalFS同一实例\n    participant F as 本机文件系统\n    C->>L: read相对路径\n    L->>F: realpath检查目标或已存在祖先\n    F-->>L: 实际路径\n    alt 真实路径越界\n        L-->>C: 拒绝，不读取内容\n    else 路径接纳\n        L->>F: 全量readFile\n        F-->>L: 字节\n        L->>L: 算hash并observed登记\n        L-->>C: text与version\n    end\n    C->>L: write新内容与expected\n    L->>L: 进入本实例pending队列\n    L->>F: 复查路径并读取当前内容\n    F-->>L: 当前版本依据\n    L->>L: 核对expected及observed\n    alt 版本不符或尚未读取\n        L-->>C: 拒绝覆盖\n    else 检查通过\n        L->>F: 写同目录临时文件\n        F-->>L: 临时内容写完\n        L->>F: rename替换目标\n        F-->>L: 替换成功\n        L->>L: 清除observed记录\n        L-->>C: 返回写入字节数\n    end\n    Note over L,F: 队列不跨实例，检查到rename仍有外部竞态"
 }

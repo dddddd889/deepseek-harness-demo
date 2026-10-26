@@ -27,5 +27,6 @@
     "packages/sdk/server/README.zh.md",
     "packages/sdk/protocol/README.zh.md",
     "packages/bundle/sdk-app/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as SDK 调用方\n    participant S as HarnessSDK（调用方进程）\n    participant R as sdk-server 的 Peer 与 remote（Bun 子进程）\n    participant H as 子进程 Host 与 Agent\n    C->>S: new HarnessSDK(home, cwd)\n    S->>R: spawn Bun，stdio 接 Peer 与 framing\n    R->>H: 创建 Host，绑定 remote\n    C->>S: create()\n    S->>R: session.create\n    R->>H: host.create\n    H-->>R: header\n    R-->>S: session.create 响应\n    S-->>C: header\n    C->>S: run(id, content, onEvent)\n    S->>R: session.watch\n    R->>H: 校验 owner，订阅并读取历史\n    H-->>R: 历史事件\n    R-->>S: watch 快照\n    S->>R: session.submit\n    R->>H: 校验 owner，agent.submit\n    H-->>R: inputId\n    R-->>S: submit 响应\n    S->>R: session.wait\n    R->>H: 校验 owner，await agent.idle\n    loop Agent 执行期间产生已提交事件\n        H-->>R: event\n        R-->>S: session.event 通知\n        S->>C: onEvent(event)\n    end\n    H-->>R: idle 后最后 turn/end\n    R-->>S: wait 响应\n    S->>R: session.read\n    R->>H: 校验 owner，session.read\n    H-->>R: 全量会话事件\n    R-->>S: read 响应\n    S-->>C: ending、events、text\n    C->>S: close()\n    S->>R: stdin.end 发送 EOF\n    R->>H: host.close\n    H-->>R: Host 清理完成\n    R-->>S: 子进程退出\n    S->>S: 关闭 Peer\n    S-->>C: close 完成\n    Note over S,H: 通知可穿插在请求之间；自定义协议共用同一 Host"
 }

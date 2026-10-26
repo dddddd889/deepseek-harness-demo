@@ -25,5 +25,6 @@
     "apps/desktop/src/update-journal.ts",
     "apps/desktop/src/mandatory-update-policy.ts",
     "apps/desktop/src/update-presentation.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 本地测试\n    participant U as 独立Updates模块\n    participant S as 更新状态Store\n    participant I as 测试安装器回调\n    T->>U: admit被改动的raw与原签名\n    U->>U: Ed25519验签\n    U-->>T: 签名无效\n    T->>U: admit合法raw\n    U->>U: 验签并校验版本与target\n    U->>S: 写admitted及previous\n    T->>U: apply固定载荷\n    U->>U: 核对SHA256\n    U->>S: 写installing\n    U->>I: 调用installer\n    alt 当前测试：安装器抛错\n        I-->>U: installer failed\n        U->>S: 写failed-keep-old\n        U-->>T: 重新抛错\n        T->>S: 检查最终状态\n        S-->>T: failed-keep-old\n    else 成功分支：当前未测试\n        I-->>U: 回调完成\n        U->>S: 写awaiting-new-version-smoke\n    end\n    Note over U,I: 没有平台安装、重启或旧应用恢复，状态名不是实机证据"
 }

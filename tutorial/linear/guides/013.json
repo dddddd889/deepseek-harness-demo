@@ -21,5 +21,6 @@
     "packages/core/agent/src/index.ts",
     "packages/core/agent-loop/src/index.ts",
     "packages/core/agent-loop/src/agent.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 用户或测试调用者\n    participant A as Agent\n    participant I as Inbox\n    participant S as Settings\n    participant L as runTurn\n    C->>A: submit第一条任务\n    A->>I: enqueue到turn\n    I-->>A: 输入id\n    A-->>C: 返回接收凭据\n    A->>A: pump，仅一个活动循环\n    loop 取出待处理turn\n        A->>I: claim(turn)\n        I-->>A: 一条已认领输入\n        A->>S: snapshot()\n        S-->>A: 本turn固定配置\n        A->>L: await runTurn与signal\n        opt 当前任务执行时排队并取消\n            C->>A: submit下一轮\n            A->>I: enqueue新turn\n            C->>A: cancel()\n            A->>L: abort当前signal\n        end\n        L-->>A: 当前turn结束\n    end\n    C->>A: await idle()\n    A-->>C: 所有活动收敛\n    opt 应用退出\n        C->>A: close，拒绝新输入并等待\n    end"
 }

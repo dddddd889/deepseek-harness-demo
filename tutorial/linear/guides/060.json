@@ -26,5 +26,6 @@
     "packages/experimental/client-ui-voice-input",
     "packages/experimental/translator/src/index.ts",
     "packages/experimental/client-ui-cot-translation"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant P as 独立浏览器调用方\n    participant R as recordAudio与MediaRecorder\n    participant T as Bun测试\n    participant A as transcribe辅助函数\n    participant F as 固定ASR fetcher\n    participant X as translate辅助函数\n    participant M as ScriptModel固定模型\n    Note over P,R: 录音是独立浏览器段，当前未接页面且本测试未运行\n    opt 显式使用录音辅助函数\n        P->>R: recordAudio申请麦克风\n        R-->>P: 返回stop接口\n        P->>R: stop\n        R->>R: 停止录音并释放媒体track\n        R-->>P: Blob\n    end\n    Note over T,F: ASR测试段使用固定字节，不是真实录音上传\n    T->>A: transcribe固定音频bytes\n    A->>F: FormData与测试凭据\n    F-->>A: 固定text为你好\n    A-->>T: 返回你好\n    Note over T,M: 翻译是另一个模块，由测试显式调用，未串成产品流程\n    T->>X: translate你好到英语\n    X->>M: stream翻译请求\n    M-->>X: hello与finish\n    X->>X: 检查完整结束\n    X-->>T: 返回hello"
 }

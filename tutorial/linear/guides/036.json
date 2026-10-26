@@ -25,5 +25,6 @@
     "packages/subagent/subagent-spawn-in-process/README.zh.md",
     "packages/subagent/subagent-fork-in-process/README.zh.md",
     "packages/subagent/tool-subagent-control/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant P as 父调用方\n    participant M as Subagents 管理器\n    participant F as factory 工厂\n    participant A as 子 Agent（同一进程内）\n    participant E as 子会话 Events\n    participant S as 父资源 Scope\n    P->>M: create(scope, parent, options)\n    M->>F: factory(options)\n    F-->>M: 返回真实 Agent\n    M->>M: entries 记录 childId、parent、agent\n    M->>S: own 登记 child.close 与撤销 id\n    M-->>P: childId\n    P->>M: send(parent, childId, text)\n    M->>M: get 校验父身份\n    M->>A: submit(text)\n    A-->>M: 输入 receipt\n    M-->>P: 输入 receipt\n    A->>E: 运行回合并追加会话事件\n    opt 运行中需要取消\n        P->>M: interrupt(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: cancel()\n    end\n    opt 需要等待并读取结果\n        P->>M: wait(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: await idle()\n        A-->>M: 当前活动结束\n        M->>E: session.read()\n        E-->>M: 会话事件副本\n        M-->>P: 原 wait 返回事件\n    end\n    P->>S: close()\n    S->>M: 执行登记的清理回调\n    M->>A: await agent.close()\n    A-->>M: Agent 关闭完成\n    M->>M: entries.delete(childId)\n    M-->>S: 清理完成\n    Note over M,A: 子 Agent 可继续 send；创建子 Agent 不等于创建新进程"
 }

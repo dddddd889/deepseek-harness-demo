@@ -24,5 +24,6 @@
     "packages/ptc-runtime/ptc-runtime/README.zh.md",
     "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
     "packages/core/tools/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant P as runProgram 指令解释器\n    participant T as Tools 统一入口\n    participant G as 工具 guard\n    participant R as 工具实现\n    C->>P: runProgram(program, tools, context)\n    P->>P: 检查数组和 maxCalls 预算\n    loop 按指令顺序\n        P->>P: 检查取消及唯一 id\n        P->>P: 复制 arguments\n        opt 顶层参数包含 $ref\n            P->>P: 查前面 values，复制引用结果\n            Note right of P: 未定义引用立即抛错\n        end\n        P->>T: execute(tool, arguments, context)\n        T->>T: 查工具并校验参数\n        T->>G: guard(tool, call, context)\n        G-->>T: 守卫通过，或抛错终止\n        T->>T: 再次检查取消\n        T->>R: run(复制后的参数, context)\n        R-->>T: value\n        T-->>P: execute 完成\n        P->>P: values.set(当前指令 id, value)\n    end\n    P-->>C: 全部指令结果对象\n    Note over C,P: 输入是声明式指令列表；没有 eval 任意 JS 或隔离脚本进程"
 }

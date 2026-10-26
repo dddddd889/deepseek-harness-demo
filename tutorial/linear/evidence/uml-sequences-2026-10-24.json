@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-24",
+  "scope": "tutorial/linear",
+  "preservedTextFlows": 70,
+  "preservedOtherGuideFields": true,
+  "sequenceDiagrams": 70,
+  "mermaidVersion": "11.12.0",
+  "parserRuntime": "Bun 1.3.14",
+  "syntaxPassed": 70,
+  "chromeHeadlessRendered": 70,
+  "textOutsideSvgBounds": 0,
+  "visuallyInspectedSamples": [
+    "036",
+    "046",
+    "052"
+  ],
+  "unchangedSourceDeltas": 203,
+  "runtimeTestsExecuted": false,
+  "harnessOwnModified": false,
+  "committed": false,
+  "notes": [
+    "文本流后直接附加时序图，保留此前的长场景与调试说明。",
+    "图中区分模块、进程、真实调用与固定测试对端；取消、审批、关闭按当前代码标注。",
+    "图的渲染成功不代表原版全功能等价或本次重跑运行时测试。"
+  ]
+}

@@ -26,5 +26,6 @@
     "packages/client/product-analytics/src/events.ts",
     "packages/session/session-telemetry/src/index.ts",
     "packages/session/session-telemetry/src/coordinator.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 手动调用的测试\n    participant L as 独立Telemetry发送器\n    participant Q as 内部有界队列\n    participant F as 固定fetcher替身\n    Note over T,F: 没有Host事件订阅或真实Collector；当前测试显式启用\n    T->>L: record事件与attributes\n    L->>L: 白名单移除prompt和apiKey\n    L->>Q: 放入OTLP日志记录\n    T->>L: 显式flush\n    L->>Q: 取出最多一百项\n    Q-->>L: 本次batch\n    L->>F: POST序列化OTLP JSON\n    alt 当前测试返回503\n        F-->>L: response.ok=false\n        L-->>T: 返回false\n    else 网络异常或超时分支\n        F-->>L: Promise拒绝\n        L-->>T: 捕获并返回false\n    end\n    T->>T: 检查body无测试敏感值\n    Note over L,Q: 默认未启用时record直接返回；本测试没有走该分支\n    Note over T,F: 只证明发送器行为，不是业务隔离的端到端证据"
 }

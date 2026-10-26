@@ -23,6 +23,8 @@ def main():
         lines = [f'# {number} · {lesson["title"]}', '', f'阶段：{lesson["phase"]}。唯一前置：' + ('空目录。' if number == '000' else f'完成第 {int(number)-1:03} 步，继续同一个工程。'), '',
                  '## 什么时候会用到这一页', '', guide['scenario'], '',
                  '### 这次数据怎么走', '', '```text', guide['flow'], '```', '',
+                 '### 对应时序图', '', '从上往下读；实线箭头表示调用或发送，虚线箭头表示返回或事件通知。`opt`表示可选操作，`alt`表示不同结果，`loop`表示重复，`par`及其`and`分支表示并行；“未接入”及fixture说明按图中标注理解。', '',
+                 '```mermaid', guide['sequence'], '```', '',
                  '**当前接线位置：**' + guide['wiring'], '',
                  '## 这一步具体做什么', '', lesson['try'], '',
                  '需要本章新文件的操作，先按下面代码创建文件，再执行；不要在上一步尚不存在的接口上试错。', '',
@@ -75,7 +77,7 @@ def main():
             lines += ['', lab.read_text()]
         (destination / f'{number}.md').write_text('\n'.join(lines).rstrip('\n') + '\n')
     (ROOT / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
-    index = ['# 连续步骤索引', '', '从000开始，每次只看下一步。所有步骤都在同一个PROJECT内累计，不切换路线。', '', '每页先看具体场景、调用链和当前接线位置，再按文件写代码；运行和VS Code断点都有具体预期。末尾逐项说明与本地固定原版的差距，不把独立模块或测试当成完整产品能力。', '']
+    index = ['# 连续步骤索引', '', '从000开始，每次只看下一步。所有步骤都在同一个PROJECT内累计，不切换路线。', '', '每页先看具体场景、文本调用链及紧接着的时序图，再看当前接线位置，按文件写代码；运行和VS Code断点都有具体预期。末尾逐项说明与本地固定原版的差距，不把独立模块或测试当成完整产品能力。', '']
     index += [f'- [{row["id"]} · {row["title"]}](lessons/{row["id"]}.md)（{row["phase"]}）' for row in lessons]
     (ROOT / 'INDEX.md').write_text('\n'.join(index) + '\n')
     print(f'已生成 {len(lessons)} 个连续可运行步骤，{len(manifest)} 次文件增量。')

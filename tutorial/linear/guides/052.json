@@ -26,5 +26,6 @@
     "apps/desktop/src/runtime-tree.ts",
     "apps/desktop/src/web-document.ts",
     "apps/desktop/src/quit-confirmation.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    actor U as 用户\n    participant L as Bun桌面启动器\n    participant E as Electron Main\n    participant H as 独立Bun Host\n    participant P as Electron Renderer与preload\n    U->>L: bun run desktop\n    L->>E: 启动Electron并传Bun绝对路径\n    E->>E: 获得单实例锁\n    E->>H: spawn显式Bun运行web-server\n    H-->>E: stdout打印启动URL\n    E->>P: 创建隔离窗口并加载URL\n    P->>H: 认证后通过WS调用Remote\n    opt 页面读取平台信息\n        P->>E: 白名单IPC desktop:info\n        E-->>P: 平台与应用版本\n    end\n    Note over P,E: preload属于Renderer，不是另一个独立进程\n    opt macOS仅关闭最后窗口\n        U->>E: 关闭窗口\n        E->>P: 销毁窗口，应用与Host继续驻留\n    end\n    opt 用户真正退出应用\n        U->>E: 退出\n        E->>H: SIGTERM并等待退出\n        H->>H: 关闭会话与资源\n        E->>E: 超时才兜底终止并退出\n    end"
 }

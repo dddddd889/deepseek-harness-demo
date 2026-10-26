@@ -25,5 +25,6 @@
     "packages/experimental/worktree/src/types.ts",
     "packages/experimental/worktree/src/process.ts",
     "packages/experimental/tool-worktree"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 测试或显式调用方\n    participant W as Worktrees管理器\n    participant G as 外部Git进程\n    participant A as 外部tar进程\n    participant F as 工作区与归档文件\n    Note over T,W: 当前测试仅执行下面拒绝路径，不会运行git或tar\n    T->>W: archive未拥有的名字\n    W-->>T: owned中无记录，立即拒绝\n    T->>W: create越界名称或选项式ref\n    W-->>T: 输入检查拒绝\n    Note over W,F: 以下是未由本章测试执行的源码支路，不是原版同语义\n    opt 调用方显式使用隔离仓库创建\n        T->>W: create合法name与ref\n        W->>G: worktree add --detach\n        G->>F: 建立独立checkout\n        G-->>W: 退出码成功\n        W->>W: owned记录路径\n        W-->>T: 返回路径\n    end\n    opt 显式归档自己拥有的checkout\n        T->>W: archive\n        W->>G: ls-files生成文件清单\n        G-->>W: NUL分隔清单\n        W->>A: tar打包到staging\n        A-->>W: 打包结果\n        W->>F: rename发布归档\n        W->>G: worktree remove --force\n        G-->>W: 删除结果\n        W-->>T: 返回自有归档结果\n    end\n    Note over W,F: 原版另有新分支与Session切目录；本图没有这些已接线能力"
 }

@@ -24,5 +24,6 @@
     "packages/subprocess/subprocess-local/README.zh.md",
     "packages/shell/bash-local/README.zh.md",
     "packages/shell/tool-bash/src/render.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant E as execute 进程适配器\n    participant P as 真实子进程\n    participant O as onOutput 回调\n    C->>E: execute(spec, signal, onOutput)\n    E->>P: spawn(command, args, shell=false)\n    loop stdout 或 stderr 数据到达\n        P-->>E: 字节块\n        E->>E: 累计字节数和 output\n        opt 尚未超过 maxBytes\n            E->>O: onOutput(text)\n        end\n    end\n    alt 超时、取消或输出超限\n        E->>P: 终止进程树；必要时强制结束\n        P-->>E: close 事件\n        E-->>C: 清理监听后 reject\n    else 正常退出\n        P-->>E: close(code, signal)\n        E-->>C: code、output、bytes\n    end\n    Note over E,P: 先等 close 再结算；超限终止，没有 Spill 落盘"
 }

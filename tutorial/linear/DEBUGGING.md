@@ -40,6 +40,8 @@ Mac 若系统拦截功能键，配合 Fn 使用；也可以直接点调试工具
 
 **Bun：当前测试**只保证调试当前测试进程。SDK、Python SDK、ACP 或 Worker 启动的 Host 是另一个进程，Host 中的断点不会自动随父进程命中。
 
+第033步的MCP服务也由SDK另起子进程。按[033文档末尾的完整调试实操](lessons/033.md#033调试实操父测试mcp子进程和日志文件)操作：父测试附加6499/mcp-parent-033，fixture附加6501/mcp-033，先连接父进程并继续，再连接子进程。启动测试时加`--timeout 0`可关闭Bun单测时限；`MCP_DEBUG=1`同时把SDK每次请求时限调到1小时，SDK的`timeout: 0`会立即超时，不能拿来关闭计时。日志追加到PROJECT/tmp/mcp-server.log，stdout继续专门承载MCP协议。完整文件、运行顺序和通过标准均在该页。
+
 需要追子进程时，按第044步说明临时给子进程加 Inspector 参数并把 stderr 显示出来，然后选择 **Bun：附加子进程**，粘贴它输出的完整 `ws://` 地址。不要粘贴页面地址，也不要把调试日志写入协议 stdout。调试结束恢复临时改动，再正常验收。
 
 从044起，SDK启动的Host需要按本章末尾给出的独立地址附加，不使用032固定的worker端口代替。第045步的 Python 客户端使用本章新增的 **Python：SDK 客户端** 与 `ms-python.debugpy` 扩展，Bun Host 仍是另一个调试目标。

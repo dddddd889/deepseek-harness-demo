@@ -25,9 +25,19 @@ def main():
         if guide != lesson['guide']:
             raise ValueError(number + '说明与lessons.json不同步')
         text = (ROOT / 'lessons' / (number + '.md')).read_text()
-        for field in ('scenario', 'flow', 'wiring', 'try', 'why', 'accept', 'debug', 'recall', 'transfer', 'testEvidence'):
+        for field in ('scenario', 'flow', 'sequence', 'wiring', 'try', 'why', 'accept', 'debug', 'recall', 'transfer', 'testEvidence'):
             if guide[field] not in text:
                 raise ValueError(number + '未展示说明字段：' + field)
+        # 保留原文本调用链，并要求时序图紧跟其后、位于接线说明之前。
+        flow_block = '```text\n' + guide['flow'] + '\n```'
+        sequence_block = '```mermaid\n' + guide['sequence'] + '\n```'
+        if guide['sequence'].splitlines()[0].strip() != 'sequenceDiagram':
+            raise ValueError(number + '缺少sequenceDiagram时序图')
+        flow_position = text.index(flow_block)
+        sequence_position = text.index(sequence_block)
+        wiring_position = text.index('**当前接线位置：**')
+        if not flow_position < sequence_position < wiring_position:
+            raise ValueError(number + '文本调用链、时序图和接线说明的顺序不正确')
         for field in ('implemented', 'missing'):
             if any(item not in text for item in guide[field]):
                 raise ValueError(number + '未展示对照列表：' + field)
@@ -61,7 +71,7 @@ def main():
         article = (ROOT / 'lessons' / (row['step'] + '.md')).read_text()
         if '\n' + source + '\n' + fence not in article:
             raise ValueError('教程缺少完整代码：' + str(path))
-    print(json.dumps({'lessons': len(lessons), 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
+    print(json.dumps({'lessons': len(lessons), 'sequenceDiagrams': len(lessons), 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'flowThenSequence': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

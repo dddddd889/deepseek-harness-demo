@@ -21,5 +21,6 @@
     "packages/core/agent-loop/src/inbox.ts",
     "packages/core/agent-loop/src/agent.ts",
     "packages/core/agent/src/types.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant I as Inbox\n    participant E as Events\n    C->>I: enqueue内容与目的地\n    I->>E: append inbox/add\n    E-->>I: 事实已写入\n    I-->>C: 返回输入id\n    opt 尚未认领时修改\n        C->>I: update(id, 新内容)\n        I->>E: read并确认仍pending\n        E-->>I: 待处理事实\n        I->>E: append inbox/edit\n    end\n    C->>I: claim指定目的地\n    I->>E: read完整事实\n    E-->>I: add、edit、remove、claim事件\n    I->>I: pending重放，挑选第一项\n    alt 有待处理输入\n        I->>E: 先append inbox/claim\n        E-->>I: 认领事实已提交\n        I-->>C: 返回已认领输入\n    else 没有待处理输入\n        I-->>C: undefined\n    end\n    Note over C,I: 013由Agent取turn，012及014由Loop取step\n    Note over I: 本章测试未启动Agent，不中断正在运行请求"
 }

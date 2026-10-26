@@ -26,5 +26,6 @@
     "packages/terminal/terminal-bash/README.zh.md",
     "packages/subprocess/subprocess-local/src/terminal.ts",
     "packages/experimental/tool-terminal/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant T as Terminal\n    participant B as Bun PTY 与子进程\n    participant S as 资源 Scope\n    C->>T: new Terminal(scope, command, args)\n    T->>B: Bun.spawn，配置 terminal 回调\n    T->>S: own 登记清理回调\n    C->>T: write(按键字符串)\n    T->>B: terminal.write 输入字节\n    B->>B: Vim 等程序处理按键\n    loop 终端输出到达\n        B-->>T: data(bytes)\n        T->>T: 连续解码并追加带 offset 的 chunks\n    end\n    C->>T: read(cursor)\n    T-->>C: 增量 text 与新 offset\n    opt 调整终端尺寸\n        C->>T: resize(cols, rows)\n        T->>B: terminal.resize\n    end\n    C->>S: close()\n    S->>T: 执行登记的清理回调\n    T->>B: kill 子进程\n    B-->>T: 进程退出与 PTY EOF\n    T->>B: 两者均结束后关闭 PTY\n    T-->>S: 清理完成\n    Note over C,T: read 返回文本和控制序列，尚未接入可视终端组件"
 }

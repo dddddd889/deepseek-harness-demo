@@ -26,5 +26,6 @@
     "packages/boot/plugin-market/src/parse.ts",
     "packages/boot/plugin-manager/src/index.ts",
     "packages/boot/plugin-manager/src/operations.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 本地测试\n    participant I as marketIndex数据函数\n    participant P as PluginManager\n    participant M as 本地动态插件模块\n    participant R as Plugins与Scope\n    participant S as 启用状态Store\n    T->>I: 传manifest数组\n    I-->>T: 返回列表，不执行模块\n    T->>P: enable可信本地文件\n    P->>M: dynamic import\n    M-->>P: setup函数\n    P->>R: install\n    R->>M: setup传scope与services\n    M->>R: provide proof为42\n    R-->>P: 安装成功\n    P->>S: 保存enabled=true\n    P-->>T: enable完成\n    T->>P: disable\n    P->>R: remove并关闭插件Scope\n    R->>R: 撤销proof服务\n    R-->>P: remove完成\n    P->>S: 保存enabled=false\n    P-->>T: disable完成\n    opt 固定bad插件安装失败\n        T->>P: enable bad\n        P->>M: import bad模块\n        M-->>P: 返回setup函数\n        P->>R: install\n        R->>M: 执行bad setup\n        M-->>R: 抛broken\n        R-->>P: 回滚后抛错\n        P-->>T: 拒绝，未写bad启用状态\n    end\n    Note over T,S: 无远端市场、npm安装或产品Host界面"
 }

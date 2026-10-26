@@ -24,5 +24,6 @@
     "packages/fs/tool-fs/src/write.ts",
     "packages/fs/fs-observation-policy/src/index.ts",
     "packages/fs/tool-fs/src/diff.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as edit-demo或测试\n    participant T as Tools\n    participant E as edit执行函数\n    participant F as LocalFS\n    C->>T: 已注册fileTools，execute read\n    T->>F: read(path)\n    F-->>T: text与version\n    T-->>C: 读取结果\n    C->>T: execute edit与版本及可选replaceAll\n    T->>T: Schema校验及guard\n    T->>E: run复制后的参数\n    E->>F: 重新read\n    F-->>E: 当前text与version\n    alt 版本不符\n        E-->>T: 文件版本冲突\n        T-->>C: 拒绝\n    else 版本一致\n        E->>E: split统计非重叠匹配\n        alt before为空或零匹配\n            E-->>T: 无效替换\n            T-->>C: 拒绝\n        else 多匹配且replaceAll不是true\n            E-->>T: 必须唯一匹配\n            T-->>C: 拒绝\n        else 唯一匹配或显式replaceAll为true\n            E->>E: pieces.join(after)按字面替换\n            E->>F: write结果及版本\n            F->>F: 排队复查版本并原子替换\n            F-->>E: 返回写入字节数\n            E-->>T: 编辑结果\n            T-->>C: execute结果\n        end\n    end\n    Note over C,F: 写后要重新观察，未新增分片读取或并发CAS"
 }

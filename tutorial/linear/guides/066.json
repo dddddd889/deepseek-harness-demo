@@ -27,5 +27,6 @@
     "packages/session-query/session-log-export/src/archive.ts",
     "packages/sdk/protocol/src/types.ts",
     "packages/sdk/client/src/client.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 测试调用方\n    participant Q as Query读模型\n    participant D as SQLite内存FTS\n    participant Z as 自有ZIP辅助函数\n    participant C as 外部Bun运行的tsc\n    T->>Q: index同一事件快照两次\n    Q->>D: 读seq水位并事务追加新增事件\n    D-->>Q: 第二次没有重复行\n    T->>Q: search cancel与授权集合\n    Q->>D: 参数化FTS查询\n    D-->>Q: 排序并限制的结果\n    Q->>Q: 过滤allowedSessions\n    Q-->>T: 授权时一条，未授权时零条\n    Note over T,Z: 独立ZIP段，不是原版导出格式或已接UI\n    T->>Z: exportSession\n    Z-->>T: manifest.json与events.json的ZIP\n    T->>Z: importSession\n    Z->>Z: 校验条目与自有事件格式\n    Z-->>T: 返回自有事件\n    Note over T,C: 独立类型检查段，不运行SDK消费者任务\n    T->>C: spawn tsc编译NodeNext消费者\n    C-->>T: 退出码零\n    T->>Q: close\n    Q->>D: 关闭数据库"
 }

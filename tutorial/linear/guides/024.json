@@ -26,5 +26,6 @@
     "packages/core/tools/README.zh.md",
     "packages/interaction/permission-presets/README.zh.md",
     "packages/interaction/user-approval/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant T as Tools 统一执行入口\n    participant G as permissionGuard\n    participant S as Settings 和会话\n    participant A as Approvals\n    participant R as 工具实现\n    C->>T: execute(call, context)\n    T->>T: 检查取消，查工具并校验参数\n    T->>G: guard(tool, call, context)\n    G->>S: snapshot 读取策略\n    S-->>G: 当前配置快照\n    alt 只读策略遇到副作用\n        G-->>T: 抛出只读拒绝\n        T-->>C: 拒绝，不记录决策或调用工具\n    else 通过只读检查\n        G->>S: append(permission/decision)\n        opt ask 策略且不是 read\n            G->>A: request(session.id, question, signal)\n            A-->>G: boolean 答复或取消错误\n        end\n        alt 审批拒绝或已取消\n            G-->>T: 抛出拒绝或取消错误\n            T-->>C: 原 execute 抛错\n        else 守卫通过\n            G-->>T: guard 返回\n            T->>T: 再次检查取消\n            T->>R: run(复制后的参数, context)\n            R-->>T: 工具结果\n            T-->>C: 原 execute 完成\n        end\n    end\n    Note over T,G: 本章只有单个 guard；没有多守卫和父子 restrict 交集"
 }

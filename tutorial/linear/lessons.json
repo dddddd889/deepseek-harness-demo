@@ -34,7 +34,8 @@
       "sources": [
         "apps/cli/src/args.ts",
         "apps/cli/src/profile-boot.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    actor U as 用户终端\n    participant B as Bun入口进程\n    participant I as input函数\n    U->>B: bun run start 与任务参数\n    B->>I: input(process.argv.slice(2))\n    I->>I: join空格并trim\n    alt 得到非空任务\n        I-->>B: 返回任务文字\n        B-->>U: 打印收到任务，退出码0\n    else 空白任务\n        I-->>B: 抛出用法错误\n        B->>B: catch设置process.exitCode为1\n        B-->>U: 打印用法并失败退出\n    end\n    Note over B,I: 只接收任务，不读取README或调用模型"
     }
   },
   {
@@ -73,7 +74,8 @@
         "vendor/cordis/src/fiber.ts",
         "packages/core/scope/src/index.ts",
         "packages/core/scope/src/store.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant P as 父Scope\n    participant S as 子Scope\n    participant R as 资源清理函数\n    C->>P: own父资源清理\n    C->>P: child()\n    P->>P: own子Scope.close\n    P-->>C: 返回子Scope\n    C->>S: own子资源清理\n    C->>P: await close()\n    P->>P: 标记closed并逆序取销毁项\n    P->>S: await close()\n    S->>R: 执行子资源清理\n    R-->>S: 测试样本抛错\n    S-->>P: AggregateError\n    P->>P: 收集错误，继续下一项\n    P->>R: 执行父资源清理\n    P-->>C: 汇总为AggregateError\n    opt 再次close\n        C->>P: close()\n        P-->>C: 已关闭，直接返回\n    end"
     }
   },
   {
@@ -113,7 +115,8 @@
         "vendor/cordis/src/context.ts",
         "vendor/loader/src/config/isolate.ts",
         "packages/core/scope/src/store.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant P as 父Services\n    participant S as 子Services\n    participant O as 子注册的Scope\n    C->>P: provide父Scope与本地fs\n    C->>P: child()\n    P-->>C: 返回以父表为后备的子表\n    C->>S: provide(O, fs, 远端替代对象)\n    S->>O: own撤销当前注册项\n    C->>S: get(fs)\n    S-->>C: 当前层的remote对象\n    C->>P: get(fs)\n    P-->>C: 父层仍是local对象\n    C->>O: await close()\n    O->>S: 删除对应注册项\n    C->>S: get(fs)\n    S->>P: 当前层缺项，get(fs)\n    P-->>S: local对象\n    S-->>C: 回退父服务\n    Note over P,S: 名称查找与撤销，不是真实SSH调用"
     }
   },
   {
@@ -153,7 +156,8 @@
         "vendor/loader/src/config/entry.ts",
         "vendor/loader/src/config/group.ts",
         "vendor/cordis/src/fiber.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用者\n    participant P as Plugins\n    participant S as 每插件子Scope\n    participant F as 插件setup函数\n    participant R as 共享Services\n    C->>P: profile(rows, catalog)\n    loop 按配置顺序处理启用行\n        P->>P: install(name, setup)\n        P->>S: 根Scope.child()\n        P->>F: setup(scope, shared services)\n        alt 安装成功\n            F->>R: provide服务与撤销登记\n            F-->>P: 完成\n            P->>P: active登记，再记入installed\n        else 安装失败\n            F-->>P: 抛出安装错误\n            P->>S: 关闭失败插件的半成品\n            loop 逆序撤销本次installed\n                P->>P: remove(name)\n                P->>S: close并撤销贡献\n                S->>R: 删除该插件的服务\n            end\n            P-->>C: 重新抛出错误\n        end\n    end\n    Note over P,R: 不关闭根Scope，不退出此前已有插件"
     }
   },
   {
@@ -193,7 +197,8 @@
         "packages/settings/settings/src/schema.ts",
         "vendor/loader/src/config/entry.ts",
         "vendor/loader/src/index.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant S as Settings\n    participant M as compose函数\n    C->>S: new Settings，模型a\n    C->>S: snapshot()\n    S->>S: structuredClone并递归冻结\n    S-->>C: first快照，revision为0\n    C->>S: set，模型b\n    S->>S: 替换当前值，revision加1\n    C->>C: 检查first仍为a\n    C->>S: snapshot()\n    S-->>C: 新快照为b，revision为1\n    Note over C,M: 下面是另一个独立配置合并调用\n    C->>M: 基础行与同id覆盖行\n    loop 按层遍历插件行\n        M->>M: Map按id浅合并\n    end\n    M-->>C: 返回enabled为false的配置行\n    Note over M: 005才把结果交给Plugins.profile"
     }
   },
   {
@@ -233,7 +238,8 @@
         "packages/core/session/src/surface.ts",
         "packages/session/session-persistence/src/index.ts",
         "packages/session/session-persistence-jsonl/src/index.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant D as session-demo进程\n    participant P as 插件装配\n    participant R as readTask\n    participant S as Settings\n    participant E as Events\n    participant F as 本机文件系统\n    participant V as 终端订阅者\n    D->>P: createReaderApp安装四个插件\n    P->>F: 打开本次独立JSONL\n    P->>E: 注册persist与显示订阅\n    D->>R: run指定文件\n    R->>S: snapshot()\n    S-->>R: 当前任务固定配置\n    R->>E: append开始与用户事实\n    E->>F: 追加JSONL并fsync\n    E-->>V: 发布已提交事实\n    R->>F: readFile真实读取\n    F-->>R: 文件文本\n    R->>E: append工具结果与最终消息\n    E->>F: 先落盘\n    E-->>V: 显示文件结果\n    D->>P: remove终端插件\n    P->>E: 撤销显示订阅\n    D->>R: 第二次run，仍写事实与磁盘\n    D->>E: read(cursor)补读错过事件\n    E-->>D: 返回新增事实副本\n    D->>P: close，等待任务后撤销服务并关闭日志"
     }
   },
   {
@@ -273,7 +279,8 @@
         "packages/session/session-persistence-jsonl/src/lease.ts",
         "packages/session/session-persistence-jsonl/src/zstd.ts",
         "packages/session/session-persistence-jsonl/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant J as Journal\n    participant E as Events\n    participant F as 本机文件系统\n    C->>J: new Journal(path)\n    J->>F: wx创建锁并打开日志\n    F-->>J: 现有日志字节\n    J->>J: 按最后LF解析完整行及seq\n    opt 最后存在未完成半行\n        J->>F: truncate到最后LF并fsync\n    end\n    C->>E: append用户消息\n    E->>J: persist(record)\n    J->>F: writeSync循环写完并fsync\n    J-->>E: 提交成功\n    E->>E: 追加内存并发布\n    opt 第二写者同时构造\n        C->>J: 再次new Journal同一路径\n        J->>F: wx创建同名锁\n        F-->>J: EEXIST\n        J-->>C: 构造失败，拒绝双写\n    end\n    C->>J: close()\n    J->>F: 关闭日志fd，移除锁文件\n    Note over J,F: 普通文件锁，崩溃残留不自动清除"
     }
   },
   {
@@ -313,7 +320,8 @@
         "packages/session/session-format/src/catalog.ts",
         "packages/session/session-persistence-jsonl/src/generation.ts",
         "packages/session/session-persistence-jsonl/src/migration-verifier.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant G as Generations\n    participant F as 本机文件系统\n    participant M as 相邻迁移回调\n    C->>G: publish新版候选\n    G->>F: 写UUID.json并fsync\n    G->>G: beforePublish故障注入点\n    alt 回调抛错\n        G-->>C: 拒绝，current仍指向旧文件\n    else 正常继续\n        G->>F: 写临时指针并rename为current\n        G-->>C: 返回新代次文件名\n    end\n    Note over C,G: 迁移是调用者另行发起的操作\n    C->>G: migrate目标版本2\n    G->>F: 按current读取version为1的对象\n    loop 每次只前进一个版本\n        G->>M: migration复制后的旧对象\n        M-->>G: 返回下一版本对象\n    end\n    G->>G: publish迁移后对象\n    G->>F: 保留旧文件并发布新指针\n    G-->>C: 返回version为2的对象\n    Note over G: 当前未接Journal或Host"
     }
   },
   {
@@ -353,7 +361,8 @@
         "packages/core/session/src/fork.ts",
         "packages/core/session/src/repair.ts",
         "packages/session-query/session-query/src/cold-read.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant P as 父Events\n    participant V as 投影函数\n    participant S as 子Events\n    C->>P: 追加用户消息与stream分片\n    C->>V: fork(parent, child, through)\n    V->>S: append lineage\n    V->>P: read事实前缀副本\n    P-->>V: 两条记录\n    loop 仅选择message开头事件\n        V->>S: append复制的消息\n    end\n    V-->>C: 返回子会话\n    C->>S: read()\n    S-->>C: 子会话事实\n    C->>V: messages(子会话事实)\n    V-->>C: 仅提交消息，不含stream分片\n    C->>V: search父会话与关键字\n    V->>P: read()\n    P-->>V: 父会话事实副本\n    V-->>C: 命中的sessionId与seq\n    Note over V: fork和search仍是单测能力，未接Host"
     }
   },
   {
@@ -392,7 +401,8 @@
         "packages/core/agent-loop/src/inbox.ts",
         "packages/core/agent-loop/src/agent.ts",
         "packages/core/agent/src/types.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant I as Inbox\n    participant E as Events\n    C->>I: enqueue内容与目的地\n    I->>E: append inbox/add\n    E-->>I: 事实已写入\n    I-->>C: 返回输入id\n    opt 尚未认领时修改\n        C->>I: update(id, 新内容)\n        I->>E: read并确认仍pending\n        E-->>I: 待处理事实\n        I->>E: append inbox/edit\n    end\n    C->>I: claim指定目的地\n    I->>E: read完整事实\n    E-->>I: add、edit、remove、claim事件\n    I->>I: pending重放，挑选第一项\n    alt 有待处理输入\n        I->>E: 先append inbox/claim\n        E-->>I: 认领事实已提交\n        I-->>C: 返回已认领输入\n    else 没有待处理输入\n        I-->>C: undefined\n    end\n    Note over C,I: 013由Agent取turn，012及014由Loop取step\n    Note over I: 本章测试未启动Agent，不中断正在运行请求"
     }
   },
   {
@@ -431,7 +441,8 @@
         "packages/llm/llm/src/index.ts",
         "packages/llm/llm/src/types.ts",
         "packages/test-support/llm-replay/src/index.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant M as ScriptModel\n    participant A as AbortController\n    C->>M: stream(request)\n    M->>M: 记录request并shift脚本\n    alt 普通Part数组\n        loop 按脚本次序\n            M->>M: signal.throwIfAborted\n            M-->>C: yield一份Part副本\n        end\n    else hang样本\n        M-->>C: yield partial文字\n        M->>M: 等待可取消delay\n        C->>A: abort()\n        A-->>M: signal取消\n        M-->>C: 下一次next拒绝\n    else 脚本耗尽\n        M-->>C: 抛出固定模型脚本耗尽\n    end\n    Note over M: 本地替身，不产生HTTP或模型推理"
     }
   },
   {
@@ -471,7 +482,8 @@
         "packages/core/tools/src/json-schema.ts",
         "packages/core/tools/src/types.ts",
         "packages/core/tools/src/ptc.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试或调用方\n    participant T as Tools\n    participant V as validate\n    participant G as 单一guard\n    participant R as 工具run函数\n    participant S as 资源Scope\n    C->>T: register(scope, tool)\n    T->>S: own撤销注册项\n    C->>T: catalog()\n    T-->>C: 仅name、description与schema\n    C->>T: execute(call, context)\n    T->>T: 检查取消并按名查工具\n    T->>V: 校验arguments\n    alt 参数不合法\n        V-->>T: 抛出参数错误\n        T-->>C: 拒绝，不调用guard或run\n    else 参数合法\n        V-->>T: 校验通过\n        T->>G: await guard(tool, call, context)\n        G-->>T: 本次检查通过\n        T->>T: 再检查signal\n        T->>R: run参数副本\n        R-->>T: 实际工具结果\n        T-->>C: execute结果\n    end\n    opt 插件退出\n        C->>S: close()\n        S->>T: 删除对应注册项\n    end"
     }
   },
   {
@@ -511,7 +523,8 @@
         "packages/core/agent-loop/src/assistant-stream.ts",
         "packages/core/agent-loop/src/tool-calls.ts",
         "packages/core/session/src/repair.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 本章测试\n    participant L as runTurn\n    participant E as Events\n    participant M as ScriptModel\n    participant T as Tools与sum\n    C->>L: runTurn，计算2加3\n    L->>E: turn/start与message/user\n    L->>E: read并投影历史\n    E-->>L: 已提交消息\n    L->>T: catalog()\n    T-->>L: sum的schema\n    L->>M: 第一次stream，历史与工具\n    M-->>L: sum调用与finish tools\n    L->>E: 提交assistant调用及request/end\n    L->>E: tool/start\n    L->>T: execute(sum, a为2,b为3)\n    T-->>L: 实际结果5\n    L->>E: message/tool，保留同一callId\n    L->>E: read新历史\n    E-->>L: assistant调用及tool结果\n    L->>M: 第二次stream，携带工具结果\n    M-->>L: 文字5与finish stop\n    L->>E: assistant与turn/end completed\n    L-->>C: 返回turnId与completed\n    Note over M: 固定模型事件，没有网络请求"
     }
   },
   {
@@ -550,7 +563,8 @@
         "packages/core/agent/src/index.ts",
         "packages/core/agent-loop/src/index.ts",
         "packages/core/agent-loop/src/agent.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 用户或测试调用者\n    participant A as Agent\n    participant I as Inbox\n    participant S as Settings\n    participant L as runTurn\n    C->>A: submit第一条任务\n    A->>I: enqueue到turn\n    I-->>A: 输入id\n    A-->>C: 返回接收凭据\n    A->>A: pump，仅一个活动循环\n    loop 取出待处理turn\n        A->>I: claim(turn)\n        I-->>A: 一条已认领输入\n        A->>S: snapshot()\n        S-->>A: 本turn固定配置\n        A->>L: await runTurn与signal\n        opt 当前任务执行时排队并取消\n            C->>A: submit下一轮\n            A->>I: enqueue新turn\n            C->>A: cancel()\n            A->>L: abort当前signal\n        end\n        L-->>A: 当前turn结束\n    end\n    C->>A: await idle()\n    A-->>C: 所有活动收敛\n    opt 应用退出\n        C->>A: close，拒绝新输入并等待\n    end"
     }
   },
   {
@@ -590,7 +604,8 @@
         "packages/core/agent-loop/src/constants.ts",
         "packages/core/tools/src/index.ts",
         "packages/core/tools/src/ptc-calls.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用者\n    participant L as Loop\n    participant B as batch调度器\n    participant T as Tools\n    participant R as 工具run函数\n    Note over C,B: 本章单测直接调用batch，041才安装到Host\n    C->>L: 工具组待执行\n    alt 未调用installBatch，本章demo默认\n        L->>L: tools.batch为undefined\n        loop 按调用顺序逐个await\n            L->>T: execute(call)\n            T->>R: run()\n            R-->>T: 当前调用结果\n            T-->>L: 当前调用结束\n        end\n    else 已显式installBatch，例如041 Host\n        L->>B: tools.batch(calls, context)\n        loop 按模型顺序扫描\n            alt 非独占工具\n                B->>T: 启动execute\n                T->>R: 启动run，可与同组重叠\n                T-->>B: 进行中Promise加入group\n            else 独占工具\n                B->>B: 等待前组全部结束\n                R-->>T: 前组run完成\n                T-->>B: 前组execute结果\n                B->>T: await独占execute\n                T->>R: 独占run\n                R-->>T: 独占结果\n                T-->>B: 完成后才启动后组\n            end\n        end\n        B->>B: await剩余组\n        opt 最后仍有进行中的非独占调用\n            R-->>T: 最后组run完成\n            T-->>B: 最后组execute结果\n        end\n        B->>B: 按index保留结果\n        B-->>L: 模型调用顺序的results\n    end"
     }
   },
   {
@@ -629,7 +644,8 @@
         "packages/llm/llm-deepseek/src/sse.ts",
         "packages/llm/llm-deepseek/src/translate.ts",
         "packages/llm/llm-deepseek/src/transport.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 上层调用者或测试\n    participant S as sse生成器\n    participant D as TextDecoder\n    C->>S: 传入异步字节chunks\n    loop 每次收到任意大小chunk\n        S->>D: decode，stream为true\n        D-->>S: 完整UTF-8文字，保留半字符状态\n        S->>S: 追加到buffer\n        loop buffer内有完整空行分隔\n            S->>S: 取出一帧并移除已消费前缀\n            S->>S: 提取data行并合并\n            S-->>C: yield data正文字符串\n        end\n    end\n    S->>D: 最后decode刷新\n    D-->>S: 解码器剩余结果\n    S->>S: 再处理完整帧\n    alt 存在非注释的未完成尾帧\n        S-->>C: 抛出SSE尾帧未完成\n    else 没有残留\n        S-->>C: 结束迭代\n    end\n    Note over C,S: 此层不解释JSON、工具或DONE含义"
     }
   },
   {
@@ -669,7 +685,8 @@
         "packages/llm/llm-deepseek/src/translate.ts",
         "packages/llm/llm-deepseek/src/transport.ts",
         "packages/llm/llm-deepseek/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant L as Agent Loop\n    participant M as DeepSeekModel\n    participant F as 本地固定HTTP响应源\n    participant S as sse解析器\n    participant T as Tools与sum\n    participant E as Events\n    Note over M,F: 图示本章离线测试，真实demo才使用远端fetch\n    loop 本例两次模型请求\n        L->>M: stream历史、工具与signal\n        M->>M: toMessages组装兼容请求\n        M->>F: 调用fetcher，POST chat/completions\n        F-->>M: Response及body字节流\n        M->>S: sse(response.body)\n        loop 完整SSE data\n            S->>F: 迭代body字节\n            F-->>S: 任意大小字节块\n            S-->>M: 解码后的data字符串\n            M->>M: 累计thinking、正文与tool参数\n            opt 有正文增量\n                M-->>L: text Part供显示\n            end\n        end\n        M->>M: 校验finish_reason与DONE及工具JSON\n        M-->>L: thinking、tool、replay和finish\n        L->>E: 提交完整assistant与request/end\n        opt 首次请求要求工具\n            L->>T: execute sum\n            T-->>L: 实际结果5\n            L->>E: 记录tool结果供下一次请求\n        end\n    end\n    L->>E: turn/end completed"
     }
   },
   {
@@ -709,7 +726,8 @@
         "packages/llm/llm-deepseek/src/upload-index.ts",
         "packages/llm/llm-deepseek/src/request-files.ts",
         "packages/llm/llm-deepseek/src/files-api.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant M as ModelFiles\n    participant H as 本地固定Files响应\n    Note over C,M: 仅上传helper单测，没有Agent或Loop接线\n    C->>M: upload(bytes, mediaType, signal)\n    M->>M: 算digest并查cache\n    alt 缓存仍在有效期\n        M-->>C: 复用file id\n    else 同digest正在上传\n        M->>M: 等待共享inflight Promise\n        M-->>C: 返回同一次上传的id或错误\n    else 没有可复用项\n        M->>H: 调用fetcher发POST，登记inflight\n        alt HTTP失败\n            H-->>M: 固定500\n            M->>M: 不写cache，finally移除inflight\n            M-->>C: 抛错，下次可重试\n        else HTTP成功\n            H-->>M: 含file id的JSON\n            M->>M: 校验id，写cache并清inflight\n            M-->>C: 返回file id\n        end\n    end\n    Note over M,H: 取得id不等于图片已进入模型请求"
     }
   },
   {
@@ -750,7 +768,8 @@
         "packages/llm/llm/src/retry-policy.ts",
         "packages/llm/llm-pi-ai/src/auth.ts",
         "packages/credentials/credentials/src/index.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant A as Agent与Loop\n    participant R as Routes\n    participant P as 路由提供方\n    participant K as RefreshToken\n    participant C as 本地凭据回调\n    participant H as 本地固定模型HTTP\n    A->>R: stream固定provider与model\n    R->>R: 校验路由，attempt从0开始\n    loop 首次尝试及最多一次重试\n        R->>P: stream同一请求快照\n        alt 正常完成\n            P-->>R: Parts并结束\n            R-->>A: 转交Parts并结束\n        else 请求失败\n            P-->>R: 错误，可能已交付部分Part\n            alt published或已取消或attempt已到1\n                R-->>A: 错误，不再重试\n            else 尚无Part且是首次未取消尝试\n                R->>R: 可取消等待10ms，再试一次\n            end\n        end\n    end\n    Note over R: usage也算published，不要求已经有正文\n    Note over A,H: 以下是demo中另一独立并发鉴权场景\n    A->>R: 两个独立Agent并发请求OAuth路由\n    R->>P: 两次进入鉴权包装器stream\n    P->>K: 两次get，均在构造鉴权头前等待\n    K->>C: read过期凭据\n    C-->>K: 过期token记录\n    K->>C: pending合并为一次refresh\n    Note over K,C: demo确认两个请求到达后放行gate\n    C-->>K: 新凭据\n    K->>C: write保存新凭据\n    C-->>K: 保存完成\n    K-->>P: 两个等待者取得同一新token\n    P->>H: 分别用新Bearer发送两次模型请求\n    H-->>P: 各自模型响应\n    P-->>R: 两个请求的Part流\n    R-->>A: 各自请求完成结果"
     }
   },
   {
@@ -791,7 +810,8 @@
         "packages/compaction/compaction/src/tool-pairing.ts",
         "packages/spill/spill-policy/src/index.ts",
         "packages/spill/spill-local/src/store.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant P as compact函数\n    participant M as 固定摘要回调\n    participant S as Spill\n    participant F as 本机临时文件\n    Note over C,S: 两个helper独立调用，均未接入Loop\n    C->>P: compact(history, limit, measure)\n    P->>P: 复制history并计量\n    alt 未超预算\n        P-->>C: 返回副本\n    else 超预算且当前轮可保留\n        P->>P: 找最后user并保留recent\n        P->>M: summarize旧前缀\n        M-->>P: 固定摘要关键事实\n        P->>P: 摘要加recent，再检查预算\n        P-->>C: 返回压缩副本，原数组不改\n    end\n    Note over C,S: Spill并非由compact自动触发\n    C->>S: put完整原文\n    S->>F: 按内容hash写文件\n    F-->>S: 写入成功\n    S-->>C: id、bytes与preview\n    C->>S: get(id)\n    S->>F: 读取文本\n    F-->>S: 当前文件内容\n    S->>S: 比较实际hash与id\n    S-->>C: 返回原文或完整性错误"
     }
   },
   {
@@ -832,7 +852,8 @@
         "packages/llm/llm-pi-ai/src/stream.ts",
         "packages/llm/llm-pi-ai/src/discovery.ts",
         "packages/llm/llm-pi-ai/src/auth.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant A as Agent Loop\n    participant R as Routes\n    participant P as PiModel\n    participant S as 真实pi-ai SDK\n    participant F as 本地demo fetcher\n    participant H as DeepSeek远端\n    participant T as Tools与sum\n    participant E as Events\n    loop 本例两次模型请求\n        A->>R: stream deepseek-pi路由\n        R->>P: stream同一请求\n        P->>P: context转换历史与工具，保留pi回放\n        P->>S: streamSimple，SDK重试设0\n        S->>F: SDK构造兼容HTTP请求\n        alt 默认离线demo\n            F-->>S: 固定DeepSeek SSE，不联网\n        else 显式live且有Key\n            F->>H: fetch真实请求\n            H-->>F: 远端SSE响应\n            F-->>S: 返回真实Response\n        end\n        S->>S: 解析SSE并拼工具参数\n        S-->>P: SDK事件与完整assistant\n        P-->>R: 转为自有Part及pi replay\n        R-->>A: 转交Part流\n        A->>E: 保存assistant与请求事实\n        opt 首次请求返回sum调用\n            A->>T: 真实执行sum\n            T-->>A: 5\n            A->>E: 提交tool结果供第二次请求\n        end\n    end\n    A->>E: turn/end completed"
     }
   },
   {
@@ -874,7 +895,8 @@
         "packages/fs/fs-local/src/fsio.ts",
         "packages/fs/fs-observation-policy/src/index.ts",
         "packages/fs/fs-sandbox/src/containment.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant L as LocalFS同一实例\n    participant F as 本机文件系统\n    C->>L: read相对路径\n    L->>F: realpath检查目标或已存在祖先\n    F-->>L: 实际路径\n    alt 真实路径越界\n        L-->>C: 拒绝，不读取内容\n    else 路径接纳\n        L->>F: 全量readFile\n        F-->>L: 字节\n        L->>L: 算hash并observed登记\n        L-->>C: text与version\n    end\n    C->>L: write新内容与expected\n    L->>L: 进入本实例pending队列\n    L->>F: 复查路径并读取当前内容\n    F-->>L: 当前版本依据\n    L->>L: 核对expected及observed\n    alt 版本不符或尚未读取\n        L-->>C: 拒绝覆盖\n    else 检查通过\n        L->>F: 写同目录临时文件\n        F-->>L: 临时内容写完\n        L->>F: rename替换目标\n        F-->>L: 替换成功\n        L->>L: 清除observed记录\n        L-->>C: 返回写入字节数\n    end\n    Note over L,F: 队列不跨实例，检查到rename仍有外部竞态"
     }
   },
   {
@@ -916,7 +938,8 @@
         "packages/fs/tool-fs/src/write.ts",
         "packages/fs/fs-observation-policy/src/index.ts",
         "packages/fs/tool-fs/src/diff.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as edit-demo或测试\n    participant T as Tools\n    participant E as edit执行函数\n    participant F as LocalFS\n    C->>T: 已注册fileTools，execute read\n    T->>F: read(path)\n    F-->>T: text与version\n    T-->>C: 读取结果\n    C->>T: execute edit与版本及可选replaceAll\n    T->>T: Schema校验及guard\n    T->>E: run复制后的参数\n    E->>F: 重新read\n    F-->>E: 当前text与version\n    alt 版本不符\n        E-->>T: 文件版本冲突\n        T-->>C: 拒绝\n    else 版本一致\n        E->>E: split统计非重叠匹配\n        alt before为空或零匹配\n            E-->>T: 无效替换\n            T-->>C: 拒绝\n        else 多匹配且replaceAll不是true\n            E-->>T: 必须唯一匹配\n            T-->>C: 拒绝\n        else 唯一匹配或显式replaceAll为true\n            E->>E: pieces.join(after)按字面替换\n            E->>F: write结果及版本\n            F->>F: 排队复查版本并原子替换\n            F-->>E: 返回写入字节数\n            E-->>T: 编辑结果\n            T-->>C: execute结果\n        end\n    end\n    Note over C,F: 写后要重新观察，未新增分片读取或并发CAS"
     }
   },
   {
@@ -959,7 +982,8 @@
         "packages/interaction/user-approval/src/index.ts",
         "packages/interaction/user-questions/README.zh.md",
         "packages/interaction/tool-ask-user/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 消费方或测试\n    participant A as Approvals 审批管理器\n    participant P as publish 回调\n    participant U as 答复方或测试\n    C->>A: request(owner, question, signal)\n    A->>A: 创建 id，登记 pending、定时器和取消监听\n    A->>P: 发布 approval/request\n    P-->>U: 展示问题和审批 id\n    alt 正常答复\n        U->>A: answer(owner, id, allowed)\n        A->>A: 校验 owner，删除 pending 并清理监听\n        A->>P: 发布 approval/settled\n        A-->>C: 原 request 返回 boolean\n    else 取消或超时\n        A->>A: finish 清理同一 pending\n        A->>P: 发布 approval/settled\n        A-->>C: 原 request 抛错\n    end\n    Note over A,U: 结算后迟答和重复答复被拒绝；本章测试直接扮演答复方"
     }
   },
   {
@@ -1003,7 +1027,8 @@
         "packages/core/tools/README.zh.md",
         "packages/interaction/permission-presets/README.zh.md",
         "packages/interaction/user-approval/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant T as Tools 统一执行入口\n    participant G as permissionGuard\n    participant S as Settings 和会话\n    participant A as Approvals\n    participant R as 工具实现\n    C->>T: execute(call, context)\n    T->>T: 检查取消，查工具并校验参数\n    T->>G: guard(tool, call, context)\n    G->>S: snapshot 读取策略\n    S-->>G: 当前配置快照\n    alt 只读策略遇到副作用\n        G-->>T: 抛出只读拒绝\n        T-->>C: 拒绝，不记录决策或调用工具\n    else 通过只读检查\n        G->>S: append(permission/decision)\n        opt ask 策略且不是 read\n            G->>A: request(session.id, question, signal)\n            A-->>G: boolean 答复或取消错误\n        end\n        alt 审批拒绝或已取消\n            G-->>T: 抛出拒绝或取消错误\n            T-->>C: 原 execute 抛错\n        else 守卫通过\n            G-->>T: guard 返回\n            T->>T: 再次检查取消\n            T->>R: run(复制后的参数, context)\n            R-->>T: 工具结果\n            T-->>C: 原 execute 完成\n        end\n    end\n    Note over T,G: 本章只有单个 guard；没有多守卫和父子 restrict 交集"
     }
   },
   {
@@ -1045,7 +1070,8 @@
         "packages/subprocess/subprocess-local/README.zh.md",
         "packages/shell/bash-local/README.zh.md",
         "packages/shell/tool-bash/src/render.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant E as execute 进程适配器\n    participant P as 真实子进程\n    participant O as onOutput 回调\n    C->>E: execute(spec, signal, onOutput)\n    E->>P: spawn(command, args, shell=false)\n    loop stdout 或 stderr 数据到达\n        P-->>E: 字节块\n        E->>E: 累计字节数和 output\n        opt 尚未超过 maxBytes\n            E->>O: onOutput(text)\n        end\n    end\n    alt 超时、取消或输出超限\n        E->>P: 终止进程树；必要时强制结束\n        P-->>E: close 事件\n        E-->>C: 清理监听后 reject\n    else 正常退出\n        P-->>E: close(code, signal)\n        E-->>C: code、output、bytes\n    end\n    Note over E,P: 先等 close 再结算；超限终止，没有 Spill 落盘"
     }
   },
   {
@@ -1088,7 +1114,8 @@
         "packages/shell/tool-bash-persistent/README.zh.md",
         "packages/shell/tool-bash-persistent/src/index.ts",
         "packages/terminal/terminal/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant S as 持久 Shell\n    participant B as Bash 子进程（普通管道）\n    C->>S: new Shell(cwd)\n    S->>B: spawn Bash，一次创建持续复用\n    loop 每次 run\n        C->>S: run(command, signal)\n        S->>S: 排入 tail，等待前一调用结算\n        S->>B: stdin 写命令和随机结束 marker\n        B-->>S: stdout 与 stderr 数据\n        alt 收到 marker 和退出码\n            S->>S: 截取 marker 前输出并撤销本次监听\n            S-->>C: 返回 code 和 output\n        else 取消、超时或超限\n            S->>B: kill 整个进程组\n            S-->>C: 本次 run 抛错\n        end\n    end\n    opt 调用方结束资源寿命\n        C->>S: close()\n        S->>B: kill 并等待 close\n    end\n    Note over S,B: 环境变量和 cwd 留在同一个 Bash；这里没有 PTY"
     }
   },
   {
@@ -1132,7 +1159,8 @@
         "packages/terminal/terminal-bash/README.zh.md",
         "packages/subprocess/subprocess-local/src/terminal.ts",
         "packages/experimental/tool-terminal/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant T as Terminal\n    participant B as Bun PTY 与子进程\n    participant S as 资源 Scope\n    C->>T: new Terminal(scope, command, args)\n    T->>B: Bun.spawn，配置 terminal 回调\n    T->>S: own 登记清理回调\n    C->>T: write(按键字符串)\n    T->>B: terminal.write 输入字节\n    B->>B: Vim 等程序处理按键\n    loop 终端输出到达\n        B-->>T: data(bytes)\n        T->>T: 连续解码并追加带 offset 的 chunks\n    end\n    C->>T: read(cursor)\n    T-->>C: 增量 text 与新 offset\n    opt 调整终端尺寸\n        C->>T: resize(cols, rows)\n        T->>B: terminal.resize\n    end\n    C->>S: close()\n    S->>T: 执行登记的清理回调\n    T->>B: kill 子进程\n    B-->>T: 进程退出与 PTY EOF\n    T->>B: 两者均结束后关闭 PTY\n    T-->>S: 清理完成\n    Note over C,T: read 返回文本和控制序列，尚未接入可视终端组件"
     }
   },
   {
@@ -1174,7 +1202,8 @@
         "packages/sandbox/sandbox-local/README.zh.md",
         "packages/sandbox/sandbox-policy/README.zh.md",
         "packages/sandbox/sandbox-windows-acl/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant S as Sandbox 参数编译器\n    participant P as runner 探测函数\n    C->>S: wrap(spec, workspace, mode)\n    S->>S: 校验 mode 与操作系统\n    alt macOS 或 Linux\n        S->>P: probe(sandbox-exec 或 bwrap)\n        P-->>S: 是否可用\n        alt runner 可用\n            S->>S: 生成限制规则和包装后的 argv\n            S-->>C: 返回新的执行 Spec\n        else runner 不可用\n            S-->>C: 抛错，拒绝执行\n        end\n    else 未实现的平台\n        S-->>C: 抛错，拒绝执行\n    end\n    Note over C,P: 本章使用注入的 probe，只验 Spec；未启动 OS 沙箱\n    Note over C,S: 051 才由调用方把返回 Spec 交给 execute"
     }
   },
   {
@@ -1220,7 +1249,8 @@
         "packages/ssh/fs-ssh/README.zh.md",
         "packages/ssh/subprocess-ssh/README.zh.md",
         "packages/ssh/ssh-helper-runtime/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方\n    participant S as SSH 适配器\n    participant E as runner（默认 execute）\n    participant L as 本机 ssh 进程\n    participant R as 远端 Shell 与文件系统\n    C->>S: new SSH(host, workspace)\n    S->>S: 校验 host 与绝对工作区\n    alt 读取文件\n        C->>S: read(path, signal)\n        S->>S: 检查路径并生成 cat argv\n    else 写入文件\n        C->>S: write(path, text, signal)\n        S->>S: 检查路径，编码 base64，生成固定写入模板\n    else 执行命令\n        C->>S: run(argv, signal)\n    end\n    S->>S: quote 编码每个远端参数\n    S->>E: runner(ssh 启动 Spec, signal)\n    E->>L: 默认实现 spawn ssh\n    L->>R: cd 工作区后 exec 命令\n    R-->>L: 输出和退出码\n    L-->>E: 进程结果\n    E-->>S: code 和 output\n    S-->>C: 读取文本或执行结果\n    Note over E,R: 本章 SSH 测试注入 runner；图中真实远端路径尚未端到端验收"
     }
   },
   {
@@ -1264,7 +1294,8 @@
         "packages/jobs/jobs-local/README.zh.md",
         "packages/jobs/tool-jobs/README.zh.md",
         "packages/shell/bash-local/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant J as Jobs\n    participant P as producer 异步任务\n    participant S as 资源 Scope\n    C->>J: start(scope, owner, producer)\n    J->>J: 登记 job 与 AbortController\n    J->>S: own 登记取消、等待和删除回调\n    J-->>C: jobId\n    J->>P: producer(signal, emit)\n    loop 有输出\n        P->>J: emit(text) 追加 output\n    end\n    opt 观察任务\n        C->>J: wait(owner, jobId, timeout)\n        J->>J: 等 done 或观察期限到达\n        J-->>C: 当前状态；观察超时不取消 producer\n        C->>J: read(owner, jobId, cursor)\n        J-->>C: 增量 chunks 与新 cursor\n    end\n    opt 显式停止\n        C->>J: kill(owner, jobId)\n        J->>P: abort 并等待 done\n        P-->>J: 生产方结束，job.done 结算\n        J-->>C: kill 完成\n    end\n    C->>S: close()\n    S->>J: 执行登记的清理回调\n    J->>P: abort 并等待 done（已结束则立即返回）\n    J->>J: 删除 entries 项\n    J-->>S: 清理完成\n    Note over C,J: get 会校验 owner；本章 producer 为可取消等待，不是构建进程"
     }
   },
   {
@@ -1308,7 +1339,8 @@
         "packages/skill/skill/src/index.ts",
         "packages/skill/skill-filesystem/README.zh.md",
         "packages/skill/tool-skill/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant S as Skills\n    participant F as 本地 Skill 目录\n    participant E as 会话 Events\n    C->>S: discover()\n    S->>S: 清空 catalog\n    loop 用户根目录，再项目根目录\n        S->>F: readdir 扫描命名子目录\n        F-->>S: 目录项\n        S->>S: 记录 SKILL.md 路径，同名后层覆盖\n    end\n    S-->>C: 已发现名称列表\n    C->>S: load(name, session)\n    S->>S: 查 catalog；未知名称抛错\n    S->>F: readFile 对应 SKILL.md\n    F-->>S: 正文\n    S->>S: 计算正文 SHA-256\n    S->>E: append(context/skill，来源、hash、正文)\n    S-->>C: 返回正文\n    Note over S,F: 本章只读取入口文档；scripts 和 references 尚未建立资源使用链"
     }
   },
   {
@@ -1353,7 +1385,8 @@
         "packages/sdk/protocol/src/transport.ts",
         "packages/sdk/server/README.zh.md",
         "packages/interaction/user-approval/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant D as 父进程 rpc-demo\n    participant P as 父 Peer 与 framing\n    participant W as 子进程 worker Peer 与处理函数\n    participant A as 父进程 Approvals 与答复方\n    participant F as 演示目录文件\n    D->>W: spawn worker，传入隔离工作区\n    Note over P,W: 双方 Peer 管 RPC id；framing 经 stdin/stdout 传 NDJSON\n    D->>P: request(tools/call，sum)\n    P->>W: 请求 id=A，a 与 b\n    W-->>P: 响应 id=A，value 与子进程 pid\n    P-->>D: 原 sum 请求完成\n    loop 依次调用 allow.txt 与 deny.txt 的 delete\n        D->>P: request(tools/call，delete)\n        P->>W: 请求 id=B，文件名\n        W->>F: realpath 校验文件在工作区根目录\n        F-->>W: 真实文件路径\n        W->>P: 反向请求 id=C，approval/request\n        P->>A: Approvals.request 后等待真人或自动答复\n        A-->>P: allowed\n        P-->>W: 响应 id=C，审批结论\n        alt allowed 为 true\n            W->>F: unlink 删除文件\n            F-->>W: 删除完成\n            W-->>P: 响应 id=B，deleted=true\n        else 用户拒绝\n            W-->>P: 响应 id=B，deleted=false\n        end\n        P-->>D: 原 delete 请求完成\n    end\n    Note over D,W: A/B/C 是示意名，每次生成新 id；审批与工具请求各自配对"
     }
   },
   {
@@ -1365,7 +1398,7 @@
     "run": "bun install --ignore-scripts\nbun test ./tests/033-mcp.test.mjs",
     "test": "tests/033-mcp.test.mjs",
     "accept": "测试应1项通过，覆盖真实stdio握手、两页发现、调用和卸载。没有实际验证HTTP、list_changed动态刷新、资源模板分页、OAuth或在途取消。",
-    "debug": "父进程在src/mcp.mjs的await client.connect、definitions.push、tools.register和client.callTool打断点。F10完成两次listTools后看definitions.length=2、generation===revision；执行second时看注册名project__second但远端name=\"second\"。在await contribution.close后检查旧注册撤销。外部fixture是单独Bun进程，父调试器不能直接停到其handler；需显式为该子进程配置独立Inspector才可调试。",
+    "debug": "按下方[033调试实操](#033调试实操父测试mcp子进程和日志文件)先验收基础测试，再完整替换列出的调试扩展文件，再在自己的PROJECT运行固定启动命令：父测试附加6499/mcp-parent-033，fixture子进程附加6501/mcp-033；先连接父进程并继续，等待它创建子进程，再建立子调试会话。父进程在src/mcp.mjs的client.connect、definitions.push、tools.register和client.callTool停下，看definitions.length=2与远端name=\"second\"；子进程在tests/fixtures/mcp.mjs的分页和工具处理函数体停下，看cursor从undefined变为page2、工具name为second。--timeout 0关闭Bun测试时限，MCP_DEBUG=1才开启子Inspector并把SDK每次请求时限设为1小时；普通回归不带该开关。日志在PROJECT/tmp/mcp-server.log，用另一个终端tail -f查看。完整launch.json、preload和5份文件均在本页末尾，不能只附加父进程就等子进程断点命中。",
     "recall": "闭卷画出project__second→远端second名称映射；说明为什么关闭连接要移除工具，而不是仅把client变量设undefined。",
     "transfer": "安全练习：在固定fixture增加第三页并同步测试期望，验证do/while cursor；不要直接连接带写权限的真实服务试验。OAuth与重连需独立实现，当前spec.headers不是刷新流程。",
     "original": "原版mcp-client接入Loader配置、调用作用域、协议探测、服务指令快照与产品运行时；教程没有完整组合。；原版共享mcp-resources提供模型资源发现/读取路径；本章只返回辅助方法，没有相应工具/上下文接线。；当前测试仅stdio固定样本，尚未覆盖HTTP/OAuth、动态更新与故障恢复；不能因使用同一SDK宣称全功能相同。",
@@ -1375,7 +1408,7 @@
       "try": "先写完src/mcp.mjs和tests/fixtures/mcp.mjs，按本章package.json安装依赖后运行 bun test ./tests/033-mcp.test.mjs。测试真实启动本地MCP服务进程；目录应出现project__first与project__second，执行second返回文本second，remote.close后目录为空。无需远端账户。",
       "why": "MCP适配器把外部协议翻译成现有Tools入口：模型看到的是统一工具名与schema，实际调用委托官方SDK。revision用于防止旧刷新覆盖新一代目录；Scope负责撤销注册，不代表已经自动取消所有在途副作用。",
       "accept": "测试应1项通过，覆盖真实stdio握手、两页发现、调用和卸载。没有实际验证HTTP、list_changed动态刷新、资源模板分页、OAuth或在途取消。",
-      "debug": "父进程在src/mcp.mjs的await client.connect、definitions.push、tools.register和client.callTool打断点。F10完成两次listTools后看definitions.length=2、generation===revision；执行second时看注册名project__second但远端name=\"second\"。在await contribution.close后检查旧注册撤销。外部fixture是单独Bun进程，父调试器不能直接停到其handler；需显式为该子进程配置独立Inspector才可调试。",
+      "debug": "按下方[033调试实操](#033调试实操父测试mcp子进程和日志文件)先验收基础测试，再完整替换列出的调试扩展文件，再在自己的PROJECT运行固定启动命令：父测试附加6499/mcp-parent-033，fixture子进程附加6501/mcp-033；先连接父进程并继续，等待它创建子进程，再建立子调试会话。父进程在src/mcp.mjs的client.connect、definitions.push、tools.register和client.callTool停下，看definitions.length=2与远端name=\"second\"；子进程在tests/fixtures/mcp.mjs的分页和工具处理函数体停下，看cursor从undefined变为page2、工具name为second。--timeout 0关闭Bun测试时限，MCP_DEBUG=1才开启子Inspector并把SDK每次请求时限设为1小时；普通回归不带该开关。日志在PROJECT/tmp/mcp-server.log，用另一个终端tail -f查看。完整launch.json、preload和5份文件均在本页末尾，不能只附加父进程就等子进程断点命中。",
       "recall": "闭卷画出project__second→远端second名称映射；说明为什么关闭连接要移除工具，而不是仅把client变量设undefined。",
       "transfer": "安全练习：在固定fixture增加第三页并同步测试期望，验证do/while cursor；不要直接连接带写权限的真实服务试验。OAuth与重连需独立实现，当前spec.headers不是刷新流程。",
       "wiring": "033已经通过真实MCP进程调用Tools，但当前章没有模型。051 capabilities未调用mountMCP，最终Host没有自动装配MCP配置；后续没有证明Agent→MCP→服务的完整产品链。",
@@ -1396,7 +1429,8 @@
         "packages/mcp/mcp-client/README.zh.md",
         "packages/mcp/mcp-client/src/index.ts",
         "packages/mcp/mcp-resources/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant M as mountMCP 适配器\n    participant K as 官方 MCP Client\n    participant S as MCP 服务（测试为真实子进程 fixture）\n    participant T as Tools 与贡献 Scope\n    C->>M: mountMCP(scope, tools, name, spec)\n    M->>K: 创建 stdio 或 Streamable HTTP 传输\n    K->>S: connect 并完成 MCP 初始化\n    loop 按 nextCursor 分页\n        M->>K: listTools(cursor)\n        K->>S: tools/list\n        S-->>K: 工具定义与下一页游标\n        K-->>M: 返回当前页\n    end\n    M->>T: 当前 generation 注册 name__tool\n    C->>T: execute(call, context)\n    T->>K: 注册的 run 调用 callTool(signal)\n    K->>S: tools/call\n    S-->>K: content 或 isError\n    K-->>T: callTool 返回；isError 转为异常\n    T-->>C: 工具结果或错误\n    opt 服务通知工具列表改变\n        S-->>K: list_changed 通知\n        K->>M: 调用 discover 处理函数\n        M->>T: 新代次发现后撤销旧贡献并重新注册\n    end\n    C->>M: close 或父 Scope.close\n    M->>T: 关闭贡献 Scope，撤销工具\n    M->>K: client.close 释放连接\n    Note over C,T: 本章已接 Tools，但最终 Host 尚未自动挂载 MCP"
     }
   },
   {
@@ -1451,7 +1485,8 @@
         "packages/bundle/base/cordis.patch.yml",
         "packages/llm/token-meter/src/estimate.ts",
         "packages/spill/spill-policy/src/retention.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant W as 当前 Web 适配器\n    participant D as URL 与 DNS 检查\n    participant H as HTTP 服务\n    C->>W: fetchText(url, signal)\n    loop 最多五次尝试，逐次检查跳转地址\n        W->>D: check(url)，检查协议、凭据和私网地址\n        D-->>W: 合法 URL 或抛错\n        W->>H: fetch，手动跳转与十秒期限\n        alt 收到重定向\n            H-->>W: 3xx 与 Location\n            W->>W: 解析下一地址，进入下一次检查\n        else 正常正文\n            H-->>W: 有界流式正文\n            W->>W: 累计字节，超过 1 MiB 抛错\n            W->>W: 连续解码，去 script、style 和标签\n            W-->>C: 返回 url 和 text，结束 fetchText\n        end\n    end\n    opt 单独调用 search\n        C->>W: search(query, signal)\n        alt 未配置 searchURL\n            W-->>C: 抛出尚未配置错误\n        else 已配置搜索提供方\n            W->>D: check(searchURL)\n            D-->>W: 合法搜索地址\n            W->>H: POST 搜索请求\n            H-->>W: JSON 搜索结果\n            W-->>C: 返回搜索结果\n        end\n    end\n    Note over C,W: 这是当前 034 链路；下文原版 HTML 转换与 Spill 尚未接入本实现"
     }
   },
   {
@@ -1459,7 +1494,7 @@
     "title": "语言服务走真实进程和文档版本",
     "phase": "R05",
     "try": "先写完src/lsp.mjs及tests/fixtures/lsp.mjs，再运行 bun test ./tests/035-lsp.test.mjs。测试启动固定LSP对端，发送example.ts打开与修改通知，再查第0行第7列definition，检查返回URI和起始行。fixture不会分析TypeScript，因此不需要先安装tsserver。",
-    "why": "LSP规定编辑器与语言服务如何交流；本章重用032的RPC字节分帧，用URI和文档版本维持状态。它是通用进程客户端骨架，不是完整代码导航工具，也不是语言分析器。",
+    "why": "LSP规定编辑器与语言服务如何交流；本章重用032的RPC字节分帧，用URI和文档版本维持状态。它是通用进程客户端骨架，不是完整代码导航工具，也不是语言分析器。 本章query直接传从0开始的行列，character按默认UTF-16位置解释，不是UTF-8字节数；这与Content-Length按字节分帧是两件事。",
     "run": "bun test ./tests/035-lsp.test.mjs",
     "test": "tests/035-lsp.test.mjs",
     "accept": "测试应1项通过，真实进程握手、通知发送、定义请求与关闭路径可走通。返回位置由fixture固定给出，不证明真实语言语义、诊断、新旧版本同步或取消能力。",
@@ -1468,10 +1503,10 @@
     "transfer": "安全练习：给固定fixture增加hover返回值并用query调用，理解协议扩展；这仍是协议演练。真正接入TypeScript语言服务需要配置服务器与文档同步，当前教程未提供端到端证明。",
     "original": "原版lsp按扩展名路由提供方，规范化definition/references/implementation/hover及结构化错误；本章暴露任意query。；原版lsp-stdio/tool-lsp配对fs/subprocess并处理文件同步和能力验证；本章没有对应统一工具接线。；原版公共LSP seam刻意不含诊断与符号列表；教程的这些辅助接口是自定义范围，不能算原版完整覆盖。",
     "guide": {
-      "scenario": "Agent在TypeScript代码中看到一个同名函数，文本搜索不能可靠判断定义位置。语言服务器可以按文件URI与光标坐标返回语义导航结果。",
+      "scenario": "a.ts和b.ts都定义run，main.ts却从a.ts导入并调用run。文本搜索会匹配多个位置；真实TypeScript语言服务器可依据main.ts的文件URI、光标坐标和import关系定位a.ts。下面用具体三文件例子解释；本章固定fixture只演示协议，不负责真正语义分析。 后面的订单总价例子进一步展示：真实语言服务识别calcTotal导入别名、提供定义/引用/类型信息，实际文件修改仍由Agent调用工具完成。",
       "flow": "languageServer(scope,spec,root) → spawn语言服务器 → Peer/framing使用Content-Length → initialize/initialized → didOpen/didChange版本通知 → textDocument/definition → 返回位置 → shutdown/exit",
       "try": "先写完src/lsp.mjs及tests/fixtures/lsp.mjs，再运行 bun test ./tests/035-lsp.test.mjs。测试启动固定LSP对端，发送example.ts打开与修改通知，再查第0行第7列definition，检查返回URI和起始行。fixture不会分析TypeScript，因此不需要先安装tsserver。",
-      "why": "LSP规定编辑器与语言服务如何交流；本章重用032的RPC字节分帧，用URI和文档版本维持状态。它是通用进程客户端骨架，不是完整代码导航工具，也不是语言分析器。",
+      "why": "LSP规定编辑器与语言服务如何交流；本章重用032的RPC字节分帧，用URI和文档版本维持状态。它是通用进程客户端骨架，不是完整代码导航工具，也不是语言分析器。 本章query直接传从0开始的行列，character按默认UTF-16位置解释，不是UTF-8字节数；这与Content-Length按字节分帧是两件事。",
       "accept": "测试应1项通过，真实进程握手、通知发送、定义请求与关闭路径可走通。返回位置由fixture固定给出，不证明真实语言语义、诊断、新旧版本同步或取消能力。",
       "debug": "在src/lsp.mjs的await peer.request(\"initialize\"...)、versions.set和query打断点。F10握手后看capabilities.definitionProvider=true；open后Map版本1，change后为2；query发出的line=0、character=7。想看字节数可F11进rpc.mjs的mode===\"lsp\"发送分支。fixture是子进程，父的断点不跨进程；只观察父收到的结果URI。",
       "recall": "闭卷写出initialize、initialized、didOpen、didChange、definition的先后关系，并解释为什么中文正文的Content-Length必须按UTF-8字节计算。",
@@ -1492,8 +1527,10 @@
       "sources": [
         "packages/lsp/lsp/README.zh.md",
         "packages/lsp/lsp-stdio/README.zh.md",
-        "packages/lsp/tool-lsp/README.zh.md"
-      ]
+        "packages/lsp/tool-lsp/README.zh.md",
+        "packages/lsp/tool-lsp/src/index.ts"
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant L as languageServer 客户端\n    participant P as Peer 与 Content-Length framing\n    participant F as 外部语言服务（本章为固定 fixture）\n    participant S as 资源 Scope\n    C->>L: languageServer(scope, spec, root)\n    L->>F: spawn 子进程\n    L->>P: 接上 child.stdout 与 child.stdin\n    L->>P: request(initialize)\n    P->>F: 按 UTF-8 字节长度分帧的 JSON-RPC\n    F-->>P: initialize 响应，含 capabilities\n    P-->>L: 按请求 id 返回 capabilities\n    L->>P: notify(initialized)\n    P->>F: initialized 通知\n    L->>S: own 登记关闭回调\n    L-->>C: 客户端操作接口\n    C->>L: open(path, text, languageId)\n    L->>P: notify(didOpen，URI 与版本 1)\n    P->>F: textDocument/didOpen\n    opt 文本变化\n        C->>L: change(path, text)\n        L->>P: notify(didChange，递增版本与完整文本)\n        P->>F: textDocument/didChange\n    end\n    C->>L: query(definition, path, line, character)\n    L->>P: request(textDocument/definition，URI 和零基坐标)\n    P->>F: JSON-RPC 定义查询\n    F-->>P: 固定位置响应\n    P-->>L: 按请求 id 返回位置\n    L-->>C: 原 query 完成\n    C->>S: close()\n    S->>L: 执行登记的关闭回调\n    L->>P: request(shutdown)\n    P->>F: shutdown 请求\n    F-->>P: shutdown 响应\n    P-->>L: shutdown 完成\n    L->>P: notify(exit)\n    P->>F: exit 通知\n    L->>P: close Peer\n    L->>F: child.kill()\n    L-->>S: 关闭回调完成\n    Note over L,S: shutdown 失败时仍 close Peer 和 kill 子进程\n    Note over C,F: 真实传输、固定导航答案；没有运行 TypeScript 语义分析或 Agent 改码"
     }
   },
   {
@@ -1536,7 +1573,8 @@
         "packages/subagent/subagent-spawn-in-process/README.zh.md",
         "packages/subagent/subagent-fork-in-process/README.zh.md",
         "packages/subagent/tool-subagent-control/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant P as 父调用方\n    participant M as Subagents 管理器\n    participant F as factory 工厂\n    participant A as 子 Agent（同一进程内）\n    participant E as 子会话 Events\n    participant S as 父资源 Scope\n    P->>M: create(scope, parent, options)\n    M->>F: factory(options)\n    F-->>M: 返回真实 Agent\n    M->>M: entries 记录 childId、parent、agent\n    M->>S: own 登记 child.close 与撤销 id\n    M-->>P: childId\n    P->>M: send(parent, childId, text)\n    M->>M: get 校验父身份\n    M->>A: submit(text)\n    A-->>M: 输入 receipt\n    M-->>P: 输入 receipt\n    A->>E: 运行回合并追加会话事件\n    opt 运行中需要取消\n        P->>M: interrupt(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: cancel()\n    end\n    opt 需要等待并读取结果\n        P->>M: wait(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: await idle()\n        A-->>M: 当前活动结束\n        M->>E: session.read()\n        E-->>M: 会话事件副本\n        M-->>P: 原 wait 返回事件\n    end\n    P->>S: close()\n    S->>M: 执行登记的清理回调\n    M->>A: await agent.close()\n    A-->>M: Agent 关闭完成\n    M->>M: entries.delete(childId)\n    M-->>S: 清理完成\n    Note over M,A: 子 Agent 可继续 send；创建子 Agent 不等于创建新进程"
     }
   },
   {
@@ -1578,7 +1616,8 @@
         "packages/workflow/workflow/README.zh.md",
         "packages/workflow/tool-workflow/README.zh.md",
         "packages/workflow/workflow-ptc/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant W as workflow\n    participant T as Tools 统一入口\n    participant R as 已注册 record 工具\n    C->>W: workflow([b, a], tools, context)，b 依赖 a\n    W->>W: 检查重复 id、预算、缺失依赖和循环\n    alt 检查发现循环等错误\n        W-->>C: 执行任何工具前抛错\n    else 图合法（本章 a 到 b 的测试）\n        W->>W: 第一批 ready 只有 a\n        W->>T: execute(a.call, context)\n        T->>R: 校验参数、通过守卫后 run(id=a)\n        R-->>T: 返回 a\n        T-->>W: execute 结果 a\n        W->>W: results 保存 a，等待本批 Promise.all\n        W->>W: 第二批 ready 只有 b\n        W->>T: execute(b.call, context)\n        T->>R: 校验参数、通过守卫后 run(id=b)\n        R-->>T: 返回 b\n        T-->>W: execute 结果 b\n        W->>W: results 保存 b，等待本批 Promise.all\n        W-->>C: 返回 a、b 的结果对象\n    end\n    Note over W,T: 实现可用 Promise.all 并发同批独立节点；本章测试只验证依赖链\n    Note over W,T: 工作流编排不绕过工具守卫；本章没有原版脚本引擎"
     }
   },
   {
@@ -1620,7 +1659,8 @@
         "packages/ptc-runtime/ptc-runtime/README.zh.md",
         "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
         "packages/core/tools/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant P as runProgram 指令解释器\n    participant T as Tools 统一入口\n    participant G as 工具 guard\n    participant R as 工具实现\n    C->>P: runProgram(program, tools, context)\n    P->>P: 检查数组和 maxCalls 预算\n    loop 按指令顺序\n        P->>P: 检查取消及唯一 id\n        P->>P: 复制 arguments\n        opt 顶层参数包含 $ref\n            P->>P: 查前面 values，复制引用结果\n            Note right of P: 未定义引用立即抛错\n        end\n        P->>T: execute(tool, arguments, context)\n        T->>T: 查工具并校验参数\n        T->>G: guard(tool, call, context)\n        G-->>T: 守卫通过，或抛错终止\n        T->>T: 再次检查取消\n        T->>R: run(复制后的参数, context)\n        R-->>T: value\n        T-->>P: execute 完成\n        P->>P: values.set(当前指令 id, value)\n    end\n    P-->>C: 全部指令结果对象\n    Note over C,P: 输入是声明式指令列表；没有 eval 任意 JS 或隔离脚本进程"
     }
   },
   {
@@ -1665,7 +1705,8 @@
         "packages/goal/goal-round-driver/README.zh.md",
         "packages/schedule/schedule/README.zh.md",
         "packages/feedback/message-feedback/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant A as Collaboration\n    participant E as 会话 Events\n    participant D as 外部 deliver 回调\n    C->>A: set(kind, value)\n    A->>A: 校验 id 和对应状态词\n    A->>E: append(collaboration/kind, value)\n    C->>A: state(kind)\n    A->>E: read 并筛选对应事件\n    E-->>A: 历史事实\n    A-->>C: 按 id 折叠的最新状态\n    opt 调用方主动检查到期提醒\n        C->>A: due(now, deliver)\n        A->>A: 取 schedule 最新状态\n        loop pending 且已到期的条目\n            A->>D: deliver(id, text)\n            D-->>A: 投递完成\n            A->>E: append schedule 状态为 delivered\n        end\n    end\n    opt 用户提交评价\n        C->>A: feedback(messageSeq, rating, text)\n        A->>E: append 独立 feedback 事件\n    end\n    Note over C,D: 没有自动定时器；deliver 需自行保证幂等"
     }
   },
   {
@@ -1710,7 +1751,8 @@
         "packages/attachment/attachment-local/README.zh.md",
         "packages/deliverables/tool-present/README.zh.md",
         "packages/document/office-to-pdf/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant P as present\n    participant F as 本地文件系统\n    participant A as Attachments 存储\n    participant E as 会话 Events\n    C->>P: present(session, store, path, mediaType)\n    P->>F: readFile(path)\n    F-->>P: 源文件字节\n    P->>A: save(bytes, mediaType)\n    A->>A: 校验大小并计算 SHA-256 id\n    A->>F: 私有 blob 目录中写入内容（已存在则复用）\n    F-->>A: 写入或复用完成\n    A-->>P: ref，包含 id、mediaType、bytes\n    P->>E: append(deliverable，源路径与 ref)\n    P-->>C: 返回 ref\n    opt 以后由调用方读取快照\n        C->>A: read(ref)\n        A->>A: 校验 ref.id 格式\n        A->>F: 按 id 读取 blob\n        F-->>A: 已保存字节\n        A->>A: 校验内容 hash\n        A-->>C: 原始字节快照\n    end\n    Note over P,E: 当前源文件后续变化，不会改变已保存快照\n    Note over C,A: 本章独立模块；没有下载 API、预览 UI 或 Office 转换验收"
     }
   },
   {
@@ -1755,7 +1797,8 @@
         "packages/api/session-controller/README.zh.md",
         "packages/session/session-persistence-jsonl/README.zh.md",
         "packages/session/session-projection-cache/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant H as Host\n    participant D as header 与 Journal 磁盘\n    participant E as 会话 Events\n    participant A as Agent 与工具能力\n    C->>H: create(cwd, owner) 或 open(id, owner)\n    opt 新建会话\n        H->>D: 写入 header.json\n    end\n    H->>D: 读取 header\n    D-->>H: header\n    H->>H: 校验 owner\n    alt 会话已加载\n        H-->>C: 返回同一 record\n    else 首次加载\n        H->>D: Journal 恢复完整日志\n        D-->>H: 已恢复 records\n        H->>E: 恢复 records，连接 persist 到 journal.append\n        opt 最后一个 turn 尚未结束\n            H->>E: append interrupted，不自动重做工具\n        end\n        H->>A: 创建 Scope、Settings、LocalFS、Tools\n        H->>A: 注册文件工具，安装 batch\n        H->>A: 创建 Approvals 并安装 permissionGuard\n        H->>A: 创建共享上述能力的 Agent\n        H-->>C: 保存 loaded 并返回 record\n    end\n    C->>A: agent.submit(text)，然后 await idle()\n    A->>E: 追加回合、消息、工具和审批事件\n    E->>D: journal.append，先持久化\n    D-->>E: 落盘完成\n    E->>E: records.push，再通知订阅者\n    A-->>C: idle 完成\n    C->>H: closeSession(id, owner)\n    H->>A: await Agent.close，再 await Scope.close\n    A-->>H: 活动与资源清理完成（收集错误后继续）\n    H->>D: Journal.close\n    H->>H: loaded.delete；最后汇总错误\n    Note over H,A: 外层 SDK 和界面共用此 Host；未装配的 helper 不会自动启用"
     }
   },
   {
@@ -1800,7 +1843,8 @@
         "packages/storage/storage-json/README.zh.md",
         "packages/credentials/credentials-local/README.zh.md",
         "packages/workspace/workspace/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant A as Credentials 或 Workspaces\n    participant S as Store\n    participant F as 产品 JSON 文件\n    C->>A: set、add 或 update\n    A->>S: update(change)\n    S->>F: 读取当前 JSON（不存在则空对象）\n    F-->>S: 当前值\n    S->>S: change 生成新值\n    S->>F: 写入权限 0600 的临时文件\n    S->>F: rename 发布为正式文件\n    S-->>A: 更新后对象\n    A-->>C: ref 或工作区身份\n    C->>A: 新实例 list()\n    A->>S: read()\n    S->>F: 从正式 JSON 恢复\n    F-->>S: 已保存对象\n    S-->>A: 原始存储值\n    A-->>C: 工作区记录或仅 ref/configured 的凭据列表\n    opt 宿主准备请求模型\n        C->>A: credentials.resolve(ref)\n        A->>S: read()\n        S->>F: 读取凭据 JSON\n        F-->>S: 已保存对象\n        S-->>A: 原始存储值\n        A->>A: 查 ref，缺失则查环境变量\n        A-->>C: 明文 Key，仅供宿主消费\n    end\n    Note over A,F: 凭据文件为私有权限 JSON，并非加密密钥库；本章未调用真实模型"
     }
   },
   {
@@ -1844,7 +1888,8 @@
         "packages/api/session-controller/README.zh.md",
         "packages/sdk/protocol/README.zh.md",
         "packages/sdk/server/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 客户端 Peer（本章为内存传输）\n    participant R as remote 领域控制器\n    participant H as Host\n    participant A as 同一会话 Agent 与 Events\n    R->>R: remote(peer, host, principal) 注册方法\n    C->>R: session.create(cwd)\n    R->>H: create(owner=principal)\n    H-->>R: header\n    R-->>C: session.create 响应\n    C->>R: session.watch(id)\n    R->>H: open(id, principal)，校验 owner\n    H-->>R: record\n    R->>A: 注册 Events 订阅并读取历史\n    A-->>R: 历史事件副本\n    R-->>C: watch 返回快照\n    C->>R: session.submit(id, content)\n    R->>H: open(id, principal)\n    H-->>R: 校验 owner 后返回 record\n    R->>A: agent.submit(content)\n    A-->>R: inputId\n    R-->>C: session.submit 响应\n    par 执行期间持续接收通知\n        loop 已提交会话事件\n            A-->>R: event\n            R-->>C: notify(session.event)\n        end\n    and 控制和等待当前活动\n        opt 活动中客户端显式取消（本章测试未执行）\n            C->>R: session.cancel(id)\n            R->>H: open(id, principal)\n            H-->>R: record\n            R->>A: cancel 并 await idle\n            A-->>R: 当前活动结束\n            R-->>C: cancel 响应\n        end\n        C->>R: session.wait(id)\n        R->>H: open(id, principal)\n        H-->>R: record\n        R->>A: await agent.idle()\n        A-->>R: idle 完成\n        R->>A: session.read，选择最后 turn/end\n        A-->>R: 最后结束事件\n        R-->>C: session.wait 响应\n    end\n    C->>R: Peer 断连\n    R->>A: 撤销订阅\n    Note over R,A: 通知可穿插在请求之间；断连不等于取消 Agent"
     }
   },
   {
@@ -1889,7 +1934,8 @@
         "packages/sdk/server/README.zh.md",
         "packages/sdk/protocol/README.zh.md",
         "packages/bundle/sdk-app/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as SDK 调用方\n    participant S as HarnessSDK（调用方进程）\n    participant R as sdk-server 的 Peer 与 remote（Bun 子进程）\n    participant H as 子进程 Host 与 Agent\n    C->>S: new HarnessSDK(home, cwd)\n    S->>R: spawn Bun，stdio 接 Peer 与 framing\n    R->>H: 创建 Host，绑定 remote\n    C->>S: create()\n    S->>R: session.create\n    R->>H: host.create\n    H-->>R: header\n    R-->>S: session.create 响应\n    S-->>C: header\n    C->>S: run(id, content, onEvent)\n    S->>R: session.watch\n    R->>H: 校验 owner，订阅并读取历史\n    H-->>R: 历史事件\n    R-->>S: watch 快照\n    S->>R: session.submit\n    R->>H: 校验 owner，agent.submit\n    H-->>R: inputId\n    R-->>S: submit 响应\n    S->>R: session.wait\n    R->>H: 校验 owner，await agent.idle\n    loop Agent 执行期间产生已提交事件\n        H-->>R: event\n        R-->>S: session.event 通知\n        S->>C: onEvent(event)\n    end\n    H-->>R: idle 后最后 turn/end\n    R-->>S: wait 响应\n    S->>R: session.read\n    R->>H: 校验 owner，session.read\n    H-->>R: 全量会话事件\n    R-->>S: read 响应\n    S-->>C: ending、events、text\n    C->>S: close()\n    S->>R: stdin.end 发送 EOF\n    R->>H: host.close\n    H-->>R: Host 清理完成\n    R-->>S: 子进程退出\n    S->>S: 关闭 Peer\n    S-->>C: close 完成\n    Note over S,H: 通知可穿插在请求之间；自定义协议共用同一 Host"
     }
   },
   {
@@ -1933,7 +1979,8 @@
         "packages/sdk/protocol/README.zh.md",
         "packages/sdk/server/README.zh.md",
         "packages/sdk/client/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as Python 调用方（Bun 测试启动）\n    participant S as Python HarnessSDK\n    participant T as Python 读取线程\n    participant R as Bun sdk-server 子进程\n    participant H as Bun Host 与 Agent\n    C->>S: HarnessSDK(Bun路径, server, home, cwd)\n    S->>R: Popen 启动服务并接 stdin/stdout\n    S->>T: 启动独立读取线程\n    C->>S: run(cwd, text)\n    loop create、watch、submit、wait、read\n        S->>S: 创建 request id，登记 pending Queue\n        S->>R: stdin 写入一行 JSON-RPC 并 flush\n        R->>H: remote 调用对应领域方法\n        H-->>R: 结果或已提交会话事件\n        R-->>T: stdout 一行 JSON-RPC\n        alt 带 pending id 的响应\n            T->>S: 对应 Queue.put(response)\n            S->>S: request 等到结果并删除 pending\n        else session.event 通知\n            T->>S: 追加 events，不占用请求 Queue\n        end\n    end\n    S-->>C: ending 与 session.read 的事件\n    C->>S: close()\n    S->>R: 关闭 stdin 发送 EOF\n    R->>H: 清理 Host 后退出\n    S->>T: 等待进程并 join 读取线程\n    Note over S,H: Python 只实现传输和组合调用，Agent Loop 始终在 Bun 服务"
     }
   },
   {
@@ -1978,7 +2025,8 @@
         "packages/acp/acp/src/content.ts",
         "packages/acp/acp/src/model-control.ts",
         "packages/acp/acp/src/updates.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试主进程：ACP客户端\n    participant G as ACP粘合层\n    participant H as Host与Agent\n    participant S as Session事实\n    participant M as 离线模型\n    participant T as 工具与审批\n    participant F as 临时工作区文件\n    Note over G,S: 三个模块均在同一个acp-server子进程\n    C->>G: initialize / session/new\n    G->>H: 创建并持有会话\n    H-->>G: sessionId\n    G-->>C: 返回sessionId\n    C->>G: session/prompt\n    G->>S: 注册本prompt的事实订阅\n    G->>H: agent.submit\n    par Agent执行\n        loop 模型step，工具完成后才有下一step\n            H->>M: stream请求\n            alt 正常模型完成\n                M-->>H: 文字、工具调用与finish\n                H->>S: 提交message/assistant\n                opt 本step有write调用\n                    H->>S: append tool/start\n                    H->>T: execute进入权限门\n                    T->>S: append approval/request\n                    S-->>G: 审批事实触发回调\n                    G->>C: session/request_permission反向请求\n                    C-->>G: 测试回调自动允许\n                    G->>T: approvals.answer\n                    T->>F: 真正写入proof.txt\n                    F-->>T: 写入结果\n                    T-->>H: 工具结果\n                    H->>S: append message/tool\n                end\n            else slow模型等待期间取消\n                C->>G: session/cancel通知\n                G->>H: cancel当前活动\n                H->>M: AbortSignal取消等待\n                H->>S: 提交已收到的partial，中断标记\n            end\n        end\n        H->>S: append turn/end\n    and 事实一发生就进入有序交付链\n        loop 已提交assistant或工具事实触发\n            S-->>G: message/assistant、tool/start或message/tool\n            G-->>C: notify session/update\n        end\n        Note over G,S: assistant整条提交后转chunk<br/>未映射stream/text正文增量\n    end\n    H-->>G: idle，活动已收敛\n    G->>G: 等待delivery链完成，再撤销订阅\n    G-->>C: prompt响应，end_turn或cancelled"
     }
   },
   {
@@ -2022,7 +2070,8 @@
         "packages/client/connection/src/rpc.ts",
         "packages/client/connection/src/rpc-host.ts",
         "packages/host/webserver/src/index.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 测试中的HTTP与WS客户端\n    participant W as Bun传输：HTTP与WebSocket\n    participant R as Peer与Remote\n    participant H as Host\n    Note over C,H: 本章无页面，不把HTTP客户端画成已完成的浏览器UI\n    C->>W: GET /status，不带cookie\n    W-->>C: 401\n    C->>W: GET启动token链接\n    W-->>C: 302与HttpOnly cookie\n    C->>W: /rpc升级，带Cookie和Origin\n    W->>W: 检查Host、Origin与凭据\n    alt 未授权\n        W-->>C: 拒绝升级\n    else 已授权\n        W->>R: 为连接创建Peer，挂载Remote\n        C->>R: WebSocket里的session.create请求\n        R->>H: create工作区会话\n        H-->>R: owner为local的header\n        R-->>C: 同一WebSocket回复\n    end\n    opt 连接关闭\n        W->>R: peer.close并撤销订阅\n        Note over R,H: 断线不自动取消Host中的Agent\n    end"
     }
   },
   {
@@ -2065,7 +2114,8 @@
         "packages/client/ui-conversation/src/client/conversation/assembler.ts",
         "packages/client/ui-conversation/src/client/conversation/event-registry.ts",
         "packages/client/connection/README.zh.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 纯内存测试\n    participant V as View读模型\n    participant Q as View内部的waiting与events\n    T->>V: reconnect得到generation一\n    T->>V: apply审批事件seq一\n    V->>Q: 暂存，仍缺seq零\n    T->>V: apply文字事件seq零\n    loop 连续seq已齐\n        V->>Q: 依次接纳seq零、seq一\n    end\n    T->>V: 再送seq零\n    V-->>T: 忽略已接纳事件\n    T->>V: reconnect得到generation二\n    T->>V: 用旧generation送结算seq二\n    V-->>T: 忽略，审批仍待答\n    T->>V: 用新generation送结算seq二\n    V->>Q: 接纳并移除待审批\n    T->>V: state\n    V-->>T: 文字只有一次，审批为空\n    Note over T,V: 此处没有网络重连或页面，只验证折叠规则"
     }
   },
   {
@@ -2108,7 +2158,8 @@
         "packages/client/ui-conversation/src/client/conversation/assembler.ts",
         "packages/client/ui-chat",
         "packages/api/session-controller/src/index.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    actor U as 用户\n    participant P as 浏览器页面与View\n    participant R as Bun：WS与Remote\n    participant H as Bun：Host与Agent\n    participant M as 离线模型\n    participant T as 工具与文件提供方\n    Note over U,T: 这是人工产品操作链，本章自动测试仅检查页面资源可达\n    U->>P: 创建会话并发送read任务\n    P->>R: session.create与session.watch\n    R->>H: 创建并订阅已有会话\n    H-->>R: 会话header与历史快照\n    R-->>P: 返回快照\n    P->>R: session.submit\n    R->>H: agent.submit进入Inbox\n    R-->>P: inputId接收凭据\n    H->>M: stream请求\n    M-->>H: read工具调用\n    H->>T: Tools.execute并检查权限\n    T-->>H: 真实文件内容\n    H->>M: 携工具结果继续请求\n    M-->>H: 最终文字\n    H-->>R: Session事件\n    R-->>P: session.event\n    P->>P: View.apply后render\n    opt 用户点击取消\n        U->>P: 停止当前活动\n        P->>R: session.cancel\n        R->>H: cancel并等待idle\n    end"
     }
   },
   {
@@ -2153,7 +2204,8 @@
         "packages/api/workspace-files/src/types.ts",
         "packages/settings/settings",
         "packages/credentials/credentials"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant C as 调用方：测试或页面Remote\n    participant P as product与会话设置\n    participant S as 真实设置Store\n    participant A as Host中的Agent\n    participant M as 模型工厂\n    participant T as Tools与LocalFS\n    Note over C,T: 测试直接调用设置；页面另经Remote，不是所有分支均已测试\n    C->>P: settings.set保存permission与backend\n    P->>S: 合并写入settings.json\n    P->>P: 更新当前Settings\n    C->>P: closeSession后open\n    P->>S: 读取已保存设置\n    S-->>P: read-only等配置\n    C->>A: submit新任务\n    A->>P: 取得本轮snapshot\n    P-->>A: 请求配置快照\n    A->>M: 按request.config.backend调用stream\n    alt offline\n        M-->>A: 离线结果\n    else 未知backend\n        M-->>A: 抛错，记录turn/end为error\n    end\n    opt 页面手动文件操作，当前单测未覆盖\n        C->>P: file.read或file.write\n        P->>T: Tools.execute，带版本与审批上下文\n        T-->>P: 真实文件结果\n        P-->>C: RPC返回结果\n    end\n    Note over P,M: 当前工厂未接Routes或PiModel"
     }
   },
   {
@@ -2198,7 +2250,8 @@
         "packages/shell/tool-bash-persistent/src/index.ts",
         "packages/subagent/subagent-dsh-sdk/src/run.ts",
         "packages/bundle"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 测试主进程\n    participant H as Host与capabilities装配\n    participant A as Agent与Loop\n    participant M as 离线模型\n    participant G as Tools与权限守卫\n    participant C as Collaboration\n    participant S as Session事实\n    T->>H: product与capabilities，创建会话\n    H->>G: 注册todo_update等工具\n    T->>A: submit固定todo_update任务\n    A->>M: stream\n    M-->>A: todo_update调用\n    A->>G: execute，校验并请求审批\n    G->>S: 写approval/request\n    S-->>T: 会话事件回调\n    T->>G: 测试固定允许\n    G->>C: set todo one为done\n    C->>S: 写入协作事实\n    C-->>G: 当前todo状态\n    G-->>A: 工具结果\n    A->>M: 工具结果继续投喂\n    M-->>A: 结束文字\n    T->>A: 等待idle\n    T->>C: 检查one.status\n    C-->>T: done\n    Note over H,G: Terminal只有导入，没有PTY实例或终端工具注册\n    Note over T,S: 当前测试不覆盖拒绝、子Agent或所有已注册工具"
     }
   },
   {
@@ -2242,7 +2295,8 @@
         "apps/desktop/src/runtime-tree.ts",
         "apps/desktop/src/web-document.ts",
         "apps/desktop/src/quit-confirmation.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    actor U as 用户\n    participant L as Bun桌面启动器\n    participant E as Electron Main\n    participant H as 独立Bun Host\n    participant P as Electron Renderer与preload\n    U->>L: bun run desktop\n    L->>E: 启动Electron并传Bun绝对路径\n    E->>E: 获得单实例锁\n    E->>H: spawn显式Bun运行web-server\n    H-->>E: stdout打印启动URL\n    E->>P: 创建隔离窗口并加载URL\n    P->>H: 认证后通过WS调用Remote\n    opt 页面读取平台信息\n        P->>E: 白名单IPC desktop:info\n        E-->>P: 平台与应用版本\n    end\n    Note over P,E: preload属于Renderer，不是另一个独立进程\n    opt macOS仅关闭最后窗口\n        U->>E: 关闭窗口\n        E->>P: 销毁窗口，应用与Host继续驻留\n    end\n    opt 用户真正退出应用\n        U->>E: 退出\n        E->>H: SIGTERM并等待退出\n        H->>H: 关闭会话与资源\n        E->>E: 超时才兜底终止并退出\n    end"
     }
   },
   {
@@ -2286,7 +2340,8 @@
         "apps/desktop/src/keybindings.ts",
         "packages/client/shortcuts/src/configuration.ts",
         "packages/client/shortcuts/src/binding.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 测试调用方\n    participant L as 独立loginAttempt模块\n    participant F as 固定换票fetcher\n    participant K as 独立Shortcuts模块\n    participant S as 快捷键Store\n    Note over T,F: 登录辅助段：没有真实浏览器或桌面回调接线\n    T->>L: loginAttempt\n    L-->>T: 带state与PKCE challenge的URL\n    T->>L: exchange错误state\n    L-->>T: 拒绝，未调用fetcher\n    T->>L: exchange正确state\n    L->>L: 校验路径并设置consumed\n    L->>F: POST授权码与verifier\n    F-->>L: 固定测试token\n    L-->>T: 返回结果\n    T->>L: 重复exchange\n    L-->>T: 已消费，拒绝\n    Note over K,S: 另一独立能力：当前测试未调用，未串到登录或Electron\n    opt 调用者显式使用快捷键模块\n        T->>K: write bindings\n        K->>S: 读取现有配置\n        S-->>K: 版本与绑定\n        alt 未知版本或绑定不合法\n            K-->>T: 拒绝，不改文件\n        else 校验通过\n            K->>S: 保存新绑定\n            K-->>T: 完成\n        end\n    end"
     }
   },
   {
@@ -2330,7 +2385,8 @@
         "scripts/primary-runtime/smoke.py",
         "packages/skill/tool-workspace-dependencies/src/index.ts",
         "apps/desktop/scripts/prepare-primary-runtime.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 测试或独立调用方\n    participant A as asset辅助函数\n    participant F as 固定下载fetcher\n    participant D as 文件系统\n    participant I as installRuntime辅助函数\n    participant X as 外部tar程序\n    participant W as workspaceDependencies辅助函数\n    Note over T,D: 当前测试只执行asset段，正文不是可运行的真实归档\n    T->>A: 传入URL与可信hash\n    A->>F: 读取固定响应字节\n    F-->>A: trusted或tampered字节\n    alt hash匹配\n        A->>D: 写入真实缓存\n        A-->>T: 返回缓存路径\n    else hash不匹配\n        A-->>T: 抛错，拒绝缓存写入\n    end\n    Note over I,X: 独立安装段：源码提供，本章测试未调用\n    opt 显式调用installRuntime\n        T->>I: specs与目标目录\n        I->>A: 下载并校验组件\n        A-->>I: 已验证的缓存路径\n        I->>X: 列目录后解包到staging\n        X-->>I: 列表与解包结果\n        I->>D: 写manifest并rename发布\n        I-->>T: 返回安装清单\n    end\n    Note over W,D: 独立路径查询段：未接桌面自动启动\n    opt 显式查询依赖路径\n        T->>W: root\n        W->>D: 读取manifest与目标文件\n        D-->>W: 清单与文件内容\n        W-->>T: 返回路径或缺失错误\n    end"
     }
   },
   {
@@ -2373,7 +2429,8 @@
         "apps/desktop/src/update-journal.ts",
         "apps/desktop/src/mandatory-update-policy.ts",
         "apps/desktop/src/update-presentation.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 本地测试\n    participant U as 独立Updates模块\n    participant S as 更新状态Store\n    participant I as 测试安装器回调\n    T->>U: admit被改动的raw与原签名\n    U->>U: Ed25519验签\n    U-->>T: 签名无效\n    T->>U: admit合法raw\n    U->>U: 验签并校验版本与target\n    U->>S: 写admitted及previous\n    T->>U: apply固定载荷\n    U->>U: 核对SHA256\n    U->>S: 写installing\n    U->>I: 调用installer\n    alt 当前测试：安装器抛错\n        I-->>U: installer failed\n        U->>S: 写failed-keep-old\n        U-->>T: 重新抛错\n        T->>S: 检查最终状态\n        S-->>T: failed-keep-old\n    else 成功分支：当前未测试\n        I-->>U: 回调完成\n        U->>S: 写awaiting-new-version-smoke\n    end\n    Note over U,I: 没有平台安装、重启或旧应用恢复，状态名不是实机证据"
     }
   },
   {
@@ -2417,7 +2474,8 @@
         "apps/desktop/scripts/prepare-primary-runtime.ts",
         "apps/desktop/installer",
         "apps/desktop/windows-signing/README.md"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 单测或人工命令\n    participant R as release脚本\n    participant F as 本地产品文件\n    participant B as electron-builder外部进程\n    Note over T,R: 当前单测只调用releaseTarget并读配置\n    T->>R: 请求正式mac目标但无凭据\n    R-->>T: 资格拒绝\n    T->>R: 在darwin请求Windows目标\n    R-->>T: 原生主机不匹配\n    T->>R: 请求unsigned mac-arm64\n    R-->>T: 返回目标flags\n    Note over R,B: 以下是人工打包源码路径，不代表本章单测已生成产物\n    opt 在匹配目标主机显式运行package\n        T->>R: target与unsigned标记\n        R->>R: 检查Bun与目标架构\n        R->>F: 复制Bun并生成打包配置\n        R->>B: 运行builder，publish为never\n        B->>F: 生成本机安装产物\n        B-->>R: 返回退出码\n        R-->>T: 报告打包结果\n    end\n    Note over F,B: 安装、签名公证、升级及干净机验证仍是独立资格"
     }
   },
   {
@@ -2461,7 +2519,8 @@
         "packages/experimental/agent-team/src/task-board.ts",
         "packages/experimental/agent-team/src/projection.ts",
         "packages/experimental/tool-agent-team"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 本地测试\n    participant G as 独立Team模块\n    participant S as 真实JSON Store\n    participant C as 创建成员回调替身\n    T->>G: Lead创建reviewer\n    G->>S: 先保存provisioning占名\n    G->>C: createAgent名称\n    C-->>G: 仅返回名称，没有创建Agent\n    G->>S: 保存inactive与返回id\n    T->>G: 再创建同名成员\n    G-->>T: 名字不可复用\n    T->>G: task a与依赖a的task b\n    G->>S: 保存pending任务\n    T->>G: claim b\n    G->>S: 读取a状态\n    alt a尚未完成\n        G-->>T: 拒绝认领b\n    end\n    T->>G: claim a，随后complete a\n    G->>S: 保存owner与done\n    T->>G: 再claim b\n    G->>S: 检查依赖并保存owner\n    G-->>T: reviewer认领成功\n    Note over T,C: send与interrupt也是回调入口，当前未接真实团队、模型或UI"
     }
   },
   {
@@ -2505,7 +2564,8 @@
         "packages/experimental/hook-protocol/src/merge.ts",
         "packages/experimental/hooks-claude-code/src/index.ts",
         "packages/experimental/hooks-codex"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 测试调用方\n    participant X as Tools执行门\n    participant H as hooks守卫包装\n    participant P as 真实Bun Hook子进程\n    participant G as 原权限守卫\n    participant R as 临时工具run\n    T->>X: execute工具x\n    X->>X: 校验schema\n    X->>H: 调用当前guard\n    H->>P: argv传固定JSON，等待进程输出\n    P-->>H: JSON结果\n    alt 当前测试返回allow=false\n        H-->>X: 抛Hook拒绝\n        X-->>T: 调用失败，executed仍false\n    else Hook允许且原guard通过的源码分支，当前未测试\n        opt Hook修改arguments\n            H->>H: 重新按schema校验\n        end\n        H->>G: previous继续原权限检查\n        G-->>H: 通过\n        H-->>X: 守卫通过\n        X->>R: 执行工具\n        R-->>X: 工具结果\n        X-->>T: 返回结果\n    end\n    T->>H: remove恢复原guard\n    Note over T,R: 只在临时Tools中演示；原guard抛错也会停止，不强制允许"
     }
   },
   {
@@ -2548,7 +2608,8 @@
         "packages/experimental/browser-use-playwright-mcp",
         "packages/experimental/cua",
         "packages/experimental/cua-macos"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as Bun测试与Scope\n    participant B as browser辅助模块\n    participant C as 真实隔离Chrome页面\n    participant S as computerSpec纯函数\n    T->>B: browser并传Chrome路径\n    B->>C: Playwright启动headless进程\n    B-->>T: 返回页面与操作接口\n    T->>C: setContent固定表单\n    T->>B: fill中文\n    B->>C: locator.fill\n    C-->>B: 输入已完成\n    B-->>T: 返回\n    T->>B: click按钮\n    B->>C: locator.click并读body\n    C-->>B: data-done变yes\n    B-->>T: 页面文字\n    T->>B: screenshot\n    B->>C: 采集PNG\n    C-->>B: PNG字节\n    B-->>T: 返回真实截图\n    T->>S: 不支持的mac按键动作\n    S-->>T: 拒绝，不执行系统命令\n    T->>B: Scope关闭浏览器\n    B->>C: instance.close\n    Note over T,S: 没有Agent工具接线，也未实测系统截图或点击"
     }
   },
   {
@@ -2592,7 +2653,8 @@
         "packages/experimental/client-ui-voice-input",
         "packages/experimental/translator/src/index.ts",
         "packages/experimental/client-ui-cot-translation"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant P as 独立浏览器调用方\n    participant R as recordAudio与MediaRecorder\n    participant T as Bun测试\n    participant A as transcribe辅助函数\n    participant F as 固定ASR fetcher\n    participant X as translate辅助函数\n    participant M as ScriptModel固定模型\n    Note over P,R: 录音是独立浏览器段，当前未接页面且本测试未运行\n    opt 显式使用录音辅助函数\n        P->>R: recordAudio申请麦克风\n        R-->>P: 返回stop接口\n        P->>R: stop\n        R->>R: 停止录音并释放媒体track\n        R-->>P: Blob\n    end\n    Note over T,F: ASR测试段使用固定字节，不是真实录音上传\n    T->>A: transcribe固定音频bytes\n    A->>F: FormData与测试凭据\n    F-->>A: 固定text为你好\n    A-->>T: 返回你好\n    Note over T,M: 翻译是另一个模块，由测试显式调用，未串成产品流程\n    T->>X: translate你好到英语\n    X->>M: stream翻译请求\n    M-->>X: hello与finish\n    X->>X: 检查完整结束\n    X-->>T: 返回hello"
     }
   },
   {
@@ -2636,7 +2698,8 @@
         "packages/experimental/webhook/src/session.ts",
         "packages/experimental/webhook-github/src/handler.ts",
         "packages/experimental/webhook-github/src/body.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 纯内存测试调用方\n    participant W as webhook接收函数\n    participant E as 内存Events\n    participant P as agent.pump计数替身\n    Note over T,P: 没有HTTP路由、Journal、真实Agent或重启\n    T->>W: 第一次传body、签名与delivery\n    W->>W: 时间检查并验body的HMAC\n    W->>E: 查webhook_delivery身份\n    E-->>W: 尚不存在\n    W->>E: append inbox/add\n    W->>P: pump\n    P-->>W: pumps加一\n    W-->>T: duplicate=false\n    T->>W: 重建接收函数后重复同delivery\n    W->>E: 读取同一个内存Events\n    E-->>W: 身份已存在\n    W-->>T: duplicate=true，不再pump\n    T->>W: 篡改body沿用旧签名\n    W->>W: HMAC不匹配\n    W-->>T: 签名错误\n    Note over W,E: 重建函数不等于进程重启或持久恢复"
     }
   },
   {
@@ -2679,7 +2742,8 @@
         "packages/experimental/worktree/src/types.ts",
         "packages/experimental/worktree/src/process.ts",
         "packages/experimental/tool-worktree"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 测试或显式调用方\n    participant W as Worktrees管理器\n    participant G as 外部Git进程\n    participant A as 外部tar进程\n    participant F as 工作区与归档文件\n    Note over T,W: 当前测试仅执行下面拒绝路径，不会运行git或tar\n    T->>W: archive未拥有的名字\n    W-->>T: owned中无记录，立即拒绝\n    T->>W: create越界名称或选项式ref\n    W-->>T: 输入检查拒绝\n    Note over W,F: 以下是未由本章测试执行的源码支路，不是原版同语义\n    opt 调用方显式使用隔离仓库创建\n        T->>W: create合法name与ref\n        W->>G: worktree add --detach\n        G->>F: 建立独立checkout\n        G-->>W: 退出码成功\n        W->>W: owned记录路径\n        W-->>T: 返回路径\n    end\n    opt 显式归档自己拥有的checkout\n        T->>W: archive\n        W->>G: ls-files生成文件清单\n        G-->>W: NUL分隔清单\n        W->>A: tar打包到staging\n        A-->>W: 打包结果\n        W->>F: rename发布归档\n        W->>G: worktree remove --force\n        G-->>W: 删除结果\n        W-->>T: 返回自有归档结果\n    end\n    Note over W,F: 原版另有新分支与Session切目录；本图没有这些已接线能力"
     }
   },
   {
@@ -2723,7 +2787,8 @@
         "packages/sdk/client/src/client.ts",
         "packages/experimental/webworker-runtime/src/worker.ts",
         "packages/experimental/webworker-runtime/src/node/process-table.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 测试与父Scope\n    participant W as Workers配额管理\n    participant S as 父进程HarnessSDK\n    participant H as 子Bun进程：基础Host\n    participant A as 子进程Agent\n    participant M as 子进程离线模型\n    T->>W: run任务worker\n    W->>W: 检查active配额\n    W->>S: 新建SDK并分配独立home\n    S->>H: spawn sdk-server，stdio接RPC\n    W->>W: active保存运行项\n    S->>H: create与submit\n    H->>A: 接收并执行任务\n    A->>M: stream\n    opt await run仍进行中且signal触发，当前测试未覆盖\n        W->>S: cancel session\n        S->>H: session.cancel\n        H->>A: cancel\n    end\n    M-->>A: 当前未取消测试的离线回声与结束\n    A-->>H: 会话结果\n    H-->>S: RPC结果与事件\n    S-->>W: run返回\n    W->>S: finally关闭SDK\n    S->>H: stdin EOF，等待子Host退出\n    W->>W: 删除active并归还配额\n    W-->>T: 返回结果\n    T->>W: limit设零后再run\n    W-->>T: 启动前拒绝超额\n    Note over H,M: 子Host未装product与capabilities，不是浏览器Web Worker"
     }
   },
   {
@@ -2767,7 +2832,8 @@
         "packages/client/product-analytics/src/events.ts",
         "packages/session/session-telemetry/src/index.ts",
         "packages/session/session-telemetry/src/coordinator.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 手动调用的测试\n    participant L as 独立Telemetry发送器\n    participant Q as 内部有界队列\n    participant F as 固定fetcher替身\n    Note over T,F: 没有Host事件订阅或真实Collector；当前测试显式启用\n    T->>L: record事件与attributes\n    L->>L: 白名单移除prompt和apiKey\n    L->>Q: 放入OTLP日志记录\n    T->>L: 显式flush\n    L->>Q: 取出最多一百项\n    Q-->>L: 本次batch\n    L->>F: POST序列化OTLP JSON\n    alt 当前测试返回503\n        F-->>L: response.ok=false\n        L-->>T: 返回false\n    else 网络异常或超时分支\n        F-->>L: Promise拒绝\n        L-->>T: 捕获并返回false\n    end\n    T->>T: 检查body无测试敏感值\n    Note over L,Q: 默认未启用时record直接返回；本测试没有走该分支\n    Note over T,F: 只证明发送器行为，不是业务隔离的端到端证据"
     }
   },
   {
@@ -2811,7 +2877,8 @@
         "packages/boot/plugin-market/src/parse.ts",
         "packages/boot/plugin-manager/src/index.ts",
         "packages/boot/plugin-manager/src/operations.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 本地测试\n    participant I as marketIndex数据函数\n    participant P as PluginManager\n    participant M as 本地动态插件模块\n    participant R as Plugins与Scope\n    participant S as 启用状态Store\n    T->>I: 传manifest数组\n    I-->>T: 返回列表，不执行模块\n    T->>P: enable可信本地文件\n    P->>M: dynamic import\n    M-->>P: setup函数\n    P->>R: install\n    R->>M: setup传scope与services\n    M->>R: provide proof为42\n    R-->>P: 安装成功\n    P->>S: 保存enabled=true\n    P-->>T: enable完成\n    T->>P: disable\n    P->>R: remove并关闭插件Scope\n    R->>R: 撤销proof服务\n    R-->>P: remove完成\n    P->>S: 保存enabled=false\n    P-->>T: disable完成\n    opt 固定bad插件安装失败\n        T->>P: enable bad\n        P->>M: import bad模块\n        M-->>P: 返回setup函数\n        P->>R: install\n        R->>M: 执行bad setup\n        M-->>R: 抛broken\n        R-->>P: 回滚后抛错\n        P-->>T: 拒绝，未写bad启用状态\n    end\n    Note over T,S: 无远端市场、npm安装或产品Host界面"
     }
   },
   {
@@ -2856,7 +2923,8 @@
         "packages/session-query/session-log-export/src/archive.ts",
         "packages/sdk/protocol/src/types.ts",
         "packages/sdk/client/src/client.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 测试调用方\n    participant Q as Query读模型\n    participant D as SQLite内存FTS\n    participant Z as 自有ZIP辅助函数\n    participant C as 外部Bun运行的tsc\n    T->>Q: index同一事件快照两次\n    Q->>D: 读seq水位并事务追加新增事件\n    D-->>Q: 第二次没有重复行\n    T->>Q: search cancel与授权集合\n    Q->>D: 参数化FTS查询\n    D-->>Q: 排序并限制的结果\n    Q->>Q: 过滤allowedSessions\n    Q-->>T: 授权时一条，未授权时零条\n    Note over T,Z: 独立ZIP段，不是原版导出格式或已接UI\n    T->>Z: exportSession\n    Z-->>T: manifest.json与events.json的ZIP\n    T->>Z: importSession\n    Z->>Z: 校验条目与自有事件格式\n    Z-->>T: 返回自有事件\n    Note over T,C: 独立类型检查段，不运行SDK消费者任务\n    T->>C: spawn tsc编译NodeNext消费者\n    C-->>T: 退出码零\n    T->>Q: close\n    Q->>D: 关闭数据库"
     }
   },
   {
@@ -2899,7 +2967,8 @@
         "packages/acp/acp/src/index.ts",
         "packages/acp/acp/src/session.ts",
         "packages/acp/acp/src/updates.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as 普通单测\n    participant F as signature纯函数\n    participant C as 独立compare脚本\n    participant P as 本轮ACP子进程\n    Note over T,F: bun test只验证归一化，不启动原版对照\n    T->>F: 固定updates与cancelled\n    F-->>T: 保留partial与结束原因\n    Note over C,P: compare另行启动；先自有fixture，后原版测试装配oracle\n    opt 显式运行compare且原版提交已锁定\n        C->>C: 检查原版commit\n        loop 自有进程和oracle各执行一组\n            C->>P: spawn并接真实ACP SDK\n            C->>P: initialize与session/new\n            P-->>C: sessionId\n            C->>P: 第一轮prompt\n            P-->>C: golden-answer与end_turn\n            C->>P: 第二轮prompt\n            P-->>C: fd3确认首片被Loop消费\n            C->>P: session/cancel通知\n            P-->>C: partial与cancelled结果\n            C->>P: 第三轮prompt\n            P-->>C: after-cancel与end_turn\n            C->>P: stdin EOF，收回子进程\n        end\n        C->>F: 分别归一化两组结果\n        F-->>C: 两份窄signature\n        C->>C: 比较并写证据\n    end\n    Note over C,P: 两边模型固定；只对照三个样本，不是全产品等价"
     }
   },
   {
@@ -2942,7 +3011,8 @@
         "packages/client/ui-approval",
         "packages/api/session-controller/src/index.ts",
         "packages/api/workspace-files/src/index.ts"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    participant T as Bun测试：Playwright驱动\n    participant P as 真实Chrome页面\n    participant H as 同一Bun进程：Host与权限服务\n    participant A as Agent与Loop\n    participant M as 离线模型\n    participant F as 临时工作区文件\n    T->>P: 打开启动URL并创建会话\n    P->>H: WebSocket创建与订阅\n    T->>P: 输入write任务并点击发送\n    P->>H: session.submit\n    H->>A: submit\n    A->>M: stream\n    M-->>A: write工具调用\n    A->>H: Tools执行前请求审批\n    H-->>P: session.event显示审批\n    T->>P: 点击允许一次\n    P->>H: approval.answer\n    H->>F: LocalFS写proof.txt\n    F-->>H: 写入结果\n    H-->>A: 工具结果，继续模型步骤\n    A->>M: 携工具结果请求\n    M-->>A: 完成文字\n    A-->>H: 会话事实\n    H-->>P: 工具完成与消息\n    T->>F: 读取并断言from-browser\n    opt 第二轮测试取消\n        T->>P: 输入slow并发送\n        P->>H: session.submit\n        H->>A: 执行slow\n        A->>M: stream\n        M-->>A: partial后等待取消\n        A-->>H: stream事实\n        H-->>P: 显示partial\n        T->>P: 确认partial出现后点击停止\n        P->>H: session.cancel\n        H->>A: cancel并等待收敛\n    end\n    T->>P: 发送after-cancel\n    P->>H: session.submit\n    H->>A: 新turn\n    A->>M: stream\n    M-->>A: after-cancel离线回答\n    A-->>H: 已提交消息\n    H-->>P: 显示下一轮结果\n    T->>P: reload页面\n    P->>H: 重订阅并读取历史快照\n    H-->>P: 历史恢复，旧审批已结算\n    Note over T,F: 浏览器、WS和磁盘真实；模型固定，不是原版GUI差分"
     }
   },
   {
@@ -2987,7 +3057,8 @@
         "apps/cli/src/plugin.ts",
         "apps/cli/src/process-shutdown.ts",
         "packages/boot/app-boot"
-      ]
+      ],
+      "sequence": "sequenceDiagram\n    actor U as 终端用户\n    participant C as Bun CLI适配器\n    participant H as Host与产品装配\n    participant A as Agent与Loop\n    participant M as 离线模型\n    participant T as Tools与权限门\n    participant F as 工作区文件\n    U->>C: 启动并传任务argv\n    C->>H: 装product与capabilities，创建或恢复会话\n    H-->>C: 会话record\n    C->>A: submit后等待idle\n    alt 当前测试正常读取文件\n        A->>M: stream模型请求\n        M-->>A: read工具调用\n        A->>T: execute并检查权限\n        T->>F: 读取真实文件\n        F-->>T: text与version\n        T-->>A: 工具结果\n        A->>M: 工具结果继续投喂\n        M-->>A: 最终文字与finish\n        A-->>C: Session监听器输出事实\n    else 运行中用户Ctrl+C，当前测试未覆盖\n        U->>C: 中断信号\n        C->>A: 请求cancel\n        A-->>C: 活动收敛后的取消事实\n    end\n    C->>C: 从turn/end决定退出码\n    C->>H: finally关闭Host\n    H->>A: close并等待活动结束\n    C-->>U: 退出码\n    Note over C,T: 副作用工具另有终端审批；本章read用例不触发\n    Note over C,M: 测试另起真实CLI子进程并移除Key，使用离线模型"
     }
   }
 ]

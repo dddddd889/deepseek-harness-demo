@@ -22,5 +22,6 @@
     "packages/session/session-format/src/catalog.ts",
     "packages/session/session-persistence-jsonl/src/generation.ts",
     "packages/session/session-persistence-jsonl/src/migration-verifier.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant G as Generations\n    participant F as 本机文件系统\n    participant M as 相邻迁移回调\n    C->>G: publish新版候选\n    G->>F: 写UUID.json并fsync\n    G->>G: beforePublish故障注入点\n    alt 回调抛错\n        G-->>C: 拒绝，current仍指向旧文件\n    else 正常继续\n        G->>F: 写临时指针并rename为current\n        G-->>C: 返回新代次文件名\n    end\n    Note over C,G: 迁移是调用者另行发起的操作\n    C->>G: migrate目标版本2\n    G->>F: 按current读取version为1的对象\n    loop 每次只前进一个版本\n        G->>M: migration复制后的旧对象\n        M-->>G: 返回下一版本对象\n    end\n    G->>G: publish迁移后对象\n    G->>F: 保留旧文件并发布新指针\n    G-->>C: 返回version为2的对象\n    Note over G: 当前未接Journal或Host"
 }

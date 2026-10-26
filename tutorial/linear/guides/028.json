@@ -24,5 +24,6 @@
     "packages/sandbox/sandbox-local/README.zh.md",
     "packages/sandbox/sandbox-policy/README.zh.md",
     "packages/sandbox/sandbox-windows-acl/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant S as Sandbox 参数编译器\n    participant P as runner 探测函数\n    C->>S: wrap(spec, workspace, mode)\n    S->>S: 校验 mode 与操作系统\n    alt macOS 或 Linux\n        S->>P: probe(sandbox-exec 或 bwrap)\n        P-->>S: 是否可用\n        alt runner 可用\n            S->>S: 生成限制规则和包装后的 argv\n            S-->>C: 返回新的执行 Spec\n        else runner 不可用\n            S-->>C: 抛错，拒绝执行\n        end\n    else 未实现的平台\n        S-->>C: 抛错，拒绝执行\n    end\n    Note over C,P: 本章使用注入的 probe，只验 Spec；未启动 OS 沙箱\n    Note over C,S: 051 才由调用方把返回 Spec 交给 execute"
 }

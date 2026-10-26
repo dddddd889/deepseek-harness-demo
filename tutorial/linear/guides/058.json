@@ -26,5 +26,6 @@
     "packages/experimental/hook-protocol/src/merge.ts",
     "packages/experimental/hooks-claude-code/src/index.ts",
     "packages/experimental/hooks-codex"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 测试调用方\n    participant X as Tools执行门\n    participant H as hooks守卫包装\n    participant P as 真实Bun Hook子进程\n    participant G as 原权限守卫\n    participant R as 临时工具run\n    T->>X: execute工具x\n    X->>X: 校验schema\n    X->>H: 调用当前guard\n    H->>P: argv传固定JSON，等待进程输出\n    P-->>H: JSON结果\n    alt 当前测试返回allow=false\n        H-->>X: 抛Hook拒绝\n        X-->>T: 调用失败，executed仍false\n    else Hook允许且原guard通过的源码分支，当前未测试\n        opt Hook修改arguments\n            H->>H: 重新按schema校验\n        end\n        H->>G: previous继续原权限检查\n        G-->>H: 通过\n        H-->>X: 守卫通过\n        X->>R: 执行工具\n        R-->>X: 工具结果\n        X-->>T: 返回结果\n    end\n    T->>H: remove恢复原guard\n    Note over T,R: 只在临时Tools中演示；原guard抛错也会停止，不强制允许"
 }

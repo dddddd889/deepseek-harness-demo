@@ -27,5 +27,6 @@
     "packages/attachment/attachment-local/README.zh.md",
     "packages/deliverables/tool-present/README.zh.md",
     "packages/document/office-to-pdf/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant P as present\n    participant F as 本地文件系统\n    participant A as Attachments 存储\n    participant E as 会话 Events\n    C->>P: present(session, store, path, mediaType)\n    P->>F: readFile(path)\n    F-->>P: 源文件字节\n    P->>A: save(bytes, mediaType)\n    A->>A: 校验大小并计算 SHA-256 id\n    A->>F: 私有 blob 目录中写入内容（已存在则复用）\n    F-->>A: 写入或复用完成\n    A-->>P: ref，包含 id、mediaType、bytes\n    P->>E: append(deliverable，源路径与 ref)\n    P-->>C: 返回 ref\n    opt 以后由调用方读取快照\n        C->>A: read(ref)\n        A->>A: 校验 ref.id 格式\n        A->>F: 按 id 读取 blob\n        F-->>A: 已保存字节\n        A->>A: 校验内容 hash\n        A-->>C: 原始字节快照\n    end\n    Note over P,E: 当前源文件后续变化，不会改变已保存快照\n    Note over C,A: 本章独立模块；没有下载 API、预览 UI 或 Office 转换验收"
 }

@@ -25,5 +25,6 @@
     "packages/experimental/browser-use-playwright-mcp",
     "packages/experimental/cua",
     "packages/experimental/cua-macos"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as Bun测试与Scope\n    participant B as browser辅助模块\n    participant C as 真实隔离Chrome页面\n    participant S as computerSpec纯函数\n    T->>B: browser并传Chrome路径\n    B->>C: Playwright启动headless进程\n    B-->>T: 返回页面与操作接口\n    T->>C: setContent固定表单\n    T->>B: fill中文\n    B->>C: locator.fill\n    C-->>B: 输入已完成\n    B-->>T: 返回\n    T->>B: click按钮\n    B->>C: locator.click并读body\n    C-->>B: data-done变yes\n    B-->>T: 页面文字\n    T->>B: screenshot\n    B->>C: 采集PNG\n    C-->>B: PNG字节\n    B-->>T: 返回真实截图\n    T->>S: 不支持的mac按键动作\n    S-->>T: 拒绝，不执行系统命令\n    T->>B: Scope关闭浏览器\n    B->>C: instance.close\n    Note over T,S: 没有Agent工具接线，也未实测系统截图或点击"
 }

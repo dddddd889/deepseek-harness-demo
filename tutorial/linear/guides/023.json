@@ -25,5 +25,6 @@
     "packages/interaction/user-approval/src/index.ts",
     "packages/interaction/user-questions/README.zh.md",
     "packages/interaction/tool-ask-user/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 消费方或测试\n    participant A as Approvals 审批管理器\n    participant P as publish 回调\n    participant U as 答复方或测试\n    C->>A: request(owner, question, signal)\n    A->>A: 创建 id，登记 pending、定时器和取消监听\n    A->>P: 发布 approval/request\n    P-->>U: 展示问题和审批 id\n    alt 正常答复\n        U->>A: answer(owner, id, allowed)\n        A->>A: 校验 owner，删除 pending 并清理监听\n        A->>P: 发布 approval/settled\n        A-->>C: 原 request 返回 boolean\n    else 取消或超时\n        A->>A: finish 清理同一 pending\n        A->>P: 发布 approval/settled\n        A-->>C: 原 request 抛错\n    end\n    Note over A,U: 结算后迟答和重复答复被拒绝；本章测试直接扮演答复方"
 }

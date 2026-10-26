@@ -25,5 +25,6 @@
     "packages/client/ui-conversation/src/client/conversation/assembler.ts",
     "packages/client/ui-chat",
     "packages/api/session-controller/src/index.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    actor U as 用户\n    participant P as 浏览器页面与View\n    participant R as Bun：WS与Remote\n    participant H as Bun：Host与Agent\n    participant M as 离线模型\n    participant T as 工具与文件提供方\n    Note over U,T: 这是人工产品操作链，本章自动测试仅检查页面资源可达\n    U->>P: 创建会话并发送read任务\n    P->>R: session.create与session.watch\n    R->>H: 创建并订阅已有会话\n    H-->>R: 会话header与历史快照\n    R-->>P: 返回快照\n    P->>R: session.submit\n    R->>H: agent.submit进入Inbox\n    R-->>P: inputId接收凭据\n    H->>M: stream请求\n    M-->>H: read工具调用\n    H->>T: Tools.execute并检查权限\n    T-->>H: 真实文件内容\n    H->>M: 携工具结果继续请求\n    M-->>H: 最终文字\n    H-->>R: Session事件\n    R-->>P: session.event\n    P->>P: View.apply后render\n    opt 用户点击取消\n        U->>P: 停止当前活动\n        P->>R: session.cancel\n        R->>H: cancel并等待idle\n    end"
 }

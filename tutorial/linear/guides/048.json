@@ -25,5 +25,6 @@
     "packages/client/ui-conversation/src/client/conversation/assembler.ts",
     "packages/client/ui-conversation/src/client/conversation/event-registry.ts",
     "packages/client/connection/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 纯内存测试\n    participant V as View读模型\n    participant Q as View内部的waiting与events\n    T->>V: reconnect得到generation一\n    T->>V: apply审批事件seq一\n    V->>Q: 暂存，仍缺seq零\n    T->>V: apply文字事件seq零\n    loop 连续seq已齐\n        V->>Q: 依次接纳seq零、seq一\n    end\n    T->>V: 再送seq零\n    V-->>T: 忽略已接纳事件\n    T->>V: reconnect得到generation二\n    T->>V: 用旧generation送结算seq二\n    V-->>T: 忽略，审批仍待答\n    T->>V: 用新generation送结算seq二\n    V->>Q: 接纳并移除待审批\n    T->>V: state\n    V-->>T: 文字只有一次，审批为空\n    Note over T,V: 此处没有网络重连或页面，只验证折叠规则"
 }

@@ -23,5 +23,6 @@
     "packages/compaction/compaction/src/tool-pairing.ts",
     "packages/spill/spill-policy/src/index.ts",
     "packages/spill/spill-local/src/store.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant P as compact函数\n    participant M as 固定摘要回调\n    participant S as Spill\n    participant F as 本机临时文件\n    Note over C,S: 两个helper独立调用，均未接入Loop\n    C->>P: compact(history, limit, measure)\n    P->>P: 复制history并计量\n    alt 未超预算\n        P-->>C: 返回副本\n    else 超预算且当前轮可保留\n        P->>P: 找最后user并保留recent\n        P->>M: summarize旧前缀\n        M-->>P: 固定摘要关键事实\n        P->>P: 摘要加recent，再检查预算\n        P-->>C: 返回压缩副本，原数组不改\n    end\n    Note over C,S: Spill并非由compact自动触发\n    C->>S: put完整原文\n    S->>F: 按内容hash写文件\n    F-->>S: 写入成功\n    S-->>C: id、bytes与preview\n    C->>S: get(id)\n    S->>F: 读取文本\n    F-->>S: 当前文件内容\n    S->>S: 比较实际hash与id\n    S-->>C: 返回原文或完整性错误"
 }

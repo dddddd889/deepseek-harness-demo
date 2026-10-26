@@ -4,7 +4,7 @@
   "try": "先写完src/mcp.mjs和tests/fixtures/mcp.mjs，按本章package.json安装依赖后运行 bun test ./tests/033-mcp.test.mjs。测试真实启动本地MCP服务进程；目录应出现project__first与project__second，执行second返回文本second，remote.close后目录为空。无需远端账户。",
   "why": "MCP适配器把外部协议翻译成现有Tools入口：模型看到的是统一工具名与schema，实际调用委托官方SDK。revision用于防止旧刷新覆盖新一代目录；Scope负责撤销注册，不代表已经自动取消所有在途副作用。",
   "accept": "测试应1项通过，覆盖真实stdio握手、两页发现、调用和卸载。没有实际验证HTTP、list_changed动态刷新、资源模板分页、OAuth或在途取消。",
-  "debug": "父进程在src/mcp.mjs的await client.connect、definitions.push、tools.register和client.callTool打断点。F10完成两次listTools后看definitions.length=2、generation===revision；执行second时看注册名project__second但远端name=\"second\"。在await contribution.close后检查旧注册撤销。外部fixture是单独Bun进程，父调试器不能直接停到其handler；需显式为该子进程配置独立Inspector才可调试。",
+  "debug": "按下方[033调试实操](#033调试实操父测试mcp子进程和日志文件)先验收基础测试，再完整替换列出的调试扩展文件，再在自己的PROJECT运行固定启动命令：父测试附加6499/mcp-parent-033，fixture子进程附加6501/mcp-033；先连接父进程并继续，等待它创建子进程，再建立子调试会话。父进程在src/mcp.mjs的client.connect、definitions.push、tools.register和client.callTool停下，看definitions.length=2与远端name=\"second\"；子进程在tests/fixtures/mcp.mjs的分页和工具处理函数体停下，看cursor从undefined变为page2、工具name为second。--timeout 0关闭Bun测试时限，MCP_DEBUG=1才开启子Inspector并把SDK每次请求时限设为1小时；普通回归不带该开关。日志在PROJECT/tmp/mcp-server.log，用另一个终端tail -f查看。完整launch.json、preload和5份文件均在本页末尾，不能只附加父进程就等子进程断点命中。",
   "recall": "闭卷画出project__second→远端second名称映射；说明为什么关闭连接要移除工具，而不是仅把client变量设undefined。",
   "transfer": "安全练习：在固定fixture增加第三页并同步测试期望，验证do/while cursor；不要直接连接带写权限的真实服务试验。OAuth与重连需独立实现，当前spec.headers不是刷新流程。",
   "wiring": "033已经通过真实MCP进程调用Tools，但当前章没有模型。051 capabilities未调用mountMCP，最终Host没有自动装配MCP配置；后续没有证明Agent→MCP→服务的完整产品链。",
@@ -25,5 +25,6 @@
     "packages/mcp/mcp-client/README.zh.md",
     "packages/mcp/mcp-client/src/index.ts",
     "packages/mcp/mcp-resources/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant M as mountMCP 适配器\n    participant K as 官方 MCP Client\n    participant S as MCP 服务（测试为真实子进程 fixture）\n    participant T as Tools 与贡献 Scope\n    C->>M: mountMCP(scope, tools, name, spec)\n    M->>K: 创建 stdio 或 Streamable HTTP 传输\n    K->>S: connect 并完成 MCP 初始化\n    loop 按 nextCursor 分页\n        M->>K: listTools(cursor)\n        K->>S: tools/list\n        S-->>K: 工具定义与下一页游标\n        K-->>M: 返回当前页\n    end\n    M->>T: 当前 generation 注册 name__tool\n    C->>T: execute(call, context)\n    T->>K: 注册的 run 调用 callTool(signal)\n    K->>S: tools/call\n    S-->>K: content 或 isError\n    K-->>T: callTool 返回；isError 转为异常\n    T-->>C: 工具结果或错误\n    opt 服务通知工具列表改变\n        S-->>K: list_changed 通知\n        K->>M: 调用 discover 处理函数\n        M->>T: 新代次发现后撤销旧贡献并重新注册\n    end\n    C->>M: close 或父 Scope.close\n    M->>T: 关闭贡献 Scope，撤销工具\n    M->>K: client.close 释放连接\n    Note over C,T: 本章已接 Tools，但最终 Host 尚未自动挂载 MCP"
 }

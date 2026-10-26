@@ -26,5 +26,6 @@
     "packages/client/connection/src/rpc.ts",
     "packages/client/connection/src/rpc-host.ts",
     "packages/host/webserver/src/index.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 测试中的HTTP与WS客户端\n    participant W as Bun传输：HTTP与WebSocket\n    participant R as Peer与Remote\n    participant H as Host\n    Note over C,H: 本章无页面，不把HTTP客户端画成已完成的浏览器UI\n    C->>W: GET /status，不带cookie\n    W-->>C: 401\n    C->>W: GET启动token链接\n    W-->>C: 302与HttpOnly cookie\n    C->>W: /rpc升级，带Cookie和Origin\n    W->>W: 检查Host、Origin与凭据\n    alt 未授权\n        W-->>C: 拒绝升级\n    else 已授权\n        W->>R: 为连接创建Peer，挂载Remote\n        C->>R: WebSocket里的session.create请求\n        R->>H: create工作区会话\n        H-->>R: owner为local的header\n        R-->>C: 同一WebSocket回复\n    end\n    opt 连接关闭\n        W->>R: peer.close并撤销订阅\n        Note over R,H: 断线不自动取消Host中的Agent\n    end"
 }

@@ -28,5 +28,6 @@
     "packages/ssh/fs-ssh/README.zh.md",
     "packages/ssh/subprocess-ssh/README.zh.md",
     "packages/ssh/ssh-helper-runtime/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方\n    participant S as SSH 适配器\n    participant E as runner（默认 execute）\n    participant L as 本机 ssh 进程\n    participant R as 远端 Shell 与文件系统\n    C->>S: new SSH(host, workspace)\n    S->>S: 校验 host 与绝对工作区\n    alt 读取文件\n        C->>S: read(path, signal)\n        S->>S: 检查路径并生成 cat argv\n    else 写入文件\n        C->>S: write(path, text, signal)\n        S->>S: 检查路径，编码 base64，生成固定写入模板\n    else 执行命令\n        C->>S: run(argv, signal)\n    end\n    S->>S: quote 编码每个远端参数\n    S->>E: runner(ssh 启动 Spec, signal)\n    E->>L: 默认实现 spawn ssh\n    L->>R: cd 工作区后 exec 命令\n    R-->>L: 输出和退出码\n    L-->>E: 进程结果\n    E-->>S: code 和 output\n    S-->>C: 读取文本或执行结果\n    Note over E,R: 本章 SSH 测试注入 runner；图中真实远端路径尚未端到端验收"
 }

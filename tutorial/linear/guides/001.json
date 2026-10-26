@@ -21,5 +21,6 @@
     "vendor/cordis/src/fiber.ts",
     "packages/core/scope/src/index.ts",
     "packages/core/scope/src/store.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant P as 父Scope\n    participant S as 子Scope\n    participant R as 资源清理函数\n    C->>P: own父资源清理\n    C->>P: child()\n    P->>P: own子Scope.close\n    P-->>C: 返回子Scope\n    C->>S: own子资源清理\n    C->>P: await close()\n    P->>P: 标记closed并逆序取销毁项\n    P->>S: await close()\n    S->>R: 执行子资源清理\n    R-->>S: 测试样本抛错\n    S-->>P: AggregateError\n    P->>P: 收集错误，继续下一项\n    P->>R: 执行父资源清理\n    P-->>C: 汇总为AggregateError\n    opt 再次close\n        C->>P: close()\n        P-->>C: 已关闭，直接返回\n    end"
 }

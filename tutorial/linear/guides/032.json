@@ -27,5 +27,6 @@
     "packages/sdk/protocol/src/transport.ts",
     "packages/sdk/server/README.zh.md",
     "packages/interaction/user-approval/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant D as 父进程 rpc-demo\n    participant P as 父 Peer 与 framing\n    participant W as 子进程 worker Peer 与处理函数\n    participant A as 父进程 Approvals 与答复方\n    participant F as 演示目录文件\n    D->>W: spawn worker，传入隔离工作区\n    Note over P,W: 双方 Peer 管 RPC id；framing 经 stdin/stdout 传 NDJSON\n    D->>P: request(tools/call，sum)\n    P->>W: 请求 id=A，a 与 b\n    W-->>P: 响应 id=A，value 与子进程 pid\n    P-->>D: 原 sum 请求完成\n    loop 依次调用 allow.txt 与 deny.txt 的 delete\n        D->>P: request(tools/call，delete)\n        P->>W: 请求 id=B，文件名\n        W->>F: realpath 校验文件在工作区根目录\n        F-->>W: 真实文件路径\n        W->>P: 反向请求 id=C，approval/request\n        P->>A: Approvals.request 后等待真人或自动答复\n        A-->>P: allowed\n        P-->>W: 响应 id=C，审批结论\n        alt allowed 为 true\n            W->>F: unlink 删除文件\n            F-->>W: 删除完成\n            W-->>P: 响应 id=B，deleted=true\n        else 用户拒绝\n            W-->>P: 响应 id=B，deleted=false\n        end\n        P-->>D: 原 delete 请求完成\n    end\n    Note over D,W: A/B/C 是示意名，每次生成新 id；审批与工具请求各自配对"
 }

@@ -27,5 +27,6 @@
     "apps/cli/src/plugin.ts",
     "apps/cli/src/process-shutdown.ts",
     "packages/boot/app-boot"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    actor U as 终端用户\n    participant C as Bun CLI适配器\n    participant H as Host与产品装配\n    participant A as Agent与Loop\n    participant M as 离线模型\n    participant T as Tools与权限门\n    participant F as 工作区文件\n    U->>C: 启动并传任务argv\n    C->>H: 装product与capabilities，创建或恢复会话\n    H-->>C: 会话record\n    C->>A: submit后等待idle\n    alt 当前测试正常读取文件\n        A->>M: stream模型请求\n        M-->>A: read工具调用\n        A->>T: execute并检查权限\n        T->>F: 读取真实文件\n        F-->>T: text与version\n        T-->>A: 工具结果\n        A->>M: 工具结果继续投喂\n        M-->>A: 最终文字与finish\n        A-->>C: Session监听器输出事实\n    else 运行中用户Ctrl+C，当前测试未覆盖\n        U->>C: 中断信号\n        C->>A: 请求cancel\n        A-->>C: 活动收敛后的取消事实\n    end\n    C->>C: 从turn/end决定退出码\n    C->>H: finally关闭Host\n    H->>A: close并等待活动结束\n    C-->>U: 退出码\n    Note over C,T: 副作用工具另有终端审批；本章read用例不触发\n    Note over C,M: 测试另起真实CLI子进程并移除Key，使用离线模型"
 }

@@ -25,5 +25,6 @@
     "packages/acp/acp/src/index.ts",
     "packages/acp/acp/src/session.ts",
     "packages/acp/acp/src/updates.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 普通单测\n    participant F as signature纯函数\n    participant C as 独立compare脚本\n    participant P as 本轮ACP子进程\n    Note over T,F: bun test只验证归一化，不启动原版对照\n    T->>F: 固定updates与cancelled\n    F-->>T: 保留partial与结束原因\n    Note over C,P: compare另行启动；先自有fixture，后原版测试装配oracle\n    opt 显式运行compare且原版提交已锁定\n        C->>C: 检查原版commit\n        loop 自有进程和oracle各执行一组\n            C->>P: spawn并接真实ACP SDK\n            C->>P: initialize与session/new\n            P-->>C: sessionId\n            C->>P: 第一轮prompt\n            P-->>C: golden-answer与end_turn\n            C->>P: 第二轮prompt\n            P-->>C: fd3确认首片被Loop消费\n            C->>P: session/cancel通知\n            P-->>C: partial与cancelled结果\n            C->>P: 第三轮prompt\n            P-->>C: after-cancel与end_turn\n            C->>P: stdin EOF，收回子进程\n        end\n        C->>F: 分别归一化两组结果\n        F-->>C: 两份窄signature\n        C->>C: 比较并写证据\n    end\n    Note over C,P: 两边模型固定；只对照三个样本，不是全产品等价"
 }

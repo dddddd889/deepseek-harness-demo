@@ -22,5 +22,6 @@
     "packages/core/agent-loop/src/constants.ts",
     "packages/core/tools/src/index.ts",
     "packages/core/tools/src/ptc-calls.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用者\n    participant L as Loop\n    participant B as batch调度器\n    participant T as Tools\n    participant R as 工具run函数\n    Note over C,B: 本章单测直接调用batch，041才安装到Host\n    C->>L: 工具组待执行\n    alt 未调用installBatch，本章demo默认\n        L->>L: tools.batch为undefined\n        loop 按调用顺序逐个await\n            L->>T: execute(call)\n            T->>R: run()\n            R-->>T: 当前调用结果\n            T-->>L: 当前调用结束\n        end\n    else 已显式installBatch，例如041 Host\n        L->>B: tools.batch(calls, context)\n        loop 按模型顺序扫描\n            alt 非独占工具\n                B->>T: 启动execute\n                T->>R: 启动run，可与同组重叠\n                T-->>B: 进行中Promise加入group\n            else 独占工具\n                B->>B: 等待前组全部结束\n                R-->>T: 前组run完成\n                T-->>B: 前组execute结果\n                B->>T: await独占execute\n                T->>R: 独占run\n                R-->>T: 独占结果\n                T-->>B: 完成后才启动后组\n            end\n        end\n        B->>B: await剩余组\n        opt 最后仍有进行中的非独占调用\n            R-->>T: 最后组run完成\n            T-->>B: 最后组execute结果\n        end\n        B->>B: 按index保留结果\n        B-->>L: 模型调用顺序的results\n    end"
 }

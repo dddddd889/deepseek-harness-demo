@@ -27,5 +27,6 @@
     "packages/api/workspace-files/src/types.ts",
     "packages/settings/settings",
     "packages/credentials/credentials"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方：测试或页面Remote\n    participant P as product与会话设置\n    participant S as 真实设置Store\n    participant A as Host中的Agent\n    participant M as 模型工厂\n    participant T as Tools与LocalFS\n    Note over C,T: 测试直接调用设置；页面另经Remote，不是所有分支均已测试\n    C->>P: settings.set保存permission与backend\n    P->>S: 合并写入settings.json\n    P->>P: 更新当前Settings\n    C->>P: closeSession后open\n    P->>S: 读取已保存设置\n    S-->>P: read-only等配置\n    C->>A: submit新任务\n    A->>P: 取得本轮snapshot\n    P-->>A: 请求配置快照\n    A->>M: 按request.config.backend调用stream\n    alt offline\n        M-->>A: 离线结果\n    else 未知backend\n        M-->>A: 抛错，记录turn/end为error\n    end\n    opt 页面手动文件操作，当前单测未覆盖\n        C->>P: file.read或file.write\n        P->>T: Tools.execute，带版本与审批上下文\n        T-->>P: 真实文件结果\n        P-->>C: RPC返回结果\n    end\n    Note over P,M: 当前工厂未接Routes或PiModel"
 }

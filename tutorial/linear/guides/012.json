@@ -22,5 +22,6 @@
     "packages/core/agent-loop/src/assistant-stream.ts",
     "packages/core/agent-loop/src/tool-calls.ts",
     "packages/core/session/src/repair.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 本章测试\n    participant L as runTurn\n    participant E as Events\n    participant M as ScriptModel\n    participant T as Tools与sum\n    C->>L: runTurn，计算2加3\n    L->>E: turn/start与message/user\n    L->>E: read并投影历史\n    E-->>L: 已提交消息\n    L->>T: catalog()\n    T-->>L: sum的schema\n    L->>M: 第一次stream，历史与工具\n    M-->>L: sum调用与finish tools\n    L->>E: 提交assistant调用及request/end\n    L->>E: tool/start\n    L->>T: execute(sum, a为2,b为3)\n    T-->>L: 实际结果5\n    L->>E: message/tool，保留同一callId\n    L->>E: read新历史\n    E-->>L: assistant调用及tool结果\n    L->>M: 第二次stream，携带工具结果\n    M-->>L: 文字5与finish stop\n    L->>E: assistant与turn/end completed\n    L-->>C: 返回turnId与completed\n    Note over M: 固定模型事件，没有网络请求"
 }

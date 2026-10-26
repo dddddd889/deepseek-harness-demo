@@ -22,5 +22,6 @@
     "packages/settings/settings/src/schema.ts",
     "vendor/loader/src/config/entry.ts",
     "vendor/loader/src/index.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant S as Settings\n    participant M as compose函数\n    C->>S: new Settings，模型a\n    C->>S: snapshot()\n    S->>S: structuredClone并递归冻结\n    S-->>C: first快照，revision为0\n    C->>S: set，模型b\n    S->>S: 替换当前值，revision加1\n    C->>C: 检查first仍为a\n    C->>S: snapshot()\n    S-->>C: 新快照为b，revision为1\n    Note over C,M: 下面是另一个独立配置合并调用\n    C->>M: 基础行与同id覆盖行\n    loop 按层遍历插件行\n        M->>M: Map按id浅合并\n    end\n    M-->>C: 返回enabled为false的配置行\n    Note over M: 005才把结果交给Plugins.profile"
 }

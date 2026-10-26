@@ -26,5 +26,6 @@
     "packages/skill/skill/src/index.ts",
     "packages/skill/skill-filesystem/README.zh.md",
     "packages/skill/tool-skill/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant S as Skills\n    participant F as 本地 Skill 目录\n    participant E as 会话 Events\n    C->>S: discover()\n    S->>S: 清空 catalog\n    loop 用户根目录，再项目根目录\n        S->>F: readdir 扫描命名子目录\n        F-->>S: 目录项\n        S->>S: 记录 SKILL.md 路径，同名后层覆盖\n    end\n    S-->>C: 已发现名称列表\n    C->>S: load(name, session)\n    S->>S: 查 catalog；未知名称抛错\n    S->>F: readFile 对应 SKILL.md\n    F-->>S: 正文\n    S->>S: 计算正文 SHA-256\n    S->>E: append(context/skill，来源、hash、正文)\n    S-->>C: 返回正文\n    Note over S,F: 本章只读取入口文档；scripts 和 references 尚未建立资源使用链"
 }

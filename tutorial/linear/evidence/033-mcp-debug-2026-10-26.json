@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-26",
+  "project": "/private/tmp/harness-033-debug-d4rvrx0b",
+  "runtime": "Bun 1.3.14",
+  "dependencyInstall": "Independent install using locks/033.bun.lock with --frozen-lockfile --ignore-scripts",
+  "codeSource": "Five complete code blocks extracted directly from labs/033.md",
+  "fileSha256": {
+    "scripts/vscode-debug.mjs": "2df2c7670c68893c32fc8133516be0181104e9ba222e2235cdd0cb531e11aee6",
+    "src/mcp.mjs": "5181fd8e7cce08b5ca94a8978d9fb6df4c175429cb3c8b7dcf9c2f900aff61a6",
+    "tests/033-mcp.test.mjs": "a08b1add63fdf2469687cfc79ed712728cfd4f2c142fd0b6287753374e5b0dc0",
+    "tests/fixtures/mcp.mjs": "8b1f9bca1a71e7846f8d0e45ba4950161a44630a462ddd5cc3306a50a7475d3f",
+    ".vscode/launch.json": "70e37bd0f965b7ce17f0ac9bfa325df8e80f307dd6bdccb6e6823679bdd6cedf"
+  },
+  "normalTest": {
+    "passed": 1,
+    "failed": 0
+  },
+  "inspectorCheck": {
+    "bun": "1.3.14",
+    "parentPid": 74146,
+    "childPid": 74147,
+    "parentPort": 65409,
+    "childPort": 65410,
+    "independentInspectors": true,
+    "childHandlerBreakpointHit": true,
+    "firstCursorFromFileLog": "(首页)",
+    "debuggerLocalsEvaluated": false,
+    "pausedMilliseconds": 6104,
+    "originalTestPassed": true,
+    "toolListRequests": 2,
+    "toolCalls": 1,
+    "protocolUnaffectedByFileLogs": true,
+    "vscodeUiInteractivelyVerified": false
+  },
+  "runtimeCheckScope": "033 documented examples only; not a full 000-069 rerun",
+  "launchConfigurationCount": 6,
+  "launchConfigStaticallyChecked": true,
+  "newSequenceParsedAndRendered": true,
+  "newSequenceTextOutsideSvg": 0,
+  "stepsSourceModified": false,
+  "harnessOwnModified": false,
+  "committed": false,
+  "notes": [
+    "Temporary Inspector ports replaced only in the temporary copy to avoid user sessions; the documented file was restored afterward.",
+    "Paused the real child handler for 6104ms, then passed the original assertions and verified two list requests plus one tool call in the file log.",
+    "VS Code UI was not exercised; one-hour SDK request options were checked against the installed SDK signatures, not by waiting one hour."
+  ]
+}

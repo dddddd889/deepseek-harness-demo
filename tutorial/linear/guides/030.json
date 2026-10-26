@@ -26,5 +26,6 @@
     "packages/jobs/jobs-local/README.zh.md",
     "packages/jobs/tool-jobs/README.zh.md",
     "packages/shell/bash-local/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant J as Jobs\n    participant P as producer 异步任务\n    participant S as 资源 Scope\n    C->>J: start(scope, owner, producer)\n    J->>J: 登记 job 与 AbortController\n    J->>S: own 登记取消、等待和删除回调\n    J-->>C: jobId\n    J->>P: producer(signal, emit)\n    loop 有输出\n        P->>J: emit(text) 追加 output\n    end\n    opt 观察任务\n        C->>J: wait(owner, jobId, timeout)\n        J->>J: 等 done 或观察期限到达\n        J-->>C: 当前状态；观察超时不取消 producer\n        C->>J: read(owner, jobId, cursor)\n        J-->>C: 增量 chunks 与新 cursor\n    end\n    opt 显式停止\n        C->>J: kill(owner, jobId)\n        J->>P: abort 并等待 done\n        P-->>J: 生产方结束，job.done 结算\n        J-->>C: kill 完成\n    end\n    C->>S: close()\n    S->>J: 执行登记的清理回调\n    J->>P: abort 并等待 done（已结束则立即返回）\n    J->>J: 删除 entries 项\n    J-->>S: 清理完成\n    Note over C,J: get 会校验 owner；本章 producer 为可取消等待，不是构建进程"
 }

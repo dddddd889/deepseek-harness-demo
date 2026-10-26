@@ -25,5 +25,6 @@
     "packages/client/ui-approval",
     "packages/api/session-controller/src/index.ts",
     "packages/api/workspace-files/src/index.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as Bun测试：Playwright驱动\n    participant P as 真实Chrome页面\n    participant H as 同一Bun进程：Host与权限服务\n    participant A as Agent与Loop\n    participant M as 离线模型\n    participant F as 临时工作区文件\n    T->>P: 打开启动URL并创建会话\n    P->>H: WebSocket创建与订阅\n    T->>P: 输入write任务并点击发送\n    P->>H: session.submit\n    H->>A: submit\n    A->>M: stream\n    M-->>A: write工具调用\n    A->>H: Tools执行前请求审批\n    H-->>P: session.event显示审批\n    T->>P: 点击允许一次\n    P->>H: approval.answer\n    H->>F: LocalFS写proof.txt\n    F-->>H: 写入结果\n    H-->>A: 工具结果，继续模型步骤\n    A->>M: 携工具结果请求\n    M-->>A: 完成文字\n    A-->>H: 会话事实\n    H-->>P: 工具完成与消息\n    T->>F: 读取并断言from-browser\n    opt 第二轮测试取消\n        T->>P: 输入slow并发送\n        P->>H: session.submit\n        H->>A: 执行slow\n        A->>M: stream\n        M-->>A: partial后等待取消\n        A-->>H: stream事实\n        H-->>P: 显示partial\n        T->>P: 确认partial出现后点击停止\n        P->>H: session.cancel\n        H->>A: cancel并等待收敛\n    end\n    T->>P: 发送after-cancel\n    P->>H: session.submit\n    H->>A: 新turn\n    A->>M: stream\n    M-->>A: after-cancel离线回答\n    A-->>H: 已提交消息\n    H-->>P: 显示下一轮结果\n    T->>P: reload页面\n    P->>H: 重订阅并读取历史快照\n    H-->>P: 历史恢复，旧审批已结算\n    Note over T,F: 浏览器、WS和磁盘真实；模型固定，不是原版GUI差分"
 }

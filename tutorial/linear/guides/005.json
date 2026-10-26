@@ -22,5 +22,6 @@
     "packages/core/session/src/surface.ts",
     "packages/session/session-persistence/src/index.ts",
     "packages/session/session-persistence-jsonl/src/index.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant D as session-demo进程\n    participant P as 插件装配\n    participant R as readTask\n    participant S as Settings\n    participant E as Events\n    participant F as 本机文件系统\n    participant V as 终端订阅者\n    D->>P: createReaderApp安装四个插件\n    P->>F: 打开本次独立JSONL\n    P->>E: 注册persist与显示订阅\n    D->>R: run指定文件\n    R->>S: snapshot()\n    S-->>R: 当前任务固定配置\n    R->>E: append开始与用户事实\n    E->>F: 追加JSONL并fsync\n    E-->>V: 发布已提交事实\n    R->>F: readFile真实读取\n    F-->>R: 文件文本\n    R->>E: append工具结果与最终消息\n    E->>F: 先落盘\n    E-->>V: 显示文件结果\n    D->>P: remove终端插件\n    P->>E: 撤销显示订阅\n    D->>R: 第二次run，仍写事实与磁盘\n    D->>E: read(cursor)补读错过事件\n    E-->>D: 返回新增事实副本\n    D->>P: close，等待任务后撤销服务并关闭日志"
 }

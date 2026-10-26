@@ -25,5 +25,6 @@
     "packages/shell/tool-bash-persistent/README.zh.md",
     "packages/shell/tool-bash-persistent/src/index.ts",
     "packages/terminal/terminal/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant S as 持久 Shell\n    participant B as Bash 子进程（普通管道）\n    C->>S: new Shell(cwd)\n    S->>B: spawn Bash，一次创建持续复用\n    loop 每次 run\n        C->>S: run(command, signal)\n        S->>S: 排入 tail，等待前一调用结算\n        S->>B: stdin 写命令和随机结束 marker\n        B-->>S: stdout 与 stderr 数据\n        alt 收到 marker 和退出码\n            S->>S: 截取 marker 前输出并撤销本次监听\n            S-->>C: 返回 code 和 output\n        else 取消、超时或超限\n            S->>B: kill 整个进程组\n            S-->>C: 本次 run 抛错\n        end\n    end\n    opt 调用方结束资源寿命\n        C->>S: close()\n        S->>B: kill 并等待 close\n    end\n    Note over S,B: 环境变量和 cwd 留在同一个 Bash；这里没有 PTY"
 }

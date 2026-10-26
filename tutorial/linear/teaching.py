@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-TEXT_FIELDS = ('scenario', 'flow', 'try', 'why', 'accept', 'debug', 'recall', 'transfer', 'wiring', 'testEvidence')
+TEXT_FIELDS = ('scenario', 'flow', 'sequence', 'try', 'why', 'accept', 'debug', 'recall', 'transfer', 'wiring', 'testEvidence')
 LIST_FIELDS = ('implemented', 'missing', 'sources')
 
 
@@ -20,6 +20,8 @@ def enrich_lessons(lessons):
         for field in TEXT_FIELDS:
             if not isinstance(guide.get(field), str) or not guide[field].strip():
                 raise ValueError(lesson['id'] + ' 缺少具体说明：' + field)
+        if guide['sequence'].splitlines()[0].strip() != 'sequenceDiagram':
+            raise ValueError(lesson['id'] + ' 时序图必须使用sequenceDiagram')
         for field in LIST_FIELDS:
             if not isinstance(guide.get(field), list) or not guide[field] or any(not isinstance(value, str) or not value.strip() for value in guide[field]):
                 raise ValueError(lesson['id'] + ' 缺少非空列表：' + field)

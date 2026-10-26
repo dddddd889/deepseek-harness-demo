@@ -23,5 +23,6 @@
     "packages/llm/llm/src/retry-policy.ts",
     "packages/llm/llm-pi-ai/src/auth.ts",
     "packages/credentials/credentials/src/index.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant A as Agent与Loop\n    participant R as Routes\n    participant P as 路由提供方\n    participant K as RefreshToken\n    participant C as 本地凭据回调\n    participant H as 本地固定模型HTTP\n    A->>R: stream固定provider与model\n    R->>R: 校验路由，attempt从0开始\n    loop 首次尝试及最多一次重试\n        R->>P: stream同一请求快照\n        alt 正常完成\n            P-->>R: Parts并结束\n            R-->>A: 转交Parts并结束\n        else 请求失败\n            P-->>R: 错误，可能已交付部分Part\n            alt published或已取消或attempt已到1\n                R-->>A: 错误，不再重试\n            else 尚无Part且是首次未取消尝试\n                R->>R: 可取消等待10ms，再试一次\n            end\n        end\n    end\n    Note over R: usage也算published，不要求已经有正文\n    Note over A,H: 以下是demo中另一独立并发鉴权场景\n    A->>R: 两个独立Agent并发请求OAuth路由\n    R->>P: 两次进入鉴权包装器stream\n    P->>K: 两次get，均在构造鉴权头前等待\n    K->>C: read过期凭据\n    C-->>K: 过期token记录\n    K->>C: pending合并为一次refresh\n    Note over K,C: demo确认两个请求到达后放行gate\n    C-->>K: 新凭据\n    K->>C: write保存新凭据\n    C-->>K: 保存完成\n    K-->>P: 两个等待者取得同一新token\n    P->>H: 分别用新Bearer发送两次模型请求\n    H-->>P: 各自模型响应\n    P-->>R: 两个请求的Part流\n    R-->>A: 各自请求完成结果"
 }

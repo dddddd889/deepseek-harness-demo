@@ -22,5 +22,6 @@
     "packages/session/session-persistence-jsonl/src/lease.ts",
     "packages/session/session-persistence-jsonl/src/zstd.ts",
     "packages/session/session-persistence-jsonl/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant J as Journal\n    participant E as Events\n    participant F as 本机文件系统\n    C->>J: new Journal(path)\n    J->>F: wx创建锁并打开日志\n    F-->>J: 现有日志字节\n    J->>J: 按最后LF解析完整行及seq\n    opt 最后存在未完成半行\n        J->>F: truncate到最后LF并fsync\n    end\n    C->>E: append用户消息\n    E->>J: persist(record)\n    J->>F: writeSync循环写完并fsync\n    J-->>E: 提交成功\n    E->>E: 追加内存并发布\n    opt 第二写者同时构造\n        C->>J: 再次new Journal同一路径\n        J->>F: wx创建同名锁\n        F-->>J: EEXIST\n        J-->>C: 构造失败，拒绝双写\n    end\n    C->>J: close()\n    J->>F: 关闭日志fd，移除锁文件\n    Note over J,F: 普通文件锁，崩溃残留不自动清除"
 }

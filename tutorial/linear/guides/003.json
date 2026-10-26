@@ -22,5 +22,6 @@
     "vendor/loader/src/config/entry.ts",
     "vendor/loader/src/config/group.ts",
     "vendor/cordis/src/fiber.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用者\n    participant P as Plugins\n    participant S as 每插件子Scope\n    participant F as 插件setup函数\n    participant R as 共享Services\n    C->>P: profile(rows, catalog)\n    loop 按配置顺序处理启用行\n        P->>P: install(name, setup)\n        P->>S: 根Scope.child()\n        P->>F: setup(scope, shared services)\n        alt 安装成功\n            F->>R: provide服务与撤销登记\n            F-->>P: 完成\n            P->>P: active登记，再记入installed\n        else 安装失败\n            F-->>P: 抛出安装错误\n            P->>S: 关闭失败插件的半成品\n            loop 逆序撤销本次installed\n                P->>P: remove(name)\n                P->>S: close并撤销贡献\n                S->>R: 删除该插件的服务\n            end\n            P-->>C: 重新抛出错误\n        end\n    end\n    Note over P,R: 不关闭根Scope，不退出此前已有插件"
 }

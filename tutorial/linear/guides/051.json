@@ -27,5 +27,6 @@
     "packages/shell/tool-bash-persistent/src/index.ts",
     "packages/subagent/subagent-dsh-sdk/src/run.ts",
     "packages/bundle"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 测试主进程\n    participant H as Host与capabilities装配\n    participant A as Agent与Loop\n    participant M as 离线模型\n    participant G as Tools与权限守卫\n    participant C as Collaboration\n    participant S as Session事实\n    T->>H: product与capabilities，创建会话\n    H->>G: 注册todo_update等工具\n    T->>A: submit固定todo_update任务\n    A->>M: stream\n    M-->>A: todo_update调用\n    A->>G: execute，校验并请求审批\n    G->>S: 写approval/request\n    S-->>T: 会话事件回调\n    T->>G: 测试固定允许\n    G->>C: set todo one为done\n    C->>S: 写入协作事实\n    C-->>G: 当前todo状态\n    G-->>A: 工具结果\n    A->>M: 工具结果继续投喂\n    M-->>A: 结束文字\n    T->>A: 等待idle\n    T->>C: 检查one.status\n    C-->>T: done\n    Note over H,G: Terminal只有导入，没有PTY实例或终端工具注册\n    Note over T,S: 当前测试不覆盖拒绝、子Agent或所有已注册工具"
 }

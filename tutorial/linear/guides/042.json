@@ -27,5 +27,6 @@
     "packages/storage/storage-json/README.zh.md",
     "packages/credentials/credentials-local/README.zh.md",
     "packages/workspace/workspace/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant A as Credentials 或 Workspaces\n    participant S as Store\n    participant F as 产品 JSON 文件\n    C->>A: set、add 或 update\n    A->>S: update(change)\n    S->>F: 读取当前 JSON（不存在则空对象）\n    F-->>S: 当前值\n    S->>S: change 生成新值\n    S->>F: 写入权限 0600 的临时文件\n    S->>F: rename 发布为正式文件\n    S-->>A: 更新后对象\n    A-->>C: ref 或工作区身份\n    C->>A: 新实例 list()\n    A->>S: read()\n    S->>F: 从正式 JSON 恢复\n    F-->>S: 已保存对象\n    S-->>A: 原始存储值\n    A-->>C: 工作区记录或仅 ref/configured 的凭据列表\n    opt 宿主准备请求模型\n        C->>A: credentials.resolve(ref)\n        A->>S: read()\n        S->>F: 读取凭据 JSON\n        F-->>S: 已保存对象\n        S-->>A: 原始存储值\n        A->>A: 查 ref，缺失则查环境变量\n        A-->>C: 明文 Key，仅供宿主消费\n    end\n    Note over A,F: 凭据文件为私有权限 JSON，并非加密密钥库；本章未调用真实模型"
 }

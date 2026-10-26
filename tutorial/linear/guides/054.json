@@ -26,5 +26,6 @@
     "scripts/primary-runtime/smoke.py",
     "packages/skill/tool-workspace-dependencies/src/index.ts",
     "apps/desktop/scripts/prepare-primary-runtime.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 测试或独立调用方\n    participant A as asset辅助函数\n    participant F as 固定下载fetcher\n    participant D as 文件系统\n    participant I as installRuntime辅助函数\n    participant X as 外部tar程序\n    participant W as workspaceDependencies辅助函数\n    Note over T,D: 当前测试只执行asset段，正文不是可运行的真实归档\n    T->>A: 传入URL与可信hash\n    A->>F: 读取固定响应字节\n    F-->>A: trusted或tampered字节\n    alt hash匹配\n        A->>D: 写入真实缓存\n        A-->>T: 返回缓存路径\n    else hash不匹配\n        A-->>T: 抛错，拒绝缓存写入\n    end\n    Note over I,X: 独立安装段：源码提供，本章测试未调用\n    opt 显式调用installRuntime\n        T->>I: specs与目标目录\n        I->>A: 下载并校验组件\n        A-->>I: 已验证的缓存路径\n        I->>X: 列目录后解包到staging\n        X-->>I: 列表与解包结果\n        I->>D: 写manifest并rename发布\n        I-->>T: 返回安装清单\n    end\n    Note over W,D: 独立路径查询段：未接桌面自动启动\n    opt 显式查询依赖路径\n        T->>W: root\n        W->>D: 读取manifest与目标文件\n        D-->>W: 清单与文件内容\n        W-->>T: 返回路径或缺失错误\n    end"
 }

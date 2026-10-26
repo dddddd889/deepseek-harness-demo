@@ -22,5 +22,6 @@
     "packages/llm/llm-deepseek/src/upload-index.ts",
     "packages/llm/llm-deepseek/src/request-files.ts",
     "packages/llm/llm-deepseek/src/files-api.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant M as ModelFiles\n    participant H as 本地固定Files响应\n    Note over C,M: 仅上传helper单测，没有Agent或Loop接线\n    C->>M: upload(bytes, mediaType, signal)\n    M->>M: 算digest并查cache\n    alt 缓存仍在有效期\n        M-->>C: 复用file id\n    else 同digest正在上传\n        M->>M: 等待共享inflight Promise\n        M-->>C: 返回同一次上传的id或错误\n    else 没有可复用项\n        M->>H: 调用fetcher发POST，登记inflight\n        alt HTTP失败\n            H-->>M: 固定500\n            M->>M: 不写cache，finally移除inflight\n            M-->>C: 抛错，下次可重试\n        else HTTP成功\n            H-->>M: 含file id的JSON\n            M->>M: 校验id，写cache并清inflight\n            M-->>C: 返回file id\n        end\n    end\n    Note over M,H: 取得id不等于图片已进入模型请求"
 }

@@ -27,5 +27,6 @@
     "packages/goal/goal-round-driver/README.zh.md",
     "packages/schedule/schedule/README.zh.md",
     "packages/feedback/message-feedback/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant A as Collaboration\n    participant E as 会话 Events\n    participant D as 外部 deliver 回调\n    C->>A: set(kind, value)\n    A->>A: 校验 id 和对应状态词\n    A->>E: append(collaboration/kind, value)\n    C->>A: state(kind)\n    A->>E: read 并筛选对应事件\n    E-->>A: 历史事实\n    A-->>C: 按 id 折叠的最新状态\n    opt 调用方主动检查到期提醒\n        C->>A: due(now, deliver)\n        A->>A: 取 schedule 最新状态\n        loop pending 且已到期的条目\n            A->>D: deliver(id, text)\n            D-->>A: 投递完成\n            A->>E: append schedule 状态为 delivered\n        end\n    end\n    opt 用户提交评价\n        C->>A: feedback(messageSeq, rating, text)\n        A->>E: append 独立 feedback 事件\n    end\n    Note over C,D: 没有自动定时器；deliver 需自行保证幂等"
 }

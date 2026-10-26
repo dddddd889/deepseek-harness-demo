@@ -20,5 +20,6 @@
   "sources": [
     "apps/cli/src/args.ts",
     "apps/cli/src/profile-boot.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    actor U as 用户终端\n    participant B as Bun入口进程\n    participant I as input函数\n    U->>B: bun run start 与任务参数\n    B->>I: input(process.argv.slice(2))\n    I->>I: join空格并trim\n    alt 得到非空任务\n        I-->>B: 返回任务文字\n        B-->>U: 打印收到任务，退出码0\n    else 空白任务\n        I-->>B: 抛出用法错误\n        B->>B: catch设置process.exitCode为1\n        B-->>U: 打印用法并失败退出\n    end\n    Note over B,I: 只接收任务，不读取README或调用模型"
 }

@@ -26,5 +26,6 @@
     "packages/sdk/client/src/client.ts",
     "packages/experimental/webworker-runtime/src/worker.ts",
     "packages/experimental/webworker-runtime/src/node/process-table.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 测试与父Scope\n    participant W as Workers配额管理\n    participant S as 父进程HarnessSDK\n    participant H as 子Bun进程：基础Host\n    participant A as 子进程Agent\n    participant M as 子进程离线模型\n    T->>W: run任务worker\n    W->>W: 检查active配额\n    W->>S: 新建SDK并分配独立home\n    S->>H: spawn sdk-server，stdio接RPC\n    W->>W: active保存运行项\n    S->>H: create与submit\n    H->>A: 接收并执行任务\n    A->>M: stream\n    opt await run仍进行中且signal触发，当前测试未覆盖\n        W->>S: cancel session\n        S->>H: session.cancel\n        H->>A: cancel\n    end\n    M-->>A: 当前未取消测试的离线回声与结束\n    A-->>H: 会话结果\n    H-->>S: RPC结果与事件\n    S-->>W: run返回\n    W->>S: finally关闭SDK\n    S->>H: stdin EOF，等待子Host退出\n    W->>W: 删除active并归还配额\n    W-->>T: 返回结果\n    T->>W: limit设零后再run\n    W-->>T: 启动前拒绝超额\n    Note over H,M: 子Host未装product与capabilities，不是浏览器Web Worker"
 }

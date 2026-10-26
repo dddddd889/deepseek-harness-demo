@@ -21,5 +21,6 @@
     "packages/llm/llm-deepseek/src/sse.ts",
     "packages/llm/llm-deepseek/src/translate.ts",
     "packages/llm/llm-deepseek/src/transport.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 上层调用者或测试\n    participant S as sse生成器\n    participant D as TextDecoder\n    C->>S: 传入异步字节chunks\n    loop 每次收到任意大小chunk\n        S->>D: decode，stream为true\n        D-->>S: 完整UTF-8文字，保留半字符状态\n        S->>S: 追加到buffer\n        loop buffer内有完整空行分隔\n            S->>S: 取出一帧并移除已消费前缀\n            S->>S: 提取data行并合并\n            S-->>C: yield data正文字符串\n        end\n    end\n    S->>D: 最后decode刷新\n    D-->>S: 解码器剩余结果\n    S->>S: 再处理完整帧\n    alt 存在非注释的未完成尾帧\n        S-->>C: 抛出SSE尾帧未完成\n    else 没有残留\n        S-->>C: 结束迭代\n    end\n    Note over C,S: 此层不解释JSON、工具或DONE含义"
 }

@@ -22,5 +22,6 @@
     "packages/core/session/src/fork.ts",
     "packages/core/session/src/repair.ts",
     "packages/session-query/session-query/src/cold-read.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 本章测试调用者\n    participant P as 父Events\n    participant V as 投影函数\n    participant S as 子Events\n    C->>P: 追加用户消息与stream分片\n    C->>V: fork(parent, child, through)\n    V->>S: append lineage\n    V->>P: read事实前缀副本\n    P-->>V: 两条记录\n    loop 仅选择message开头事件\n        V->>S: append复制的消息\n    end\n    V-->>C: 返回子会话\n    C->>S: read()\n    S-->>C: 子会话事实\n    C->>V: messages(子会话事实)\n    V-->>C: 仅提交消息，不含stream分片\n    C->>V: search父会话与关键字\n    V->>P: read()\n    P-->>V: 父会话事实副本\n    V-->>C: 命中的sessionId与seq\n    Note over V: fork和search仍是单测能力，未接Host"
 }

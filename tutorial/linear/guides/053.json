@@ -26,5 +26,6 @@
     "apps/desktop/src/keybindings.ts",
     "packages/client/shortcuts/src/configuration.ts",
     "packages/client/shortcuts/src/binding.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 测试调用方\n    participant L as 独立loginAttempt模块\n    participant F as 固定换票fetcher\n    participant K as 独立Shortcuts模块\n    participant S as 快捷键Store\n    Note over T,F: 登录辅助段：没有真实浏览器或桌面回调接线\n    T->>L: loginAttempt\n    L-->>T: 带state与PKCE challenge的URL\n    T->>L: exchange错误state\n    L-->>T: 拒绝，未调用fetcher\n    T->>L: exchange正确state\n    L->>L: 校验路径并设置consumed\n    L->>F: POST授权码与verifier\n    F-->>L: 固定测试token\n    L-->>T: 返回结果\n    T->>L: 重复exchange\n    L-->>T: 已消费，拒绝\n    Note over K,S: 另一独立能力：当前测试未调用，未串到登录或Electron\n    opt 调用者显式使用快捷键模块\n        T->>K: write bindings\n        K->>S: 读取现有配置\n        S-->>K: 版本与绑定\n        alt 未知版本或绑定不合法\n            K-->>T: 拒绝，不改文件\n        else 校验通过\n            K->>S: 保存新绑定\n            K-->>T: 完成\n        end\n    end"
 }

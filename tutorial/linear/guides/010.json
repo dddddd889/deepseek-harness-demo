@@ -21,5 +21,6 @@
     "packages/llm/llm/src/index.ts",
     "packages/llm/llm/src/types.ts",
     "packages/test-support/llm-replay/src/index.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 测试调用者\n    participant M as ScriptModel\n    participant A as AbortController\n    C->>M: stream(request)\n    M->>M: 记录request并shift脚本\n    alt 普通Part数组\n        loop 按脚本次序\n            M->>M: signal.throwIfAborted\n            M-->>C: yield一份Part副本\n        end\n    else hang样本\n        M-->>C: yield partial文字\n        M->>M: 等待可取消delay\n        C->>A: abort()\n        A-->>M: signal取消\n        M-->>C: 下一次next拒绝\n    else 脚本耗尽\n        M-->>C: 抛出固定模型脚本耗尽\n    end\n    Note over M: 本地替身，不产生HTTP或模型推理"
 }

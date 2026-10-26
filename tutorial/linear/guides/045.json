@@ -26,5 +26,6 @@
     "packages/sdk/protocol/README.zh.md",
     "packages/sdk/server/README.zh.md",
     "packages/sdk/client/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as Python 调用方（Bun 测试启动）\n    participant S as Python HarnessSDK\n    participant T as Python 读取线程\n    participant R as Bun sdk-server 子进程\n    participant H as Bun Host 与 Agent\n    C->>S: HarnessSDK(Bun路径, server, home, cwd)\n    S->>R: Popen 启动服务并接 stdin/stdout\n    S->>T: 启动独立读取线程\n    C->>S: run(cwd, text)\n    loop create、watch、submit、wait、read\n        S->>S: 创建 request id，登记 pending Queue\n        S->>R: stdin 写入一行 JSON-RPC 并 flush\n        R->>H: remote 调用对应领域方法\n        H-->>R: 结果或已提交会话事件\n        R-->>T: stdout 一行 JSON-RPC\n        alt 带 pending id 的响应\n            T->>S: 对应 Queue.put(response)\n            S->>S: request 等到结果并删除 pending\n        else session.event 通知\n            T->>S: 追加 events，不占用请求 Queue\n        end\n    end\n    S-->>C: ending 与 session.read 的事件\n    C->>S: close()\n    S->>R: 关闭 stdin 发送 EOF\n    R->>H: 清理 Host 后退出\n    S->>T: 等待进程并 join 读取线程\n    Note over S,H: Python 只实现传输和组合调用，Agent Loop 始终在 Bun 服务"
 }

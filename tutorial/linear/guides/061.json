@@ -26,5 +26,6 @@
     "packages/experimental/webhook/src/session.ts",
     "packages/experimental/webhook-github/src/handler.ts",
     "packages/experimental/webhook-github/src/body.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 纯内存测试调用方\n    participant W as webhook接收函数\n    participant E as 内存Events\n    participant P as agent.pump计数替身\n    Note over T,P: 没有HTTP路由、Journal、真实Agent或重启\n    T->>W: 第一次传body、签名与delivery\n    W->>W: 时间检查并验body的HMAC\n    W->>E: 查webhook_delivery身份\n    E-->>W: 尚不存在\n    W->>E: append inbox/add\n    W->>P: pump\n    P-->>W: pumps加一\n    W-->>T: duplicate=false\n    T->>W: 重建接收函数后重复同delivery\n    W->>E: 读取同一个内存Events\n    E-->>W: 身份已存在\n    W-->>T: duplicate=true，不再pump\n    T->>W: 篡改body沿用旧签名\n    W->>W: HMAC不匹配\n    W-->>T: 签名错误\n    Note over W,E: 重建函数不等于进程重启或持久恢复"
 }

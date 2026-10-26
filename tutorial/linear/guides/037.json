@@ -24,5 +24,6 @@
     "packages/workflow/workflow/README.zh.md",
     "packages/workflow/tool-workflow/README.zh.md",
     "packages/workflow/workflow-ptc/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant W as workflow\n    participant T as Tools 统一入口\n    participant R as 已注册 record 工具\n    C->>W: workflow([b, a], tools, context)，b 依赖 a\n    W->>W: 检查重复 id、预算、缺失依赖和循环\n    alt 检查发现循环等错误\n        W-->>C: 执行任何工具前抛错\n    else 图合法（本章 a 到 b 的测试）\n        W->>W: 第一批 ready 只有 a\n        W->>T: execute(a.call, context)\n        T->>R: 校验参数、通过守卫后 run(id=a)\n        R-->>T: 返回 a\n        T-->>W: execute 结果 a\n        W->>W: results 保存 a，等待本批 Promise.all\n        W->>W: 第二批 ready 只有 b\n        W->>T: execute(b.call, context)\n        T->>R: 校验参数、通过守卫后 run(id=b)\n        R-->>T: 返回 b\n        T-->>W: execute 结果 b\n        W->>W: results 保存 b，等待本批 Promise.all\n        W-->>C: 返回 a、b 的结果对象\n    end\n    Note over W,T: 实现可用 Promise.all 并发同批独立节点；本章测试只验证依赖链\n    Note over W,T: 工作流编排不绕过工具守卫；本章没有原版脚本引擎"
 }

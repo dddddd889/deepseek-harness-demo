@@ -23,5 +23,6 @@
     "packages/llm/llm-pi-ai/src/stream.ts",
     "packages/llm/llm-pi-ai/src/discovery.ts",
     "packages/llm/llm-pi-ai/src/auth.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant A as Agent Loop\n    participant R as Routes\n    participant P as PiModel\n    participant S as 真实pi-ai SDK\n    participant F as 本地demo fetcher\n    participant H as DeepSeek远端\n    participant T as Tools与sum\n    participant E as Events\n    loop 本例两次模型请求\n        A->>R: stream deepseek-pi路由\n        R->>P: stream同一请求\n        P->>P: context转换历史与工具，保留pi回放\n        P->>S: streamSimple，SDK重试设0\n        S->>F: SDK构造兼容HTTP请求\n        alt 默认离线demo\n            F-->>S: 固定DeepSeek SSE，不联网\n        else 显式live且有Key\n            F->>H: fetch真实请求\n            H-->>F: 远端SSE响应\n            F-->>S: 返回真实Response\n        end\n        S->>S: 解析SSE并拼工具参数\n        S-->>P: SDK事件与完整assistant\n        P-->>R: 转为自有Part及pi replay\n        R-->>A: 转交Part流\n        A->>E: 保存assistant与请求事实\n        opt 首次请求返回sum调用\n            A->>T: 真实执行sum\n            T-->>A: 5\n            A->>E: 提交tool结果供第二次请求\n        end\n    end\n    A->>E: turn/end completed"
 }

@@ -22,5 +22,6 @@
     "packages/core/tools/src/json-schema.ts",
     "packages/core/tools/src/types.ts",
     "packages/core/tools/src/ptc.ts"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 测试或调用方\n    participant T as Tools\n    participant V as validate\n    participant G as 单一guard\n    participant R as 工具run函数\n    participant S as 资源Scope\n    C->>T: register(scope, tool)\n    T->>S: own撤销注册项\n    C->>T: catalog()\n    T-->>C: 仅name、description与schema\n    C->>T: execute(call, context)\n    T->>T: 检查取消并按名查工具\n    T->>V: 校验arguments\n    alt 参数不合法\n        V-->>T: 抛出参数错误\n        T-->>C: 拒绝，不调用guard或run\n    else 参数合法\n        V-->>T: 校验通过\n        T->>G: await guard(tool, call, context)\n        G-->>T: 本次检查通过\n        T->>T: 再检查signal\n        T->>R: run参数副本\n        R-->>T: 实际工具结果\n        T-->>C: execute结果\n    end\n    opt 插件退出\n        C->>S: close()\n        S->>T: 删除对应注册项\n    end"
 }

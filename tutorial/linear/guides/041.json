@@ -27,5 +27,6 @@
     "packages/api/session-controller/README.zh.md",
     "packages/session/session-persistence-jsonl/README.zh.md",
     "packages/session/session-projection-cache/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant H as Host\n    participant D as header 与 Journal 磁盘\n    participant E as 会话 Events\n    participant A as Agent 与工具能力\n    C->>H: create(cwd, owner) 或 open(id, owner)\n    opt 新建会话\n        H->>D: 写入 header.json\n    end\n    H->>D: 读取 header\n    D-->>H: header\n    H->>H: 校验 owner\n    alt 会话已加载\n        H-->>C: 返回同一 record\n    else 首次加载\n        H->>D: Journal 恢复完整日志\n        D-->>H: 已恢复 records\n        H->>E: 恢复 records，连接 persist 到 journal.append\n        opt 最后一个 turn 尚未结束\n            H->>E: append interrupted，不自动重做工具\n        end\n        H->>A: 创建 Scope、Settings、LocalFS、Tools\n        H->>A: 注册文件工具，安装 batch\n        H->>A: 创建 Approvals 并安装 permissionGuard\n        H->>A: 创建共享上述能力的 Agent\n        H-->>C: 保存 loaded 并返回 record\n    end\n    C->>A: agent.submit(text)，然后 await idle()\n    A->>E: 追加回合、消息、工具和审批事件\n    E->>D: journal.append，先持久化\n    D-->>E: 落盘完成\n    E->>E: records.push，再通知订阅者\n    A-->>C: idle 完成\n    C->>H: closeSession(id, owner)\n    H->>A: await Agent.close，再 await Scope.close\n    A-->>H: 活动与资源清理完成（收集错误后继续）\n    H->>D: Journal.close\n    H->>H: loaded.delete；最后汇总错误\n    Note over H,A: 外层 SDK 和界面共用此 Host；未装配的 helper 不会自动启用"
 }

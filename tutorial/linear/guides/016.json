@@ -22,5 +22,6 @@
     "packages/llm/llm-deepseek/src/translate.ts",
     "packages/llm/llm-deepseek/src/transport.ts",
     "packages/llm/llm-deepseek/README.zh.md"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant L as Agent Loop\n    participant M as DeepSeekModel\n    participant F as 本地固定HTTP响应源\n    participant S as sse解析器\n    participant T as Tools与sum\n    participant E as Events\n    Note over M,F: 图示本章离线测试，真实demo才使用远端fetch\n    loop 本例两次模型请求\n        L->>M: stream历史、工具与signal\n        M->>M: toMessages组装兼容请求\n        M->>F: 调用fetcher，POST chat/completions\n        F-->>M: Response及body字节流\n        M->>S: sse(response.body)\n        loop 完整SSE data\n            S->>F: 迭代body字节\n            F-->>S: 任意大小字节块\n            S-->>M: 解码后的data字符串\n            M->>M: 累计thinking、正文与tool参数\n            opt 有正文增量\n                M-->>L: text Part供显示\n            end\n        end\n        M->>M: 校验finish_reason与DONE及工具JSON\n        M-->>L: thinking、tool、replay和finish\n        L->>E: 提交完整assistant与request/end\n        opt 首次请求要求工具\n            L->>T: execute sum\n            T-->>L: 实际结果5\n            L->>E: 记录tool结果供下一次请求\n        end\n    end\n    L->>E: turn/end completed"
 }

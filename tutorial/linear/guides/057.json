@@ -26,5 +26,6 @@
     "packages/experimental/agent-team/src/task-board.ts",
     "packages/experimental/agent-team/src/projection.ts",
     "packages/experimental/tool-agent-team"
-  ]
+  ],
+  "sequence": "sequenceDiagram\n    participant T as 本地测试\n    participant G as 独立Team模块\n    participant S as 真实JSON Store\n    participant C as 创建成员回调替身\n    T->>G: Lead创建reviewer\n    G->>S: 先保存provisioning占名\n    G->>C: createAgent名称\n    C-->>G: 仅返回名称，没有创建Agent\n    G->>S: 保存inactive与返回id\n    T->>G: 再创建同名成员\n    G-->>T: 名字不可复用\n    T->>G: task a与依赖a的task b\n    G->>S: 保存pending任务\n    T->>G: claim b\n    G->>S: 读取a状态\n    alt a尚未完成\n        G-->>T: 拒绝认领b\n    end\n    T->>G: claim a，随后complete a\n    G->>S: 保存owner与done\n    T->>G: 再claim b\n    G->>S: 检查依赖并保存owner\n    G-->>T: reviewer认领成功\n    Note over T,C: send与interrupt也是回调入口，当前未接真实团队、模型或UI"
 }
