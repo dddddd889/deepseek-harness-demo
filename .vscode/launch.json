@@ -52,6 +52,16 @@
         "RPC_DEMO_TIMEOUT_MS": "3600000"
       },
       "stopOnEntry": false
+    },
+    {
+      "name": "Bun：039独立事件记录",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/collaboration-demo.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": ["--preload", "${workspaceFolder}/scripts/vscode-debug.mjs"],
+      "stopOnEntry": false
     }
   ]
 }
