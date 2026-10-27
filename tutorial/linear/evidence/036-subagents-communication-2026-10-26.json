@@ -1,0 +1,136 @@
+{
+  "date": "2026-10-26",
+  "scope": "036教程说明：Subagents管理器、parent标签、进程内父子通信、全会话读取及与032 RPC worker的区别。仅文档，不改steps或harness-own，不提交。",
+  "scenarioSha256": "df65868a3a6bdc532445c7d1fadfd50f6fe93fa331cbb3bf43f73768b1f3bfd1",
+  "lessonSha256": "c9a71d683b38dc7d3b26c582aa56278f749262304eade76715cd7dfc6da6d2d8",
+  "runtimeVerification": {
+    "project": "/private/tmp/harness-036-doc-529afyis",
+    "scriptSha256": "58f28d28a6831ac1df786f7dd8cfedc32ea8bd4f5deb37db6ee367a3a2a61dd5",
+    "bunVersion": "1.3.14",
+    "example": {
+      "exitCode": 0,
+      "elapsedMs": 25,
+      "report": {
+        "parent": "parent",
+        "childId": "child_02fa04f4-4344-4c73-9ecd-e77ca95c3f97",
+        "sessionId": "session_e872baa1-3c7b-44fd-a86d-11d0c2e54091",
+        "pid": 16607,
+        "childPid": 16607,
+        "sameProcess": true,
+        "factoryCalls": 1,
+        "receipt": "input_12f6e1f1-e812-42f9-82a2-2ebc60d3b0a6",
+        "firstAnswers": [
+          "first"
+        ],
+        "secondAnswers": [
+          "first",
+          "second"
+        ],
+        "secondUserHistory": [
+          "one",
+          "two"
+        ],
+        "modelRequests": 2,
+        "entriesAfterClose": 0
+      }
+    },
+    "original036Test": {
+      "exitCode": 0,
+      "output": "bun test v1.3.14 (0d9b296a)\n\ntests/036-subagents.test.mjs:\n(pass) 真实子Agent可继续对话，父关闭后资源撤销 [1.45ms]\n\n 1 pass\n 0 fail\nRan 1 test across 1 file. [17.00ms]\n"
+    },
+    "launchConfigParses": true,
+    "guiDebugged": false
+  },
+  "diagramVerification": {
+    "mermaidVersion": "11.12.0",
+    "browser": "Google Chrome independent headless",
+    "diagramCount": 3,
+    "diagrams": [
+      {
+        "index": 1,
+        "codePath": "/private/tmp/harness-036-sequence-1.mmd",
+        "imagePath": "/private/tmp/harness-036-sequence-1.png",
+        "codeSha256": "c684f55bc5d95176daf8ac1430572c4c74ec6c0e75c5159c380bbac3695b5fd9",
+        "parsed": true,
+        "diagramType": "sequence",
+        "width": 1544.5,
+        "height": 1991,
+        "textCount": 46,
+        "clipped": [],
+        "ok": true,
+        "visualInspection": {
+          "inspected": true,
+          "result": "六个参与者、两段opt和Scope清理链均完整可读；底部注释和参与者没有截断或重叠。"
+        }
+      },
+      {
+        "index": 2,
+        "codePath": "/private/tmp/harness-036-sequence-2.mmd",
+        "imagePath": "/private/tmp/harness-036-sequence-2.png",
+        "codeSha256": "f310788e334c1726deac9aee0ace2cd8007d8d30c91a8a78e6ed53775ef63371",
+        "parsed": true,
+        "diagramType": "sequence",
+        "width": 1302,
+        "height": 1265,
+        "textCount": 30,
+        "clipped": [],
+        "ok": true,
+        "visualInspection": {
+          "inspected": true,
+          "result": "同一个Bun进程边框、send/receipt/wait与会话事件方向可辨认；文字完整，未见截断或重叠。"
+        }
+      },
+      {
+        "index": 3,
+        "codePath": "/private/tmp/harness-036-sequence-3.mmd",
+        "imagePath": "/private/tmp/harness-036-sequence-3.png",
+        "codeSha256": "bd0d4dfc7bdbfc49124f07070824e076eeb9a6bc20531e97131782680cf835e3",
+        "parsed": true,
+        "diagramType": "sequence",
+        "width": 1170,
+        "height": 746,
+        "textCount": 20,
+        "clipped": [],
+        "ok": true,
+        "visualInspection": {
+          "inspected": true,
+          "result": "两个Bun进程分框、stdin/stdout方向和关闭过程清晰；文字完整，未见截断或重叠。"
+        }
+      }
+    ],
+    "allDiagramSourcesMatchCurrentLesson": true,
+    "visualInspectionComplete": true,
+    "ok": true
+  },
+  "documentationChecks": {
+    "sourceDeltasUnchanged": 203,
+    "onlyLesson036MetadataChanged": true,
+    "originalTextFlowPreserved": true,
+    "sequenceDiagrams": 3,
+    "scope": "仅更新036教程说明，不改steps或harness-own，不提交。",
+    "checkDocsPassed": true,
+    "auditScopeIntact": true,
+    "diffCheckPassed": true,
+    "agentAndManagerInterfaceMappingAdded": true
+  },
+  "limits": [
+    "新增普通脚本使用ScriptModel，原036测试也只创建一个真实子Agent；均未创建真实父Agent或请求远端模型。",
+    "parent只是管理器内严格相等的归属标签；不是跨进程认证，也没有自动继承父历史、工具或权限。",
+    "wait返回全会话事件，不是逐输入结果或完成推送；运行中取消、异常清理和多孩子隔离未新增运行验收。",
+    "032与051只做源码对照，本轮未重新运行其跨进程或工具装配链路。",
+    "VS Code配置只核对JSON和启动路径，未交互操作；没有重跑000～069，也未声称完整复刻完成。"
+  ],
+  "interfaceMappingFollowUp": {
+    "scope": "补充Agent对象接口与Subagents管理器入口的对照、等价展开及051工具调用链；没有改实现。",
+    "waitCombinesIdleAndSessionRead": true,
+    "expandedCodeMarkedAsAlternativeNotDuplicateSubmit": true,
+    "previousCompleteExampleSourceUnchanged": true,
+    "allThreeDiagramSourcesUnchanged": true,
+    "runtimeTestsReexecuted": false,
+    "diagramRenderingReexecuted": false,
+    "previousRuntimeAndDiagramEvidenceRetained": true,
+    "checkDocsPassed": true,
+    "auditScopeIntact": true,
+    "diffCheckPassed": true
+  }
+}

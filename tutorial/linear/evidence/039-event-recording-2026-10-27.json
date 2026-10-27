@@ -1,0 +1,189 @@
+{
+  "date": "2026-10-27",
+  "title": "把协作状态和反馈记录成独立事件",
+  "scope": "039重新定位为记录、读取与模型消息投影隔离；新增普通演示入口，业务实现只改注释，不扩展Todo/Plan/Goal/Schedule/Feedback领域功能。",
+  "sourceFiles": {
+    "tutorial/linear/steps/039/tests/039-collaboration.test.mjs": "22a43e794b09f579c13e309558bff8884ad73e4e386026bce9dd4d24609e41fd",
+    "tutorial/linear/steps/039/src/collaboration.mjs": "57936b0855ed3c37dfe684312f57e5b685f5f25af55c8b2018161468d52d4d89",
+    "tutorial/linear/steps/039/src/collaboration-demo.mjs": "b61614645000c4d005d977ced9f75101f229cdb9581906d3379607bb77d30cbd"
+  },
+  "runtimeVerification": {
+    "project": "/private/tmp/039-reposition-from-doc-0xy215zs",
+    "bunVersion": "1.3.14",
+    "lessonSha256": "eaf014e56a3f666f9cbdccd1fff8e3a1dde9dbce8841d16b680ffac8db4c0abf",
+    "filesExtracted": [
+      "src/collaboration-demo.mjs",
+      "src/collaboration.mjs",
+      "tests/039-collaboration.test.mjs"
+    ],
+    "sourceFilesMatch": true,
+    "records": [
+      {
+        "command": [
+          "bun",
+          "src/collaboration-demo.mjs"
+        ],
+        "exitCode": 0,
+        "stdout": "{\n  \"storage\": \"memory\",\n  \"modelRequested\": false,\n  \"eventCount\": 5,\n  \"events\": [\n    {\n      \"format\": 1,\n      \"sessionId\": \"session_a30a0243-d202-4e89-8c9e-adc63dd70842\",\n      \"seq\": 0,\n      \"time\": 1793084054992,\n      \"type\": \"message/user\",\n      \"data\": {\n        \"role\": \"user\",\n        \"content\": \"请修复登录问题\"\n      }\n    },\n    {\n      \"format\": 1,\n      \"sessionId\": \"session_a30a0243-d202-4e89-8c9e-adc63dd70842\",\n      \"seq\": 1,\n      \"time\": 1793084054993,\n      \"type\": \"collaboration/todo\",\n      \"data\": {\n        \"id\": \"login-tests\",\n        \"text\": \"补登录测试\",\n        \"status\": \"doing\",\n        \"note\": \"演示中的阶段说明\"\n      }\n    },\n    {\n      \"format\": 1,\n      \"sessionId\": \"session_a30a0243-d202-4e89-8c9e-adc63dd70842\",\n      \"seq\": 2,\n      \"time\": 1793084054993,\n      \"type\": \"collaboration/todo\",\n      \"data\": {\n        \"id\": \"login-tests\",\n        \"text\": \"补登录测试\",\n        \"status\": \"done\"\n      }\n    },\n    {\n      \"format\": 1,\n      \"sessionId\": \"session_a30a0243-d202-4e89-8c9e-adc63dd70842\",\n      \"seq\": 3,\n      \"time\": 1793084054993,\n      \"type\": \"message/assistant\",\n      \"data\": {\n        \"role\": \"assistant\",\n        \"content\": \"已记录你的登录问题。\"\n      }\n    },\n    {\n      \"format\": 1,\n      \"sessionId\": \"session_a30a0243-d202-4e89-8c9e-adc63dd70842\",\n      \"seq\": 4,\n      \"time\": 1793084054993,\n      \"type\": \"feedback\",\n      \"data\": {\n        \"messageSeq\": 3,\n        \"rating\": \"up\",\n        \"text\": \"这个解释清楚\"\n      }\n    }\n  ],\n  \"eventTypes\": [\n    \"message/user\",\n    \"collaboration/todo\",\n    \"collaboration/todo\",\n    \"message/assistant\",\n    \"feedback\"\n  ],\n  \"latestTodo\": {\n    \"login-tests\": {\n      \"id\": \"login-tests\",\n      \"text\": \"补登录测试\",\n      \"status\": \"done\"\n    }\n  },\n  \"sameStateAfterRebuild\": true,\n  \"feedback\": {\n    \"messageSeq\": 3,\n    \"rating\": \"up\",\n    \"text\": \"这个解释清楚\"\n  },\n  \"modelMessages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"请修复登录问题\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"已记录你的登录问题。\"\n    }\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "bun",
+          "test",
+          "./tests/039-collaboration.test.mjs"
+        ],
+        "exitCode": 0,
+        "stdout": "bun test v1.3.14 (0d9b296a)\n",
+        "stderr": "\ntests/039-collaboration.test.mjs:\n(pass) 提醒重建后不重复投递，反馈不进入模型历史 [0.93ms]\n\n 1 pass\n 0 fail\nRan 1 test across 1 file. [15.00ms]\n"
+      }
+    ],
+    "report": {
+      "storage": "memory",
+      "modelRequested": false,
+      "eventCount": 5,
+      "events": [
+        {
+          "format": 1,
+          "sessionId": "session_a30a0243-d202-4e89-8c9e-adc63dd70842",
+          "seq": 0,
+          "time": 1793084054992,
+          "type": "message/user",
+          "data": {
+            "role": "user",
+            "content": "请修复登录问题"
+          }
+        },
+        {
+          "format": 1,
+          "sessionId": "session_a30a0243-d202-4e89-8c9e-adc63dd70842",
+          "seq": 1,
+          "time": 1793084054993,
+          "type": "collaboration/todo",
+          "data": {
+            "id": "login-tests",
+            "text": "补登录测试",
+            "status": "doing",
+            "note": "演示中的阶段说明"
+          }
+        },
+        {
+          "format": 1,
+          "sessionId": "session_a30a0243-d202-4e89-8c9e-adc63dd70842",
+          "seq": 2,
+          "time": 1793084054993,
+          "type": "collaboration/todo",
+          "data": {
+            "id": "login-tests",
+            "text": "补登录测试",
+            "status": "done"
+          }
+        },
+        {
+          "format": 1,
+          "sessionId": "session_a30a0243-d202-4e89-8c9e-adc63dd70842",
+          "seq": 3,
+          "time": 1793084054993,
+          "type": "message/assistant",
+          "data": {
+            "role": "assistant",
+            "content": "已记录你的登录问题。"
+          }
+        },
+        {
+          "format": 1,
+          "sessionId": "session_a30a0243-d202-4e89-8c9e-adc63dd70842",
+          "seq": 4,
+          "time": 1793084054993,
+          "type": "feedback",
+          "data": {
+            "messageSeq": 3,
+            "rating": "up",
+            "text": "这个解释清楚"
+          }
+        }
+      ],
+      "eventTypes": [
+        "message/user",
+        "collaboration/todo",
+        "collaboration/todo",
+        "message/assistant",
+        "feedback"
+      ],
+      "latestTodo": {
+        "login-tests": {
+          "id": "login-tests",
+          "text": "补登录测试",
+          "status": "done"
+        }
+      },
+      "sameStateAfterRebuild": true,
+      "feedback": {
+        "messageSeq": 3,
+        "rating": "up",
+        "text": "这个解释清楚"
+      },
+      "modelMessages": [
+        {
+          "role": "user",
+          "content": "请修复登录问题"
+        },
+        {
+          "role": "assistant",
+          "content": "已记录你的登录问题。"
+        }
+      ]
+    },
+    "transferExercise": {
+      "inputOnlyChange": "第二次set的done改成doing，保留原断言",
+      "exitCode": 1,
+      "assertionFailedAsExpected": true,
+      "restoredOriginal": true
+    },
+    "launchConfigParses": true,
+    "launchPathsExist": true,
+    "guiDebugged": false,
+    "modelRequested": false
+  },
+  "diagramVerification": {
+    "sourceHash": "eaf014e56a3f666f9cbdccd1fff8e3a1dde9dbce8841d16b680ffac8db4c0abf",
+    "mermaidVersion": "11.12.0",
+    "allChecksPass": true,
+    "currentDiagramHashesMatch": true,
+    "diagrams": [
+      {
+        "number": 1,
+        "codeHash": "23bcbc3071918e884a137298a1d195fb6e121db4b86f1a0646eacb6fe63b7508",
+        "parsed": true,
+        "rendered": true,
+        "width": 1032,
+        "height": 1210,
+        "clipped": false,
+        "pngPath": "/private/tmp/039-reposition-diagram/1.png",
+        "visualInspection": {
+          "inspected": true,
+          "result": "pass",
+          "notes": "已查看修复后的原始分辨率截图。参与方、消息、返回箭头、两条note均完整可读。第二条note分两行后完整落在灰色背景内，无文字溢出或遮挡。"
+        }
+      }
+    ]
+  },
+  "documentationChecks": {
+    "checkDocsPassed": true,
+    "auditScopeIntact": true,
+    "originalParityComplete": false,
+    "onlyLesson039MetadataChanged": true,
+    "titleAndIndexSynchronized": true,
+    "coreExecutableImplementationUnchanged": true,
+    "existingTestUnchanged": true,
+    "diffCheckPassed": true,
+    "sourceDeltas": 207
+  },
+  "limits": [
+    "默认Events只在内存保存，没有验证磁盘或进程重启恢复。",
+    "demo使用固定聊天与进度样本，不运行Agent、模型或真实登录修复/测试。",
+    "本章不实现完整Todo、Plan mode、Goal、Schedule与Feedback；due仍为手动辅助例子。",
+    "模型消息隔离只指messages不自动投影，工具结果可显式把记录交给模型；不是访问控制保证。",
+    "VS Code配置通过JSON和启动路径核对，未操作VS Code界面；未重跑000～069，未修改harness-own或提交。"
+  ]
+}

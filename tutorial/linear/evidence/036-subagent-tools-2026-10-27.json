@@ -1,0 +1,203 @@
+{
+  "date": "2026-10-27",
+  "scope": "036新增父模型工具注册与完整父子Agent普通demo，并同步036教程、生成元数据、运行调试验收说明；未改harness-own，不提交。",
+  "sourceFiles": {
+    "tutorial/linear/steps/036/tests/036-subagents.test.mjs": "4b72f59fed08ef6f11a2bb224e2d698ee22e9d7e72c6cf0163f2ed6d7f8eb815",
+    "tutorial/linear/steps/036/tests/036-subagent-tools.test.mjs": "cce377b81697cffb9c6388197c5ce0930addb8f5be0195d58e628843d112bec0",
+    "tutorial/linear/steps/036/src/subagents.mjs": "a4efe278ef12a64b8c9be092d9b94efe41156e1bd220ab6c4dedce38522350f2",
+    "tutorial/linear/steps/036/src/subagents-demo.mjs": "3d89ebcf0372a13c7e447a1ed7688ed8ef2560742fd9cdd3559132b62c2f1011",
+    "tutorial/linear/steps/036/src/subagent-tools.mjs": "b2702a4b8b1ff679c6dcdf519f356f8b9dca050fa0eef931d2b29d4805e7635f"
+  },
+  "runtimeVerification": {
+    "project": "/private/tmp/036-tool-demo-from-doc-p4ol_j7r",
+    "bunVersion": "1.3.14",
+    "lessonSha256": "88b7b8c1cd3a386e0fb505c2eb92049671a31772b0b9aa2e37d4d5d89babd66f",
+    "filesExtracted": [
+      "src/subagent-tools.mjs",
+      "src/subagents-demo.mjs",
+      "src/subagents.mjs",
+      "tests/036-subagent-tools.test.mjs",
+      "tests/036-subagents.test.mjs"
+    ],
+    "comparisonScriptExtracted": "scripts/subagents-036-demo.mjs",
+    "copiedCodeMatchesSources": true,
+    "records": [
+      {
+        "command": [
+          "bun",
+          "src/subagents-demo.mjs"
+        ],
+        "exitCode": 0,
+        "expectedExitCode": 0,
+        "stdout": "[运行方式] 离线固定模型响应：父子Agent、Loop、工具与结果回填均真实执行，不联网\n[父模型请求 #1] 工具=subagent_create,subagent_send,subagent_wait,subagent_interrupt\n[父工具] subagent_create {\"task\":\"你是订单计算助手。此条只是初始化，请回答“已准备好”，等待下一条订单JSON再计算。\"}\n[创建孩子] parent=session_59b94bc9-590d-4f9b-8730-44c05cea48d5 childSession=session_ff65de51-57d8-4166-9e2a-11e0e78d7143 pid=78162\n[子模型请求 #1] 工具=order_total\n[父工具结果] subagent_create {\"ok\":true,\"value\":{\"id\":\"child_9db74fed-adf5-4a89-a55e-61940e1b7c5d\"}}\n[父模型请求 #2] 工具=subagent_create,subagent_send,subagent_wait,subagent_interrupt\n[子回答] 已准备好\n[父工具] subagent_send {\"id\":\"child_9db74fed-adf5-4a89-a55e-61940e1b7c5d\",\"text\":\"{\\\"unitPrice\\\":19,\\\"quantity\\\":3}\"}\n[子模型请求 #2] 工具=order_total\n[父工具结果] subagent_send {\"ok\":true,\"value\":{\"receipt\":\"input_1cd26c14-85fa-4c4a-8e62-30b3ad460e89\"}}\n[父模型请求 #3] 工具=subagent_create,subagent_send,subagent_wait,subagent_interrupt\n[子工具] order_total {\"unitPrice\":19,\"quantity\":3}\n[父工具] subagent_wait {\"id\":\"child_9db74fed-adf5-4a89-a55e-61940e1b7c5d\"}\n[子工具结果] order_total {\"ok\":true,\"value\":{\"unitPrice\":19,\"quantity\":3,\"total\":57}}\n[子模型请求 #3] 工具=order_total\n[子回答] {\"unitPrice\":19,\"quantity\":3,\"total\":57}\n[父工具结果] subagent_wait 返回23条子会话事件\n[父模型请求 #4] 工具=subagent_create,subagent_send,subagent_wait,subagent_interrupt\n[父回答] 子Agent已计算：订单总价为57元。\n036验收结果：{\"mode\":\"offline\",\"parentSessionId\":\"session_59b94bc9-590d-4f9b-8730-44c05cea48d5\",\"childId\":\"child_9db74fed-adf5-4a89-a55e-61940e1b7c5d\",\"childSessionId\":\"session_ff65de51-57d8-4166-9e2a-11e0e78d7143\",\"pid\":78162,\"sameProcess\":true,\"parentRequests\":4,\"childRequests\":3,\"parentToolSequence\":[\"subagent_create\",\"subagent_send\",\"subagent_wait\"],\"parentGuardCalls\":[\"subagent_create\",\"subagent_send\",\"subagent_wait\"],\"factoryCalls\":1,\"childToolRuns\":1,\"childTurns\":2,\"waitedEvents\":23,\"childResult\":{\"unitPrice\":19,\"quantity\":3,\"total\":57},\"parentReadWaitResult\":true,\"finalText\":\"子Agent已计算：订单总价为57元。\",\"reason\":\"completed\",\"cleanup\":{\"parentClosed\":true,\"children\":0,\"parentTools\":0,\"parentListeners\":0,\"childClosed\":true,\"childTools\":0,\"childListeners\":0}}\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "bun",
+          "test",
+          "./tests/036-subagents.test.mjs",
+          "./tests/036-subagent-tools.test.mjs"
+        ],
+        "exitCode": 0,
+        "expectedExitCode": 0,
+        "stdout": "bun test v1.3.14 (0d9b296a)\n",
+        "stderr": "\ntests/036-subagents.test.mjs:\n(pass) 真实子Agent可继续对话，父关闭后资源撤销 [4.59ms]\n\ntests/036-subagent-tools.test.mjs:\n(pass) 父模型从动态编号继续send/wait，读孩子真实计算结果再回答 [9.34ms]\n(pass) 改变订单后父答案跟随孩子工具结果，不能写死样本57 [5.55ms]\n(pass) 子Agent工具仍受参数、守卫和归属检查约束，关闭后全部注销 [1.44ms]\n(pass) 显式live缺凭据时失败，不能静默回退成离线成功 [0.16ms]\n\n 5 pass\n 0 fail\nRan 5 tests across 2 files. [62.00ms]\n"
+      },
+      {
+        "command": [
+          "bun",
+          "src/subagents-demo.mjs",
+          "--live"
+        ],
+        "exitCode": 1,
+        "expectedExitCode": 1,
+        "stdout": "",
+        "stderr": "036演示失败：真实请求缺少DEEPSEEK_API_KEY；请先配置本机.env，不会回退到离线样本\n"
+      }
+    ],
+    "report": {
+      "mode": "offline",
+      "parentSessionId": "session_59b94bc9-590d-4f9b-8730-44c05cea48d5",
+      "childId": "child_9db74fed-adf5-4a89-a55e-61940e1b7c5d",
+      "childSessionId": "session_ff65de51-57d8-4166-9e2a-11e0e78d7143",
+      "pid": 78162,
+      "sameProcess": true,
+      "parentRequests": 4,
+      "childRequests": 3,
+      "parentToolSequence": [
+        "subagent_create",
+        "subagent_send",
+        "subagent_wait"
+      ],
+      "parentGuardCalls": [
+        "subagent_create",
+        "subagent_send",
+        "subagent_wait"
+      ],
+      "factoryCalls": 1,
+      "childToolRuns": 1,
+      "childTurns": 2,
+      "waitedEvents": 23,
+      "childResult": {
+        "unitPrice": 19,
+        "quantity": 3,
+        "total": 57
+      },
+      "parentReadWaitResult": true,
+      "finalText": "子Agent已计算：订单总价为57元。",
+      "reason": "completed",
+      "cleanup": {
+        "parentClosed": true,
+        "children": 0,
+        "parentTools": 0,
+        "parentListeners": 0,
+        "childClosed": true,
+        "childTools": 0,
+        "childListeners": 0
+      }
+    },
+    "launchConfigsChecked": 2,
+    "guiDebugged": false,
+    "liveNetworkCalled": false
+  },
+  "diagramVerification": {
+    "mermaidVersion": "11.12.0",
+    "engine": "Google Chrome，Playwright独立启动的无界面浏览器，每图独立上下文",
+    "sourceHash": "88b7b8c1cd3a386e0fb505c2eb92049671a31772b0b9aa2e37d4d5d89babd66f",
+    "expectedDiagramCount": 4,
+    "syntaxAndBoundaryPass": true,
+    "currentDiagramHashesMatch": true,
+    "allChecksPass": true,
+    "fixedFindings": [
+      {
+        "diagramNumber": 2,
+        "originalCodeHash": "b82fde7899d598482a11e0215ff31cc3af2ce8c437816922fb06c6f54d76a7be",
+        "problem": "重要note文字超出灰色背景，白字首尾在白底上不可见；SVG整体边界检查无法发现。",
+        "fix": "父任务将note从C,CT扩大到S,CT，并用br分成两行。",
+        "verification": "第2图重新解析、独立Chrome渲染、检查SVG和note背景边界，并查看原始分辨率截图，通过。"
+      }
+    ],
+    "diagrams": [
+      {
+        "number": 1,
+        "codeHash": "9829bd0967e20de03caac83f177de3fdaa1e114e0d8c17a3ca3a5938a90e8907",
+        "parsed": true,
+        "rendered": true,
+        "width": 1468.5,
+        "height": 1991,
+        "clipped": false,
+        "pngPath": "/private/tmp/036-tool-demo-diagrams/1.png",
+        "visualInspection": {
+          "inspected": true,
+          "result": "pass",
+          "notes": "已查看完整截图。参与方、消息、opt块与底部说明均完整可读，未见文字遮挡。"
+        }
+      },
+      {
+        "number": 2,
+        "codeHash": "407722b0b7859841ea0b32a38cf044228c2a59195b1afd54389e7c430a414b07",
+        "parsed": true,
+        "rendered": true,
+        "width": 2061,
+        "height": 1632,
+        "clipped": false,
+        "pngPath": "/private/tmp/036-tool-demo-diagrams/2.png",
+        "visualInspection": {
+          "inspected": true,
+          "result": "pass",
+          "notes": "已查看修复后的原始分辨率截图。两行note完整落在灰色背景内，首尾清晰可读，未见文字遮挡；语义明确孩子收到输入就可运行，wait只等待完成。"
+        }
+      },
+      {
+        "number": 3,
+        "codeHash": "0782c5840245665627da7a4a938f1c8271587f53c948bb219ecd1c2192a151ca",
+        "parsed": true,
+        "rendered": true,
+        "width": 1222,
+        "height": 1265,
+        "clipped": false,
+        "pngPath": "/private/tmp/036-tool-demo-diagrams/3.png",
+        "visualInspection": {
+          "inspected": true,
+          "result": "pass",
+          "notes": "已查看完整截图。同进程框、参与方、会话读写和说明完整可读，未见文字遮挡。"
+        }
+      },
+      {
+        "number": 4,
+        "codeHash": "18961ecbdc5d2535df0c7982ee7353e5943726b3fc4782c0cd93a7876b7d4d97",
+        "parsed": true,
+        "rendered": true,
+        "width": 1110,
+        "height": 746,
+        "clipped": false,
+        "pngPath": "/private/tmp/036-tool-demo-diagrams/4.png",
+        "visualInspection": {
+          "inspected": true,
+          "result": "pass",
+          "notes": "已查看完整截图。两个进程框、请求响应箭头和非Agent说明完整可读，未见文字遮挡。"
+        }
+      }
+    ]
+  },
+  "documentationChecks": {
+    "checkDocsPassed": true,
+    "auditScopeIntact": true,
+    "originalParityComplete": false,
+    "unclosedOriginalRequirements": 34,
+    "diffCheckPassed": true,
+    "originalTextFlowPreserved": true,
+    "unchangedExistingStepFiles": 203,
+    "addedStepFiles": 3,
+    "totalSourceDeltas": 206,
+    "sourceOfTruth": "guides/036.json、scenarios/036.md与steps/036，syllabus运行入口同步后生成lessons.json/lessons/036.md/manifest.json",
+    "parallelWorkspaceChanges": "发现工作区有并行038说明/场景/索引更新；未编辑或回滚其源，不计为036完成证据。"
+  },
+  "limits": [
+    "默认固定父/子外部模型响应，不声称真实模型自主委派；--live入口未发送真实DeepSeek请求。",
+    "VS Code配置做JSON和启动路径核对，未交互操作VS Code界面。",
+    "本次只运行本章普通demo与原/新5测试，没有重跑000～069。",
+    "父cancel自动传播、wait响应父signal、并发/深度预算、父子权限取交集、主动通知、失败恢复及清理抛错后登记兜底仍未补齐。"
+  ]
+}

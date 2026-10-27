@@ -1,4 +1,4 @@
-/** Todo、Plan、Goal与Schedule保留不同状态，审批不冒充计划评审。 */
+/** 教学用事件记录器；保存样例状态，不实现Todo等领域的完整业务服务。 */
 export class Collaboration {
   constructor(session) { this.session = session }
   /** 由完整事实重建，不把内存Map当永久状态。 */
@@ -10,7 +10,7 @@ export class Collaboration {
     if (!states[kind]?.includes(value.status) || !value.id) throw Error('协作状态不合法')
     this.session.append('collaboration/' + kind, value)
   }
-  /** 提醒投递通过持久身份去重；投递方必须以id实现幂等。 */
+  /** 手动扫描提醒样例；回调后再记结果，副作用投递方仍需按id保持幂等。 */
   async due(now, deliver) {
     for (const value of Object.values(this.state('schedule'))) {
       if (value.status !== 'pending' || value.at > now) continue

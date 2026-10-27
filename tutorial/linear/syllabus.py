@@ -161,8 +161,16 @@ add('网页抓取、来源与网络边界', 'R05', '让第一页重定向到第�
 add('语言服务走真实进程和文档版本', 'R05', '打开文档后再改一行，预测definition请求看到哪一版。', 'LSP是一个拥有文档生命周期和能力表的进程。复用Content-Length传输，initialize/didOpen/didChange/query/shutdown顺序不可乱。', '真实外部进程握手，定义查询返回文件URI与range，关闭执行shutdown/exit。固定对端不代表真实语言语义已通过。', '断在open/change的version和peer.request；对比URI与本地相对路径。', '合上材料解释为什么只启动语言服务器还不够。', '把spec替换为本机typescript-language-server --stdio，查询真实项目中的符号定义。', 'lsp服务/提供方/工具分层；生产服务器的启动回滚、取消、诊断版本尚需补齐。')
 add('子Agent可以继续对话', 'R05', '同一个子任务分两次发消息，先检查第二次是否还保留第一轮历史。', 'Subagent是父scope拥有的Agent资源，create/send/wait/interrupt分开，观察控制检查父身份。执行用自己前面写出的Agent。', '两个真实turn共用子Agent历史；其他父身份被拒绝；父scope关闭后子资源清空。', '断在get与factory；每次send都new Agent会丢失历史，新增断言发现。', '闭卷画出父子所有权与控制/输出两条方向。', '第一轮取消后继续子会话第二轮，仍能完成。', 'subagent的持续委派；外部ACP/worker后端与冷恢复还没有等价证据。')
 add('有依赖的工具工作流', 'R05', '构造a依赖b、b依赖a，确认任何副作用之前就发现循环。', 'DAG先整体校验再执行，ready组可并行；节点运行仍通过统一Tools。预算限制在行动之前检查。', '乱序节点按依赖执行a/b；循环拒绝，已执行计数没有增加。', '断在visiting与ready；删掉循环校验会卡住while，保留90秒超时诊断。', '闭卷写出拓扑校验和ready组的区别。', '给两个互不依赖节点加入不同延迟，结果仍按身份保存。', 'workflow服务的依赖、预算与工具执行边界。')
-add('按指令列表调用工具，继续通过守卫', 'R05', '让第二条指令引用第一条结果，统计审批守卫进入几次。', '先实现有界寄存器程序，把引用、预算和嵌套工具调用练熟。它不是原版任意JavaScript/Python run_code沙箱；那部分仍是缺口，不能用eval替代。', '结果被后续指令引用，两个内层调用均过守卫；超预算在执行前失败。', '断在$ref和tools.execute；直接调用tool.run会让checks断言失败。', '闭卷讲出嵌套工具调用为何仍归当前会话权限。', '引用未来或缺失寄存器，应拒绝且不运行该工具。', 'ptc-runtime的能力绑定基础；任意代码运行时尚未实现，完整复刻不能勾完成。')
-add('Todo、Plan、Goal、提醒和反馈', 'R05', '把一条待提醒记录恢复两次，先保证它不会在正常重启后重复投递。', '每种协作域保留自己的状态机。提醒按持久id投递，投递方负责幂等；反馈是sidecar事实，不自动混进模型对话。', '重建后只投递一次；反馈不进入messages；Plan不能接受Goal的completed状态。', '断在due的deliver与set之间；在这里制造崩溃，证明为什么外部投递仍需id幂等。', '闭卷解释Todo完成、Plan评审通过与Goal完成的不同。', '设置未来提醒和已过期提醒，只投递到期项。', 'todo/plan/goal/schedule/feedback；自动持续Goal驱动仍需完整接线。')
+add('把上一个工具的结果，传给下一个工具', 'R05', '让第一个echo返回ok，再让第二个echo使用这个返回值；预测两次调用前的检查会执行几次。', 'runProgram按数组顺序调用工具，用values保存每一步结果，再把下一步参数里的$ref换成已保存的值；每次仍调用Tools.execute做参数和权限检查。', '返回a和b两个结果，均为ok；执行前检查进入两次；超过允许条数时一个工具也不执行。', '断在替换$ref的赋值和tools.execute，查看第二步的text如何从引用对象变为ok。', '闭卷讲清a怎样保存、$ref怎样取值，以及每次工具执行前为何仍需检查。', '把引用改为不存在的名字，确认第二个工具不执行；第一步已完成的操作不会回滚。', '本步只按数组调用工具并传递返回值；原版执行JavaScript等源码的完整功能还未实现。')
+add('把协作状态和反馈记录成独立事件', 'R05',
+    '先预测一次聊天、两次同id进度更新和一次点赞，会得到怎样的完整事件、最新状态与模型消息。',
+    '本章只演示独立事件的写入、按kind/id读取最新值、messages对白名单消息的选择；Collaboration不是五个原版领域的统一服务。',
+    '普通demo展示5条事件、done最新状态、同Events重建和两条模型消息；原测试1项通过，不声称业务生命周期已完成。',
+    '在demo的set、feedback和三种读取结果处断点，进入state的reduce与messages白名单，观察整条覆盖和消息选择。',
+    '闭卷画出聊天、状态、反馈各自的记录与读取路径，说明默认内存和Journal持久化的区别。',
+    '只改第二次状态，预测状态变而模型消息不变；只加feedback，预测事件增加而模型消息不变。',
+    '原版Todo、Plan、Goal、Schedule、Feedback各有独立约定，本章只记录教学事件，不冒充完整实现。',
+    run='bun src/collaboration-demo.mjs\nbun test ./tests/039-collaboration.test.mjs', test='tests/039-collaboration.test.mjs')
 add('附件先落盘，交付保留当时快照', 'R05', '交付一个文件后马上修改原文件，预测旧turn应该展示哪个内容。', '内容寻址、附件引用、下载授权与交付事实分开。文档转换必须调用真实转换器，不能换扩展名冒充PDF。', '交付快照仍为first；非法hash拒绝；改变原文件不改变已记录附件。', '断在save与session.append；把顺序颠倒会留下指向尚未持久化内容的事实。', '闭卷画出上传、持久化、用户消息、下载四个边界。', '篡改内容文件后read必须报完整性错误；超大上传在写入前拒绝。', 'attachment/document/deliverables；Office引擎、图片像素校验和逐turn修改diff仍未完全对齐。')
 
 
@@ -202,6 +210,10 @@ add('最后亲自贯通浏览器与真实文件', 'R09', '先不看测试，用�
 
 add('最终CLI也接回同一个持久Host', 'R09', '从命令行读取一个真实文件，确认不是第000步的收到任务回声。', '保留原输入契约，CLI装配已有product/capabilities/Host，自己的审批和Ctrl+C只是UI适配；数据、执行、错误与关闭仍由领域层负责。', '真正CLI子进程读取真实工作区文件并以completed退出；Bun/ACP/Web/桌面继续使用同一领域实现。', '断在run和permissionGuard；CLI只打印成功但不读取文件时，正文断言会失败。', '合上资料，分别从CLI、Web、ACP、SDK走到同一个Agent，指出协议转换各自在哪。', '以同一home和HARNESS_SESSION恢复会话，再发后续任务；首片Ctrl+C后再启动可恢复历史。', 'CLI产品的纵向接线；原版profile/plugin命令、公共协议/历史数据/完整产品和发布资格仍在COVERAGE保持未完成。', 'bun test ./tests/069-cli.test.mjs\nbun run start \'/tool read {"path":"package.json"}\'')
 
+
+# 036以普通父子Agent工具demo为主入口，基础管理器测试继续保留。
+LESSONS[36]['run'] = 'bun src/subagents-demo.mjs\nbun test ./tests/036-subagents.test.mjs ./tests/036-subagent-tools.test.mjs'
+LESSONS[36]['test'] = 'tests/036-subagent-tools.test.mjs'
 
 # 032新增真实子进程演示，仍保留基础帧测试。
 LESSONS[32]['run'] = 'bun src/rpc-demo.mjs\nbun src/rpc-demo.mjs --auto\nbun test ./tests/032-rpc.test.mjs ./tests/032-rpc-demo.test.mjs'

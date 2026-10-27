@@ -176,3 +176,32 @@ Electron Main 使用 Electron 自带的运行时；领域 Host 改由独立 Bun 
 直接提取三份代码到独立最小工程，复用原032的rpc.mjs。Bun 1.3.14在默认5000毫秒和调试3600000毫秒预算下共6次运行全部退出0，约16～22毫秒完成；sum为5、未知方法返回错误、关闭或断连拒绝pending、双方pending为0，内存流或socket回收，WebSocket中文文本往返成功。TCP/WebSocket退出后的四个本轮端口均拒连；0预算在三例启动前均被拒绝。当前Bun的服务端error回调通过探针确认首参是Error；stop(true) Promise在本版有不结束情况，示例用两侧close与实际端口回收验收，不靠总期限结束清理。见[三种传输实测记录](evidence/032-transports-2026-10-26.json)。
 
 新增接线图经Mermaid11.12.0解析、独立Chrome渲染和截图目检，文字无越界；VS Code当前文件配置做JSON与预算接线核对，未交互操作界面。重新生成、check_docs.py、audit.py与git diff --check通过，只有032元数据更新，203份steps源码未改；032既有场景内容保留，并补充接收半包与主动切块发送的能力边界。本次没有修改harness-own、重跑000～069或自动提交；未穷尽WebSocket二进制/畸形消息、底层分片、生产流控或重连矩阵。
+
+## 2026-10-26：036管理器、父子通信与进程边界
+
+补充Subagents/factory/Agent/Scope的分工，明确原036只有一个真实子Agent，测试函数代替父调用方，parent只是归属标签，不是父Agent对象或进程身份。保留原文本调用链，并补充send提交输入、wait读取全会话的进程内时序图及032 RPC worker跨进程对照图；说明childId、会话ID、RPC请求ID和PID的不同用途，以及051才接入真实父Agent工具的边界。
+
+从文档直接提取完整scripts/subagents-036-demo.mjs，在独立临时工程按000～036累计源码运行，未安装或调用后续步骤实现。Bun 1.3.14实跑退出0：工厂仅调用一次，两轮使用同一Agent，第二次模型请求含one/two，第二次wait读出first/second，工厂与脚本PID相同，陌生parent标签拒绝，scope正常关闭后登记为0。原036测试1项通过。当前测试和新增例子都使用固定ScriptModel，不证明真实模型审阅、父Agent自主委派、多子Agent隔离或运行中取消。
+
+三张时序图通过Mermaid11.12.0解析、独立Chrome渲染和截图目检，无文字越界；VS Code普通脚本启动配置通过JSON与路径核对，未交互操作调试界面。重新生成、check_docs.py、audit.py与git diff --check通过，仅036元数据更新，203份steps源码未改。本次没有修改harness-own、执行032跨进程demo、重跑000～069或提交，详见[036通信说明验证记录](evidence/036-subagents-communication-2026-10-26.json)。
+
+随后补充Agent对象与Subagents管理器的接口对照：submit/send、idle加session.read/wait、cancel/interrupt，以及Scope触发close的映射；明确主、子Agent使用同一Agent类，管理器增加定位与归属校验，wait还组合了等待和读取。新增展开代码标注为等价示意，避免连续执行成两次提交。重新生成与文档检查通过；原完整运行例子、三张图和203份源码的hash未变，沿用上述运行与渲染证据，未重复执行功能测试。
+
+## 2026-10-27：036父Agent通过模型工具委派孩子并读回答案
+
+新增src/subagent-tools.mjs，将create/send/wait/interrupt注册进父Tools，参数校验、统一守卫、归属检查与Scope注销都保留；新增普通入口src/subagents-demo.mjs，应用只向父Agent提交用户任务。父模型从create真实结果取得动态childId，再调用send和wait；孩子经独立Tools的order_total计算19×3，父模型从wait返回事件中读取结果并回答57元。036不再需要等051才第一次接入父模型工具；原基础管理器测试仍由测试函数扮演父调用方。
+
+从最终036教程直接提取五份完整步骤代码，在只累计000～035的隔离工程运行，不依赖后续Host。Bun 1.3.14普通demo退出0：父请求4次、子请求3次、孩子2个turn、父create/send/wait均经过守卫、order_total执行1次、wait返回23条事件、父最后模型请求确实包含wait结果；正常清理后父子关闭，管理器、工具与监听归零。原测试加新增测试共5pass/0fail；另一组23×5得到115，排除最终答案写死57。显式live缺Key时退出1，不会静默退回固定响应。
+
+补齐工具注册/目录/执行/结果回填说明、完整调用链、运行命令、VS Code配置、断点变量、验收与迁移练习，保留原文本调用链和管理器/RPC对照。036全部4张Mermaid图通过解析、独立Chrome渲染与截图目检；新图的长注释经换行修复，明确孩子收到输入即可运行，wait只等待完成。两个文档调试配置通过JSON与路径核对，未操作VS Code界面。
+
+check_docs.py、audit.py和git diff --check通过，既有203份步骤文件未改，仅新增036的3份代码文件；教程共206次文件增量。本次默认固定外部模型响应，未实际请求DeepSeek，未重跑000～069、修改harness-own或提交；父取消传播、权限树、完整预算/通知/失败清理仍不在本次证明范围。工作区并行的038更新保留，不计为036完成证据。详见[036父子工具链验收记录](evidence/036-subagent-tools-2026-10-27.json)。
+
+
+## 2026-10-27：039收敛为独立事件记录、读取与消息投影
+
+标题改为“把协作状态和反馈记录成独立事件”，同步syllabus、039具体说明、索引与生成课文。主线改为写入聊天样本、同id的doing/done记录与独立feedback，分别读取完整事件、最新状态和模型消息；解释整条覆盖、旧事件保留、默认内存、同Events重建与“不自动进入模型”的准确含义。原版五领域差距收拢为边界表，手动due保留为辅助例子，没有补充或声称领域生命周期已完成。
+
+新增普通src/collaboration-demo.mjs，并在最终课文展示完整代码和VS Code配置。从课文提取本章代码，在只累计000～038的隔离工程用Bun 1.3.14运行：demo退出0，完整事件5条，doing/done均保留，最新为done且旧note消失，反馈关联seq=3，模型消息仅用户和助手两条；同Events重建结果一致。原039测试1pass/0fail。按课文练习只把第二次状态改为doing、保留原断言，稳定以AssertionError退出1，随后恢复原码。Collaboration业务逻辑未变，仅两处注释随定位修正，原测试未改。
+
+唯一时序图通过Mermaid11.12.0解析、独立Chrome渲染与截图目检，长注释换行后完整可见；VS Code配置通过JSON与路径核对，未操作GUI。check_docs.py、audit.py和git diff --check通过，仅039元数据变化，共207次步骤文件增量。未运行Agent/模型、磁盘恢复或后台时钟，未重跑000～069、修改harness-own或自动提交。详见[039事件记录验收记录](evidence/039-event-recording-2026-10-27.json)。

@@ -1,26 +1,26 @@
 {
-  "scenario": "用户给一条消息点赞，不应把点赞文字伪装成下一次模型用户输入；另有一次到期提醒，正常处理后重建协作对象不应重复投递。",
-  "flow": "Collaboration.set(kind,value) → 校验状态词 → 追加collaboration事件 → state折叠最新值；due(now,deliver) → 找到pending且到期 → deliver → 记录delivered；feedback单独追加sidecar事件",
-  "try": "写完src/collaboration.mjs与测试后运行 bun test ./tests/039-collaboration.test.mjs。先写入at=1的提醒，在now=2投递，再new Collaboration(session)于now=3检查不再投递；添加feedback后messages投影仍为空；给plan传completed应拒绝。",
-  "why": "本章把Todo/Plan/Goal/Schedule存成不同事件状态，避免都叫“任务”。due不是定时器，需要调用者传now并触发；正常路径标记delivered防重复，deliver与写事件之间不是事务，仍要求投递方按id幂等。",
-  "accept": "测试应1项通过，正常重建不重复、反馈不进入模型历史、错误状态拒绝。不能证明提醒后台自动到期、崩溃窗口恰好一次、周期任务或Goal自动继续运行。",
-  "debug": "在src/collaboration.mjs的this.session.append、await deliver及this.set(\"schedule\"...)打断点。第一次due时看status=pending且at<=now；F10完成deliver后再写delivered。第二个实例state应折叠出delivered并跳过；在feedback后切到projection.mjs观察messages过滤结果仍为空。",
-  "recall": "闭卷写出todo.done、plan.accepted、goal.completed为什么不是一个状态；画出deliver成功但delivered落盘前崩溃会导致什么。",
-  "transfer": "安全练习：在纯内存测试让deliver按id记录到Set，再重复调用due验证消费方幂等；模拟deliver抛错应保持pending。重复周期、时区、Goal驱动尚未实现，不要仅增加一个状态名宣称完成。",
-  "wiring": "039独立事件测试；051注册todo/plan/goal/schedule_update，只有状态更新。capabilities没有安排定时器调用due，也没有Goal轮次驱动，不能认为写入schedule就会在后台提醒。",
+  "scenario": "用户说“请修复登录问题”是聊天输入；应用记录“补登录测试：doing→done”是进度事实；用户给回答点赞是反馈事实。本页只学习把它们记录成不同事件、读取最新状态，并用messages选择模型消息；不实现完整Todo、Plan、Goal或提醒。",
+  "flow": "Collaboration.set(kind,value) → 校验教学状态词与id → append独立collaboration事件 → state按kind筛选并按id取最后一整份值；feedback追加独立评价事件；messages只选择message/user、message/assistant、message/tool，不自动选择状态和反馈",
+  "try": "按本页完整代码创建src/collaboration-demo.mjs、src/collaboration.mjs和原测试。先预测同一进度记录doing再记录done、给回复点赞后，完整事件、最新状态、模型消息分别是什么，再运行 bun src/collaboration-demo.mjs 对照。随后运行原039测试；提醒扫描仅是辅助例子。",
+  "why": "完整事件保存过程，state从同一事件集合按kind和id重建最新对象，messages只选择真正聊天消息。独立事件按读取用途区分，不因名字叫todo或goal就获得业务能力。默认Events只在内存保存；接入Journal才有磁盘持久化。Collaboration是教学记录器，没有实现五个原版领域的完整服务。",
+  "accept": "普通demo退出0：完整事件5条，包含doing与done两次记录；latestTodo的login-tests为done且旧note不再保留；新建读取器得到相同状态；feedback关联真实回复seq；modelMessages只有用户和助手两条，storage为memory、modelRequested为false。原测试1项通过，仍只验证手动扫描正常重建不重复、反馈隔离、非法枚举拒绝。",
+  "debug": "用本页“Bun：039独立事件记录”启动src/collaboration-demo.mjs。在两次set、feedback、events、latestTodo、modelMessages和rebuiltTodo处打断点，F10跨过声明后比较三种结果；进入src/collaboration.mjs的append与state的filter/reduce，再进入src/projection.mjs的messages白名单。辅助测试tests/039-collaboration.test.mjs中due的deliver只是收集id，观察后记delivered；不把同一Events重建说成进程恢复。",
+  "recall": "闭卷画出“聊天→message事件→messages”“进度→collaboration事件→state”“点赞→feedback事件→应用读取”三条路径；解释同id整条覆盖、旧事件保留、评价不自动变用户消息。再说明为什么写goal.active不会启动Agent、写pending提醒不会安装定时器。",
+  "transfer": "把demo第二次状态临时改成doing，先预测：事件仍5条，最新状态变化，两条模型消息不变；原done断言应失败，观察后恢复。第二天闭卷复述三个读取结果，第3天只追加一条feedback，预测完整事件增加而messages不变。",
+  "wiring": "039普通demo只调用Events、Collaboration和messages，不创建Agent、不请求模型、不接UI；原测试的due由调用方手动触发。051虽然注册部分_update工具，也只是在原统一Tools入口显式读写这些记录，不会自动获得Plan评审、Goal驱动或后台提醒。",
   "implemented": [
-    "按类别校验状态并由事件重建",
-    "一次性到期扫描",
-    "成功投递后记录delivered",
-    "反馈与模型消息分离"
+    "按教学kind/id追加状态事件，再从事件重建最新整份对象",
+    "独立记录feedback，并在示例中关联已存在回复的seq",
+    "messages白名单不自动选择状态和反馈；普通demo展示完整事件、最新状态、模型消息三种结果",
+    "保留手动due辅助例子，回调成功后记录delivered；同一Events正常重建可读取该结果"
   ],
   "missing": [
-    "原版todo、plan-mode、goal和schedule各自有独立领域协议；教程一个通用状态表没有相应生命周期。",
-    "原版schedule宿主持久调度、恢复冷会话、周期/cron/时区及投递历史；教程没有后台调度和事务确认。",
-    "原版goal-round-driver管理持续目标的后续轮次；教程goal只存状态。",
-    "原版反馈产品与消息身份关联；本章只追加messageSeq和评分文本。"
+    "本章不实现完整Todo清单协议、Plan模式和评审、Goal生命周期或自动轮次驱动；教学状态枚举不等于原版状态。",
+    "本章不实现宿主提醒时钟、周期/cron/时区、恢复原会话和持久投递确认；原版Schedule本身也不保证跨存储恰好一次。",
+    "默认内存示例不证明磁盘或进程重启恢复；完整持久化须接Journal与宿主恢复。",
+    "feedback只追加messageSeq、rating和text，没有原版完整消息身份、校验和反馈产品交互。"
   ],
-  "testEvidence": "039-collaboration.test.mjs验证同一Events上的重建和正常幂等、反馈投影排除、非法plan状态；没有重启Host或真实时钟调度。",
+  "testEvidence": "新增普通collaboration-demo真实使用本章记录器和已有messages，断言5条事件、同id整份覆盖、同Events重建、真实reply.seq关联与两条模型消息；原039-collaboration.test.mjs仍为1项测试，验证手动扫描正常重建、反馈不进messages、非法plan枚举。没有模型、UI、定时器或磁盘恢复验收。",
   "sources": [
     "packages/todo/tool-todo/README.zh.md",
     "packages/plan/plan-mode/README.zh.md",
@@ -28,5 +28,5 @@
     "packages/schedule/schedule/README.zh.md",
     "packages/feedback/message-feedback/README.zh.md"
   ],
-  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant A as Collaboration\n    participant E as 会话 Events\n    participant D as 外部 deliver 回调\n    C->>A: set(kind, value)\n    A->>A: 校验 id 和对应状态词\n    A->>E: append(collaboration/kind, value)\n    C->>A: state(kind)\n    A->>E: read 并筛选对应事件\n    E-->>A: 历史事实\n    A-->>C: 按 id 折叠的最新状态\n    opt 调用方主动检查到期提醒\n        C->>A: due(now, deliver)\n        A->>A: 取 schedule 最新状态\n        loop pending 且已到期的条目\n            A->>D: deliver(id, text)\n            D-->>A: 投递完成\n            A->>E: append schedule 状态为 delivered\n        end\n    end\n    opt 用户提交评价\n        C->>A: feedback(messageSeq, rating, text)\n        A->>E: append 独立 feedback 事件\n    end\n    Note over C,D: 没有自动定时器；deliver 需自行保证幂等"
+  "sequence": "sequenceDiagram\n    participant C as 调用方或普通demo\n    participant R as Collaboration记录器\n    participant E as 会话Events（本例内存）\n    participant P as messages投影\n    C->>E: append message/user，记录用户请求\n    C->>R: set todo，login-tests为doing\n    R->>E: append collaboration/todo\n    C->>R: set同一id，状态为done\n    R->>E: 再append一条collaboration/todo\n    C->>E: append message/assistant，得到reply.seq\n    C->>R: feedback(reply.seq, up, 评价)\n    R->>E: append独立feedback\n    C->>E: read完整事件\n    E-->>C: 五条记录，doing和done均保留\n    C->>R: state(todo)\n    R->>E: read，筛选同kind并按id折叠\n    E-->>R: 事件副本\n    R-->>C: 最新为done，整条覆盖旧对象\n    C->>P: messages(完整事件)\n    P->>P: 只选择三种message事件\n    P-->>C: 只有用户和助手两条聊天消息\n    Note over C,P: 这里只得到消息数组；未运行Agent或请求模型\n    Note over R,E: 状态和反馈仍在完整事件中<br/>不自动成为聊天输入"
 }

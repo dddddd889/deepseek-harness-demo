@@ -1537,44 +1537,45 @@
     "id": "036",
     "title": "子Agent可以继续对话",
     "phase": "R05",
-    "try": "先写完src/subagents.mjs和测试，再运行 bun test ./tests/036-subagents.test.mjs。ScriptModel预置first/second，给同一child发送one和two并分别wait；观察model.requests.length=2，stranger取消被拒绝，scope.close后entries为空。不会请求真实模型。",
-    "why": "子Agent管理器保存活的Agent资源和父身份，不只是Promise.all。复用同一child保留它的会话；factory决定模型、工具与配置，本章没有自动复制父权限或历史。",
-    "run": "bun test ./tests/036-subagents.test.mjs",
-    "test": "tests/036-subagents.test.mjs",
-    "accept": "测试应1项通过，真实Agent执行两轮、父身份校验、关闭撤销成立。没有验证子孙深度、跨进程提供方、父子权限取交集、完成通知或强制清理失败。",
-    "debug": "在src/subagents.mjs的this.entries.set和get打断点，F10看同一childId对应同一agent；send时F11进入agent.submit，等wait结束再看model.requests从1变2。stranger调用时parent不匹配，agent.cancel不应命中。scope.close时F11进入agent.close，再检查entries.size=0。所有Agent在同一进程，不是worker。",
-    "recall": "闭卷解释factory、parent、childId三个身份各负责什么；列出“同一子Agent继续对话”与“新建第二个子Agent”的历史区别。",
-    "transfer": "安全练习：在临时测试创建两个子Agent，用各自独立ScriptModel，验证一方输入不进入另一方历史。自动继承restrict/guard尚未实现，不能通过同一个parent字符串推断权限已继承。",
+    "try": "按本页完整代码创建src/subagent-tools.mjs、src/subagents-demo.mjs和新增测试，保留原管理器。先运行 bun src/subagents-demo.mjs，观察父工具create→send→wait、孩子order_total、父回答57元；再运行原测试和036-subagent-tools.test.mjs。入口只向父Agent.submit，不直接替模型调用管理器。",
+    "why": "Subagents管理孩子，subagentTools把create/send/wait/interrupt包装进父Tools；Loop在每次请求前把catalog交给模型，再把真实工具结果写入message/tool。父模型从create结果读取动态childId，从wait完整事件提取孩子最终结果后才回答。父子各有Agent、Session、Tools和Settings，均在同一Bun进程；parent由闭包绑定父session.id，不自动继承历史或权限。",
+    "run": "bun src/subagents-demo.mjs\nbun test ./tests/036-subagents.test.mjs ./tests/036-subagent-tools.test.mjs",
+    "test": "tests/036-subagent-tools.test.mjs",
+    "accept": "原036与新增测试共5项通过；默认demo父模型4次、子模型3次、孩子2个turn，父工具顺序subagent_create/send/wait且均经过守卫，order_total执行1次，父回答57元且最后模型请求携带wait结果。改成23元×5件应回答115元。正常关闭后父子Agent关闭，管理器、工具表、监听归零；live需另行运行验收。",
+    "debug": "主入口src/subagents-demo.mjs用本页“Bun：036父Agent工具委派”配置F5启动，不经过测试框架。断在src/subagent-tools.mjs的tools.register及create/send/wait处理函数，src/loop.mjs的catalog、model.stream和message/tool，src/tools.mjs的execute，以及demo的order_total与scope.close。用session.id和工具名区分父子，观察动态childId与wait事件进入父模型历史；正常退出后看cleanup。调试新增tests/036-subagent-tools.test.mjs时沿用“Bun：当前测试”长超时配置。",
+    "recall": "闭卷画出tools.register→catalog→父模型工具调用→Tools.execute→Subagents→子Agent→wait→父message/tool→父模型回答；解释为什么create已提交初始化任务、send是第二条输入，为什么父4次请求、子3次请求，以及childId、sessionId、callId各定位什么。",
+    "transfer": "先预测23元×5件时父最终答案，再运行新增测试核对115；不要同时改父回答模板。第二天闭卷复述动态childId如何传到send/wait，第3天换数量重新验证。父取消自动传播、权限取交集和多孩子隔离尚未实现，不能由同parent标签推断。",
     "original": "原版subagent有spawn/fork/ACP/DSH SDK/Codex/Claude Code等具名提供方和统一activation生命周期；教程仅factory。；原版有准入/并发/深度预算、完成通知、持久谱系与后代排空；本章没有完整控制。；原版进程内作用域可继承工具限制/守卫；教程新Tools/Settings或Host子会话不等于父权限链。",
     "guide": {
-      "scenario": "父Agent把审阅文档交给子Agent，得到结果后还要补问同一个子Agent，而不是每次重建一次性请求；其他父Agent即使知道child id也不能控制它。",
+      "scenario": "父Agent收到订单任务，通过模型工具创建子Agent、提交单价19元数量3的订单、等待孩子实际调用order_total，再根据wait返回的结果回答57元。原基础测试保留，新增普通demo贯通真实父子Agent；默认固定外部模型响应，不联网。",
       "flow": "Subagents.create(scope,parent,options) → factory创建真实Agent → 记录parent/agent → send提交输入 → wait等待Agent.idle并读会话 → interrupt取消 → 父scope关闭时child.close并撤销id",
-      "try": "先写完src/subagents.mjs和测试，再运行 bun test ./tests/036-subagents.test.mjs。ScriptModel预置first/second，给同一child发送one和two并分别wait；观察model.requests.length=2，stranger取消被拒绝，scope.close后entries为空。不会请求真实模型。",
-      "why": "子Agent管理器保存活的Agent资源和父身份，不只是Promise.all。复用同一child保留它的会话；factory决定模型、工具与配置，本章没有自动复制父权限或历史。",
-      "accept": "测试应1项通过，真实Agent执行两轮、父身份校验、关闭撤销成立。没有验证子孙深度、跨进程提供方、父子权限取交集、完成通知或强制清理失败。",
-      "debug": "在src/subagents.mjs的this.entries.set和get打断点，F10看同一childId对应同一agent；send时F11进入agent.submit，等wait结束再看model.requests从1变2。stranger调用时parent不匹配，agent.cancel不应命中。scope.close时F11进入agent.close，再检查entries.size=0。所有Agent在同一进程，不是worker。",
-      "recall": "闭卷解释factory、parent、childId三个身份各负责什么；列出“同一子Agent继续对话”与“新建第二个子Agent”的历史区别。",
-      "transfer": "安全练习：在临时测试创建两个子Agent，用各自独立ScriptModel，验证一方输入不进入另一方历史。自动继承restrict/guard尚未实现，不能通过同一个parent字符串推断权限已继承。",
-      "wiring": "036只有进程内Agent测试。051真实注册subagent_create/send/wait/interrupt，并由Host创建子会话加入agent.children；没有原版多提供方与权限树组合。",
+      "try": "按本页完整代码创建src/subagent-tools.mjs、src/subagents-demo.mjs和新增测试，保留原管理器。先运行 bun src/subagents-demo.mjs，观察父工具create→send→wait、孩子order_total、父回答57元；再运行原测试和036-subagent-tools.test.mjs。入口只向父Agent.submit，不直接替模型调用管理器。",
+      "why": "Subagents管理孩子，subagentTools把create/send/wait/interrupt包装进父Tools；Loop在每次请求前把catalog交给模型，再把真实工具结果写入message/tool。父模型从create结果读取动态childId，从wait完整事件提取孩子最终结果后才回答。父子各有Agent、Session、Tools和Settings，均在同一Bun进程；parent由闭包绑定父session.id，不自动继承历史或权限。",
+      "accept": "原036与新增测试共5项通过；默认demo父模型4次、子模型3次、孩子2个turn，父工具顺序subagent_create/send/wait且均经过守卫，order_total执行1次，父回答57元且最后模型请求携带wait结果。改成23元×5件应回答115元。正常关闭后父子Agent关闭，管理器、工具表、监听归零；live需另行运行验收。",
+      "debug": "主入口src/subagents-demo.mjs用本页“Bun：036父Agent工具委派”配置F5启动，不经过测试框架。断在src/subagent-tools.mjs的tools.register及create/send/wait处理函数，src/loop.mjs的catalog、model.stream和message/tool，src/tools.mjs的execute，以及demo的order_total与scope.close。用session.id和工具名区分父子，观察动态childId与wait事件进入父模型历史；正常退出后看cleanup。调试新增tests/036-subagent-tools.test.mjs时沿用“Bun：当前测试”长超时配置。",
+      "recall": "闭卷画出tools.register→catalog→父模型工具调用→Tools.execute→Subagents→子Agent→wait→父message/tool→父模型回答；解释为什么create已提交初始化任务、send是第二条输入，为什么父4次请求、子3次请求，以及childId、sessionId、callId各定位什么。",
+      "transfer": "先预测23元×5件时父最终答案，再运行新增测试核对115；不要同时改父回答模板。第二天闭卷复述动态childId如何传到send/wait，第3天换数量重新验证。父取消自动传播、权限取交集和多孩子隔离尚未实现，不能由同parent标签推断。",
+      "wiring": "036已新增subagentTools注册四个父模型工具，并在src/subagents-demo.mjs装配真实父Agent和子Agent，完成create→send→wait→父回答。默认只固定外部模型响应，--live显式让父子都调用DeepSeek；原基础测试的parent仍只是标签。051另在Host中组合持久会话与agent.children，不是本章demo的依赖。",
       "implemented": [
         "factory生成可继续对话的真实Agent",
-        "父身份校验",
-        "发送、等待、取消接口",
-        "父scope持有并关闭子资源"
+        "按parent标签校验子Agent归属，发送、等待、取消接口与父scope正常关闭回收",
+        "将四个Subagents入口注册为父模型工具，经过参数校验、统一守卫与Scope注销",
+        "普通demo贯通父模型create/send/wait、子工具计算、wait结果进入父模型历史后回答",
+        "默认固定响应验收与显式DeepSeek live入口；live未运行不得算作已验证"
       ],
       "missing": [
         "原版subagent有spawn/fork/ACP/DSH SDK/Codex/Claude Code等具名提供方和统一activation生命周期；教程仅factory。",
         "原版有准入/并发/深度预算、完成通知、持久谱系与后代排空；本章没有完整控制。",
         "原版进程内作用域可继承工具限制/守卫；教程新Tools/Settings或Host子会话不等于父权限链。"
       ],
-      "testEvidence": "036-subagents.test.mjs运行真实Agent与ScriptModel两轮，验证model.requests=2、陌生父拒绝和scope清理；不调用远端模型。",
+      "testEvidence": "原036测试验证子Agent两轮和父标签；新增036-subagent-tools.test.mjs实际运行同一个普通demo，验证父4次/子3次请求、create/send/wait、真实order_total与结果回填，并用23×5→115排除写死57；另验参数错误、守卫拒绝、陌生孩子send/wait/interrupt拒绝、Scope注销和live缺Key失败。总计5测试通过，默认不调用远端模型。",
       "sources": [
         "packages/subagent/subagent/README.zh.md",
         "packages/subagent/subagent-spawn-in-process/README.zh.md",
         "packages/subagent/subagent-fork-in-process/README.zh.md",
         "packages/subagent/tool-subagent-control/README.zh.md"
       ],
-      "sequence": "sequenceDiagram\n    participant P as 父调用方\n    participant M as Subagents 管理器\n    participant F as factory 工厂\n    participant A as 子 Agent（同一进程内）\n    participant E as 子会话 Events\n    participant S as 父资源 Scope\n    P->>M: create(scope, parent, options)\n    M->>F: factory(options)\n    F-->>M: 返回真实 Agent\n    M->>M: entries 记录 childId、parent、agent\n    M->>S: own 登记 child.close 与撤销 id\n    M-->>P: childId\n    P->>M: send(parent, childId, text)\n    M->>M: get 校验父身份\n    M->>A: submit(text)\n    A-->>M: 输入 receipt\n    M-->>P: 输入 receipt\n    A->>E: 运行回合并追加会话事件\n    opt 运行中需要取消\n        P->>M: interrupt(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: cancel()\n    end\n    opt 需要等待并读取结果\n        P->>M: wait(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: await idle()\n        A-->>M: 当前活动结束\n        M->>E: session.read()\n        E-->>M: 会话事件副本\n        M-->>P: 原 wait 返回事件\n    end\n    P->>S: close()\n    S->>M: 执行登记的清理回调\n    M->>A: await agent.close()\n    A-->>M: Agent 关闭完成\n    M->>M: entries.delete(childId)\n    M-->>S: 清理完成\n    Note over M,A: 子 Agent 可继续 send；创建子 Agent 不等于创建新进程"
+      "sequence": "sequenceDiagram\n    participant P as 父调用方（036测试函数）\n    participant M as Subagents 管理器\n    participant F as factory 工厂\n    participant A as 子 Agent（同一进程内）\n    participant E as 子会话 Events\n    participant S as 父资源 Scope\n    P->>M: create(scope, parent, options)\n    M->>F: factory(options)\n    F-->>M: 返回真实 Agent\n    M->>M: entries 记录 childId、parent、agent\n    M->>S: own 登记 child.close 与撤销 id\n    M-->>P: childId\n    P->>M: send(parent, childId, text)\n    M->>M: get 校验父身份\n    M->>A: submit(text)\n    A-->>M: 输入 receipt\n    M-->>P: 输入 receipt\n    A->>E: 运行回合并追加会话事件\n    opt 运行中需要取消\n        P->>M: interrupt(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: cancel()\n    end\n    opt 需要等待并读取结果\n        P->>M: wait(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: await idle()\n        A-->>M: 当前活动结束\n        M->>E: session.read()\n        E-->>M: 会话事件副本\n        M-->>P: 原 wait 返回事件\n    end\n    P->>S: close()\n    S->>M: 执行登记的清理回调\n    M->>A: await agent.close()\n    A-->>M: Agent 关闭完成\n    M->>M: entries.delete(childId)\n    M-->>S: 清理完成\n    Note over P,A: 此图仅描述原基础测试；新demo另有真实父Agent和工具调用链\n    Note over M,A: 子 Agent 可继续 send；创建子 Agent 不等于创建新进程"
     }
   },
   {
@@ -1622,83 +1623,83 @@
   },
   {
     "id": "038",
-    "title": "按指令列表调用工具，继续通过守卫",
+    "title": "把上一个工具的结果，传给下一个工具",
     "phase": "R05",
-    "try": "先写完src/ptc.mjs和测试，再运行 bun test ./tests/038-ptc.test.mjs。程序第一条echo返回ok，第二条text引用a；观察result.b=\"ok\"且checks=2，说明内层调用没有绕过guard。再看maxCalls=0的请求执行前就拒绝。",
-    "why": "本章runProgram是一个可审计的声明式寄存器解释器，不执行JavaScript源码，也不是任意代码沙箱。id是结果寄存器，$ref引用先前值；只有参数第一层的引用会被替换。",
+    "try": "在自己的工程创建本页给出的src/ptc.mjs和tests/038-ptc.test.mjs，再运行 bun test ./tests/038-ptc.test.mjs。先预测：第一个echo收到ok并返回ok；第二个echo的text会从{$ref:\"a\"}变成什么？执行前的检查会进入几次？运行后用result.b=\"ok\"和checks=2核对。最后看maxCalls=0那次调用，确认任何工具都没有开始执行。",
+    "why": "runProgram按数组顺序做事：调用工具，把返回值按id存进values，再把下一步参数里的$ref换成已经保存的值。每次都经过Tools.execute，保留原有参数校验和权限检查。这里只会替换参数第一层的引用，不会往嵌套对象里继续查找，也不会运行一段JavaScript源码。",
     "run": "bun test ./tests/038-ptc.test.mjs",
     "test": "tests/038-ptc.test.mjs",
-    "accept": "测试应1项通过：两次真实Tools.execute、引用传值、守卫计数2与预算拒绝。没有执行模型生成代码、循环、嵌套引用或隔离进程，不能称为原版完整PTC。",
-    "debug": "在src/ptc.mjs的argumentsValue[key]=structuredClone(...)和await tools.execute打断点。第一条后values.get(\"a\")应是ok；第二条替换前text是{$ref:\"a\"}，F10后变成字符串ok；F11进入Tools.execute看guard再次执行。预算场景停在program.length>maxCalls，任何tool.run均不应命中。",
-    "recall": "闭卷手写两条指令，把第一条结果传第二条；解释为什么直接调用tool.run会绕过guard，而此解释器必须调用Tools.execute。",
-    "transfer": "安全练习：把第二条引用改成不存在的missing，断言“尚未定义”且第二次工具不执行；再增加嵌套对象引用观察当前不会递归替换。任意JavaScript/Python程序执行需另建真实运行时，当前未实现。",
-    "original": "原版ptc-runtime有resolve/run、语言/程序格式描述符、宿主异步函数绑定、日志与结构化结果。；原版Node运行时在受管隔离进程执行源码并支持明确owner状态；本章只解释数组。；原版Tools PTC模式还涉及模型工具展示、嵌套调用身份与执行边界；教程run_program不兼容这些约定。",
+    "accept": "本章测试应1项通过：result等于{a:\"ok\",b:\"ok\"}；原测试实际断言b为ok、检查次数为2，并确认maxCalls=0时拒绝执行。checks只记录进入检查入口的次数，不证明已经测试了权限拒绝或用户审批。没有调用模型、启动子进程或运行模型生成的源码。",
+    "debug": "在VS Code打开tests/038-ptc.test.mjs，用“Bun：当前测试”启动。先在src/ptc.mjs的values.set打断点，F10执行第一步保存后，values.get(\"a\")应为\"ok\"。再在argumentsValue[key] = structuredClone(...)打断点：第二步替换前argumentsValue.text是{$ref:\"a\"}，F10后变成字符串\"ok\"。在await tools.execute处F11进入src/tools.mjs，再进入this.guard，看测试里的checks由0变1、再变2。maxCalls=0那次停在program.length > maxCalls，观察它直接抛错，不进入任何tool.run。",
+    "recall": "合上文档，自己写出两步echo调用，讲清a的值存在哪里、$ref由谁替换、第二次echo真正收到什么参数。再解释为什么checks=2只说明检查入口被调用两次，不能证明用户已经批准了操作。",
+    "transfer": "把第二步的$ref改为missing，确认报“引用尚未定义”，第二个echo没有执行；第一步已经执行，不会自动回滚。再把引用放到options.text里，观察当前代码不会替换这个更深一层的值。恢复原测试，明天闭卷重写查值和替换这几行，第3天再用自己的话讲清结果传递和逐次检查。",
+    "original": "原版可以选择脚本运行环境、描述所用语言和程序格式，并把工具接给脚本调用，还会记录日志和返回结果。本章只支持固定格式的数组。；原版的Node运行环境在单独进程中执行源码，并管理这个进程归谁、何时关闭。本章没有启动脚本进程，也没有执行JavaScript或Python源码。；原版还规定模型怎样看到程序调用工具、脚本内部每次调用怎样编号和记录。本章的run_program没有实现这些完整约定，不能直接替换原版。",
     "guide": {
-      "scenario": "一次工具任务需要串起两个操作：先拿到一个值，再把这个值传给下一个工具。希望只给模型一份编排输入，但每个内层工具仍经过权限守卫。",
-      "flow": "runProgram(program) → 先检查条数预算 → 逐条解析id/tool/arguments → 将顶层参数中的{$ref:id}换成之前结果 → Tools.execute → 存values → 返回所有结果",
-      "try": "先写完src/ptc.mjs和测试，再运行 bun test ./tests/038-ptc.test.mjs。程序第一条echo返回ok，第二条text引用a；观察result.b=\"ok\"且checks=2，说明内层调用没有绕过guard。再看maxCalls=0的请求执行前就拒绝。",
-      "why": "本章runProgram是一个可审计的声明式寄存器解释器，不执行JavaScript源码，也不是任意代码沙箱。id是结果寄存器，$ref引用先前值；只有参数第一层的引用会被替换。",
-      "accept": "测试应1项通过：两次真实Tools.execute、引用传值、守卫计数2与预算拒绝。没有执行模型生成代码、循环、嵌套引用或隔离进程，不能称为原版完整PTC。",
-      "debug": "在src/ptc.mjs的argumentsValue[key]=structuredClone(...)和await tools.execute打断点。第一条后values.get(\"a\")应是ok；第二条替换前text是{$ref:\"a\"}，F10后变成字符串ok；F11进入Tools.execute看guard再次执行。预算场景停在program.length>maxCalls，任何tool.run均不应命中。",
-      "recall": "闭卷手写两条指令，把第一条结果传第二条；解释为什么直接调用tool.run会绕过guard，而此解释器必须调用Tools.execute。",
-      "transfer": "安全练习：把第二条引用改成不存在的missing，断言“尚未定义”且第二次工具不执行；再增加嵌套对象引用观察当前不会递归替换。任意JavaScript/Python程序执行需另建真实运行时，当前未实现。",
-      "wiring": "038独立解释器测试；051注册run_program，内层实际复用同一Tools。没有接原版ptcRuntime，也没有Node/Python隔离执行。",
+      "scenario": "先调用一个工具取得结果，再把这个结果作为参数调用下一个工具。例如先读出文件正文，再交给写文件工具保存。本章用两次echo演示传值：第一次返回ok，第二次使用第一次的返回值；每次执行前仍做参数和权限检查。文件读写只是用途示意，本章不会实际读写文件。",
+      "flow": "runProgram(program) → 检查调用条数是否超过maxCalls → 按数组顺序取出每一步 → 把参数里的{$ref:\"a\"}替换为a已保存的结果 → Tools.execute检查并调用工具 → values保存这一步的返回值 → 返回全部结果",
+      "try": "在自己的工程创建本页给出的src/ptc.mjs和tests/038-ptc.test.mjs，再运行 bun test ./tests/038-ptc.test.mjs。先预测：第一个echo收到ok并返回ok；第二个echo的text会从{$ref:\"a\"}变成什么？执行前的检查会进入几次？运行后用result.b=\"ok\"和checks=2核对。最后看maxCalls=0那次调用，确认任何工具都没有开始执行。",
+      "why": "runProgram按数组顺序做事：调用工具，把返回值按id存进values，再把下一步参数里的$ref换成已经保存的值。每次都经过Tools.execute，保留原有参数校验和权限检查。这里只会替换参数第一层的引用，不会往嵌套对象里继续查找，也不会运行一段JavaScript源码。",
+      "accept": "本章测试应1项通过：result等于{a:\"ok\",b:\"ok\"}；原测试实际断言b为ok、检查次数为2，并确认maxCalls=0时拒绝执行。checks只记录进入检查入口的次数，不证明已经测试了权限拒绝或用户审批。没有调用模型、启动子进程或运行模型生成的源码。",
+      "debug": "在VS Code打开tests/038-ptc.test.mjs，用“Bun：当前测试”启动。先在src/ptc.mjs的values.set打断点，F10执行第一步保存后，values.get(\"a\")应为\"ok\"。再在argumentsValue[key] = structuredClone(...)打断点：第二步替换前argumentsValue.text是{$ref:\"a\"}，F10后变成字符串\"ok\"。在await tools.execute处F11进入src/tools.mjs，再进入this.guard，看测试里的checks由0变1、再变2。maxCalls=0那次停在program.length > maxCalls，观察它直接抛错，不进入任何tool.run。",
+      "recall": "合上文档，自己写出两步echo调用，讲清a的值存在哪里、$ref由谁替换、第二次echo真正收到什么参数。再解释为什么checks=2只说明检查入口被调用两次，不能证明用户已经批准了操作。",
+      "transfer": "把第二步的$ref改为missing，确认报“引用尚未定义”，第二个echo没有执行；第一步已经执行，不会自动回滚。再把引用放到options.text里，观察当前代码不会替换这个更深一层的值。恢复原测试，明天闭卷重写查值和替换这几行，第3天再用自己的话讲清结果传递和逐次检查。",
+      "wiring": "038由测试函数直接调用runProgram，没有父Agent或模型参与。051才把它包装为run_program工具供Agent调用。两种入口最后都经过Tools.execute；本章没有实现原版执行源码的脚本运行环境。",
       "implemented": [
-        "条数预算、唯一指令id",
-        "先前结果引用与结构克隆",
-        "取消检查",
-        "所有内层调用过统一Tools守卫"
+        "先检查调用总条数，默认最多20条；执行每一步时检查id非空且未重复",
+        "把已完成工具的整个返回值复制到下一步的第一层参数里",
+        "每一步开始前检查是否已取消，Tools.execute执行前也会检查",
+        "每次工具调用都经过Tools.execute中的参数校验和guard检查入口"
       ],
       "missing": [
-        "原版ptc-runtime有resolve/run、语言/程序格式描述符、宿主异步函数绑定、日志与结构化结果。",
-        "原版Node运行时在受管隔离进程执行源码并支持明确owner状态；本章只解释数组。",
-        "原版Tools PTC模式还涉及模型工具展示、嵌套调用身份与执行边界；教程run_program不兼容这些约定。"
+        "原版可以选择脚本运行环境、描述所用语言和程序格式，并把工具接给脚本调用，还会记录日志和返回结果。本章只支持固定格式的数组。",
+        "原版的Node运行环境在单独进程中执行源码，并管理这个进程归谁、何时关闭。本章没有启动脚本进程，也没有执行JavaScript或Python源码。",
+        "原版还规定模型怎样看到程序调用工具、脚本内部每次调用怎样编号和记录。本章的run_program没有实现这些完整约定，不能直接替换原版。"
       ],
-      "testEvidence": "038-ptc.test.mjs验证声明式引用传值和guard调用次数，测试不包含eval、JS源码执行或OS沙箱。",
+      "testEvidence": "038-ptc.test.mjs实际调用两次Tools.execute，验证前一步的结果能填进后一步参数、guard被调用两次，以及调用条数超限被拒绝。guard只做计数；没有验证真实审批、目录权限或隔离进程。",
       "sources": [
         "packages/ptc-runtime/ptc-runtime/README.zh.md",
         "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
         "packages/core/tools/README.zh.md"
       ],
-      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant P as runProgram 指令解释器\n    participant T as Tools 统一入口\n    participant G as 工具 guard\n    participant R as 工具实现\n    C->>P: runProgram(program, tools, context)\n    P->>P: 检查数组和 maxCalls 预算\n    loop 按指令顺序\n        P->>P: 检查取消及唯一 id\n        P->>P: 复制 arguments\n        opt 顶层参数包含 $ref\n            P->>P: 查前面 values，复制引用结果\n            Note right of P: 未定义引用立即抛错\n        end\n        P->>T: execute(tool, arguments, context)\n        T->>T: 查工具并校验参数\n        T->>G: guard(tool, call, context)\n        G-->>T: 守卫通过，或抛错终止\n        T->>T: 再次检查取消\n        T->>R: run(复制后的参数, context)\n        R-->>T: value\n        T-->>P: execute 完成\n        P->>P: values.set(当前指令 id, value)\n    end\n    P-->>C: 全部指令结果对象\n    Note over C,P: 输入是声明式指令列表；没有 eval 任意 JS 或隔离脚本进程"
+      "sequence": "sequenceDiagram\n    participant C as 测试函数\n    participant P as runProgram：按清单执行\n    participant T as Tools.execute：执行入口\n    participant G as guard：执行前检查\n    participant E as echo：返回收到的text\n    C->>P: 两步任务：a返回ok，b使用a的结果\n    P->>P: 检查清单共2条，没有超过默认20条\n    P->>P: 第一步id为a，text已经是字符串ok\n    P->>T: execute(echo, text为ok)\n    T->>T: 检查参数\n    T->>G: 调用检查函数\n    G-->>T: 本测试只把checks加到1\n    T->>E: run(text为ok)\n    E-->>T: 返回字符串ok\n    T-->>P: 返回ok\n    P->>P: values保存a等于ok\n    P->>P: 第二步把text里的$ref:a换成字符串ok\n    P->>T: execute(echo, text为ok)\n    T->>T: 再次检查参数\n    T->>G: 再次调用检查函数\n    G-->>T: checks加到2\n    T->>E: run(text为ok)\n    E-->>T: 返回字符串ok\n    T-->>P: 返回ok\n    P->>P: values保存b等于ok\n    P-->>C: 返回a和b的结果，均为ok\n    Note over C,E: 没有模型或子进程；两次工具调用按顺序执行\n    Note over T,G: checks只证明检查入口被调用，不代表已验证审批或拒绝权限"
     }
   },
   {
     "id": "039",
-    "title": "Todo、Plan、Goal、提醒和反馈",
+    "title": "把协作状态和反馈记录成独立事件",
     "phase": "R05",
-    "try": "写完src/collaboration.mjs与测试后运行 bun test ./tests/039-collaboration.test.mjs。先写入at=1的提醒，在now=2投递，再new Collaboration(session)于now=3检查不再投递；添加feedback后messages投影仍为空；给plan传completed应拒绝。",
-    "why": "本章把Todo/Plan/Goal/Schedule存成不同事件状态，避免都叫“任务”。due不是定时器，需要调用者传now并触发；正常路径标记delivered防重复，deliver与写事件之间不是事务，仍要求投递方按id幂等。",
-    "run": "bun test ./tests/039-collaboration.test.mjs",
+    "try": "按本页完整代码创建src/collaboration-demo.mjs、src/collaboration.mjs和原测试。先预测同一进度记录doing再记录done、给回复点赞后，完整事件、最新状态、模型消息分别是什么，再运行 bun src/collaboration-demo.mjs 对照。随后运行原039测试；提醒扫描仅是辅助例子。",
+    "why": "完整事件保存过程，state从同一事件集合按kind和id重建最新对象，messages只选择真正聊天消息。独立事件按读取用途区分，不因名字叫todo或goal就获得业务能力。默认Events只在内存保存；接入Journal才有磁盘持久化。Collaboration是教学记录器，没有实现五个原版领域的完整服务。",
+    "run": "bun src/collaboration-demo.mjs\nbun test ./tests/039-collaboration.test.mjs",
     "test": "tests/039-collaboration.test.mjs",
-    "accept": "测试应1项通过，正常重建不重复、反馈不进入模型历史、错误状态拒绝。不能证明提醒后台自动到期、崩溃窗口恰好一次、周期任务或Goal自动继续运行。",
-    "debug": "在src/collaboration.mjs的this.session.append、await deliver及this.set(\"schedule\"...)打断点。第一次due时看status=pending且at<=now；F10完成deliver后再写delivered。第二个实例state应折叠出delivered并跳过；在feedback后切到projection.mjs观察messages过滤结果仍为空。",
-    "recall": "闭卷写出todo.done、plan.accepted、goal.completed为什么不是一个状态；画出deliver成功但delivered落盘前崩溃会导致什么。",
-    "transfer": "安全练习：在纯内存测试让deliver按id记录到Set，再重复调用due验证消费方幂等；模拟deliver抛错应保持pending。重复周期、时区、Goal驱动尚未实现，不要仅增加一个状态名宣称完成。",
-    "original": "原版todo、plan-mode、goal和schedule各自有独立领域协议；教程一个通用状态表没有相应生命周期。；原版schedule宿主持久调度、恢复冷会话、周期/cron/时区及投递历史；教程没有后台调度和事务确认。；原版goal-round-driver管理持续目标的后续轮次；教程goal只存状态。；原版反馈产品与消息身份关联；本章只追加messageSeq和评分文本。",
+    "accept": "普通demo退出0：完整事件5条，包含doing与done两次记录；latestTodo的login-tests为done且旧note不再保留；新建读取器得到相同状态；feedback关联真实回复seq；modelMessages只有用户和助手两条，storage为memory、modelRequested为false。原测试1项通过，仍只验证手动扫描正常重建不重复、反馈隔离、非法枚举拒绝。",
+    "debug": "用本页“Bun：039独立事件记录”启动src/collaboration-demo.mjs。在两次set、feedback、events、latestTodo、modelMessages和rebuiltTodo处打断点，F10跨过声明后比较三种结果；进入src/collaboration.mjs的append与state的filter/reduce，再进入src/projection.mjs的messages白名单。辅助测试tests/039-collaboration.test.mjs中due的deliver只是收集id，观察后记delivered；不把同一Events重建说成进程恢复。",
+    "recall": "闭卷画出“聊天→message事件→messages”“进度→collaboration事件→state”“点赞→feedback事件→应用读取”三条路径；解释同id整条覆盖、旧事件保留、评价不自动变用户消息。再说明为什么写goal.active不会启动Agent、写pending提醒不会安装定时器。",
+    "transfer": "把demo第二次状态临时改成doing，先预测：事件仍5条，最新状态变化，两条模型消息不变；原done断言应失败，观察后恢复。第二天闭卷复述三个读取结果，第3天只追加一条feedback，预测完整事件增加而messages不变。",
+    "original": "本章不实现完整Todo清单协议、Plan模式和评审、Goal生命周期或自动轮次驱动；教学状态枚举不等于原版状态。；本章不实现宿主提醒时钟、周期/cron/时区、恢复原会话和持久投递确认；原版Schedule本身也不保证跨存储恰好一次。；默认内存示例不证明磁盘或进程重启恢复；完整持久化须接Journal与宿主恢复。；feedback只追加messageSeq、rating和text，没有原版完整消息身份、校验和反馈产品交互。",
     "guide": {
-      "scenario": "用户给一条消息点赞，不应把点赞文字伪装成下一次模型用户输入；另有一次到期提醒，正常处理后重建协作对象不应重复投递。",
-      "flow": "Collaboration.set(kind,value) → 校验状态词 → 追加collaboration事件 → state折叠最新值；due(now,deliver) → 找到pending且到期 → deliver → 记录delivered；feedback单独追加sidecar事件",
-      "try": "写完src/collaboration.mjs与测试后运行 bun test ./tests/039-collaboration.test.mjs。先写入at=1的提醒，在now=2投递，再new Collaboration(session)于now=3检查不再投递；添加feedback后messages投影仍为空；给plan传completed应拒绝。",
-      "why": "本章把Todo/Plan/Goal/Schedule存成不同事件状态，避免都叫“任务”。due不是定时器，需要调用者传now并触发；正常路径标记delivered防重复，deliver与写事件之间不是事务，仍要求投递方按id幂等。",
-      "accept": "测试应1项通过，正常重建不重复、反馈不进入模型历史、错误状态拒绝。不能证明提醒后台自动到期、崩溃窗口恰好一次、周期任务或Goal自动继续运行。",
-      "debug": "在src/collaboration.mjs的this.session.append、await deliver及this.set(\"schedule\"...)打断点。第一次due时看status=pending且at<=now；F10完成deliver后再写delivered。第二个实例state应折叠出delivered并跳过；在feedback后切到projection.mjs观察messages过滤结果仍为空。",
-      "recall": "闭卷写出todo.done、plan.accepted、goal.completed为什么不是一个状态；画出deliver成功但delivered落盘前崩溃会导致什么。",
-      "transfer": "安全练习：在纯内存测试让deliver按id记录到Set，再重复调用due验证消费方幂等；模拟deliver抛错应保持pending。重复周期、时区、Goal驱动尚未实现，不要仅增加一个状态名宣称完成。",
-      "wiring": "039独立事件测试；051注册todo/plan/goal/schedule_update，只有状态更新。capabilities没有安排定时器调用due，也没有Goal轮次驱动，不能认为写入schedule就会在后台提醒。",
+      "scenario": "用户说“请修复登录问题”是聊天输入；应用记录“补登录测试：doing→done”是进度事实；用户给回答点赞是反馈事实。本页只学习把它们记录成不同事件、读取最新状态，并用messages选择模型消息；不实现完整Todo、Plan、Goal或提醒。",
+      "flow": "Collaboration.set(kind,value) → 校验教学状态词与id → append独立collaboration事件 → state按kind筛选并按id取最后一整份值；feedback追加独立评价事件；messages只选择message/user、message/assistant、message/tool，不自动选择状态和反馈",
+      "try": "按本页完整代码创建src/collaboration-demo.mjs、src/collaboration.mjs和原测试。先预测同一进度记录doing再记录done、给回复点赞后，完整事件、最新状态、模型消息分别是什么，再运行 bun src/collaboration-demo.mjs 对照。随后运行原039测试；提醒扫描仅是辅助例子。",
+      "why": "完整事件保存过程，state从同一事件集合按kind和id重建最新对象，messages只选择真正聊天消息。独立事件按读取用途区分，不因名字叫todo或goal就获得业务能力。默认Events只在内存保存；接入Journal才有磁盘持久化。Collaboration是教学记录器，没有实现五个原版领域的完整服务。",
+      "accept": "普通demo退出0：完整事件5条，包含doing与done两次记录；latestTodo的login-tests为done且旧note不再保留；新建读取器得到相同状态；feedback关联真实回复seq；modelMessages只有用户和助手两条，storage为memory、modelRequested为false。原测试1项通过，仍只验证手动扫描正常重建不重复、反馈隔离、非法枚举拒绝。",
+      "debug": "用本页“Bun：039独立事件记录”启动src/collaboration-demo.mjs。在两次set、feedback、events、latestTodo、modelMessages和rebuiltTodo处打断点，F10跨过声明后比较三种结果；进入src/collaboration.mjs的append与state的filter/reduce，再进入src/projection.mjs的messages白名单。辅助测试tests/039-collaboration.test.mjs中due的deliver只是收集id，观察后记delivered；不把同一Events重建说成进程恢复。",
+      "recall": "闭卷画出“聊天→message事件→messages”“进度→collaboration事件→state”“点赞→feedback事件→应用读取”三条路径；解释同id整条覆盖、旧事件保留、评价不自动变用户消息。再说明为什么写goal.active不会启动Agent、写pending提醒不会安装定时器。",
+      "transfer": "把demo第二次状态临时改成doing，先预测：事件仍5条，最新状态变化，两条模型消息不变；原done断言应失败，观察后恢复。第二天闭卷复述三个读取结果，第3天只追加一条feedback，预测完整事件增加而messages不变。",
+      "wiring": "039普通demo只调用Events、Collaboration和messages，不创建Agent、不请求模型、不接UI；原测试的due由调用方手动触发。051虽然注册部分_update工具，也只是在原统一Tools入口显式读写这些记录，不会自动获得Plan评审、Goal驱动或后台提醒。",
       "implemented": [
-        "按类别校验状态并由事件重建",
-        "一次性到期扫描",
-        "成功投递后记录delivered",
-        "反馈与模型消息分离"
+        "按教学kind/id追加状态事件，再从事件重建最新整份对象",
+        "独立记录feedback，并在示例中关联已存在回复的seq",
+        "messages白名单不自动选择状态和反馈；普通demo展示完整事件、最新状态、模型消息三种结果",
+        "保留手动due辅助例子，回调成功后记录delivered；同一Events正常重建可读取该结果"
       ],
       "missing": [
-        "原版todo、plan-mode、goal和schedule各自有独立领域协议；教程一个通用状态表没有相应生命周期。",
-        "原版schedule宿主持久调度、恢复冷会话、周期/cron/时区及投递历史；教程没有后台调度和事务确认。",
-        "原版goal-round-driver管理持续目标的后续轮次；教程goal只存状态。",
-        "原版反馈产品与消息身份关联；本章只追加messageSeq和评分文本。"
+        "本章不实现完整Todo清单协议、Plan模式和评审、Goal生命周期或自动轮次驱动；教学状态枚举不等于原版状态。",
+        "本章不实现宿主提醒时钟、周期/cron/时区、恢复原会话和持久投递确认；原版Schedule本身也不保证跨存储恰好一次。",
+        "默认内存示例不证明磁盘或进程重启恢复；完整持久化须接Journal与宿主恢复。",
+        "feedback只追加messageSeq、rating和text，没有原版完整消息身份、校验和反馈产品交互。"
       ],
-      "testEvidence": "039-collaboration.test.mjs验证同一Events上的重建和正常幂等、反馈投影排除、非法plan状态；没有重启Host或真实时钟调度。",
+      "testEvidence": "新增普通collaboration-demo真实使用本章记录器和已有messages，断言5条事件、同id整份覆盖、同Events重建、真实reply.seq关联与两条模型消息；原039-collaboration.test.mjs仍为1项测试，验证手动扫描正常重建、反馈不进messages、非法plan枚举。没有模型、UI、定时器或磁盘恢复验收。",
       "sources": [
         "packages/todo/tool-todo/README.zh.md",
         "packages/plan/plan-mode/README.zh.md",
@@ -1706,7 +1707,7 @@
         "packages/schedule/schedule/README.zh.md",
         "packages/feedback/message-feedback/README.zh.md"
       ],
-      "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant A as Collaboration\n    participant E as 会话 Events\n    participant D as 外部 deliver 回调\n    C->>A: set(kind, value)\n    A->>A: 校验 id 和对应状态词\n    A->>E: append(collaboration/kind, value)\n    C->>A: state(kind)\n    A->>E: read 并筛选对应事件\n    E-->>A: 历史事实\n    A-->>C: 按 id 折叠的最新状态\n    opt 调用方主动检查到期提醒\n        C->>A: due(now, deliver)\n        A->>A: 取 schedule 最新状态\n        loop pending 且已到期的条目\n            A->>D: deliver(id, text)\n            D-->>A: 投递完成\n            A->>E: append schedule 状态为 delivered\n        end\n    end\n    opt 用户提交评价\n        C->>A: feedback(messageSeq, rating, text)\n        A->>E: append 独立 feedback 事件\n    end\n    Note over C,D: 没有自动定时器；deliver 需自行保证幂等"
+      "sequence": "sequenceDiagram\n    participant C as 调用方或普通demo\n    participant R as Collaboration记录器\n    participant E as 会话Events（本例内存）\n    participant P as messages投影\n    C->>E: append message/user，记录用户请求\n    C->>R: set todo，login-tests为doing\n    R->>E: append collaboration/todo\n    C->>R: set同一id，状态为done\n    R->>E: 再append一条collaboration/todo\n    C->>E: append message/assistant，得到reply.seq\n    C->>R: feedback(reply.seq, up, 评价)\n    R->>E: append独立feedback\n    C->>E: read完整事件\n    E-->>C: 五条记录，doing和done均保留\n    C->>R: state(todo)\n    R->>E: read，筛选同kind并按id折叠\n    E-->>R: 事件副本\n    R-->>C: 最新为done，整条覆盖旧对象\n    C->>P: messages(完整事件)\n    P->>P: 只选择三种message事件\n    P-->>C: 只有用户和助手两条聊天消息\n    Note over C,P: 这里只得到消息数组；未运行Agent或请求模型\n    Note over R,E: 状态和反馈仍在完整事件中<br/>不自动成为聊天输入"
     }
   },
   {

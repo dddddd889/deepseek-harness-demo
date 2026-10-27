@@ -501,8 +501,23 @@
   },
   {
     "step": "036",
+    "path": "src/subagent-tools.mjs",
+    "sha256": "b2702a4b8b1ff679c6dcdf519f356f8b9dca050fa0eef931d2b29d4805e7635f"
+  },
+  {
+    "step": "036",
+    "path": "src/subagents-demo.mjs",
+    "sha256": "3d89ebcf0372a13c7e447a1ed7688ed8ef2560742fd9cdd3559132b62c2f1011"
+  },
+  {
+    "step": "036",
     "path": "src/subagents.mjs",
     "sha256": "a4efe278ef12a64b8c9be092d9b94efe41156e1bd220ab6c4dedce38522350f2"
+  },
+  {
+    "step": "036",
+    "path": "tests/036-subagent-tools.test.mjs",
+    "sha256": "cce377b81697cffb9c6388197c5ce0930addb8f5be0195d58e628843d112bec0"
   },
   {
     "step": "036",
@@ -531,8 +546,13 @@
   },
   {
     "step": "039",
+    "path": "src/collaboration-demo.mjs",
+    "sha256": "b61614645000c4d005d977ced9f75101f229cdb9581906d3379607bb77d30cbd"
+  },
+  {
+    "step": "039",
     "path": "src/collaboration.mjs",
-    "sha256": "90a8033c2c2a9ded46e27634022ea0632909886a6bbd359f7dd98713d578b7d4"
+    "sha256": "57936b0855ed3c37dfe684312f57e5b685f5f25af55c8b2018161468d52d4d89"
   },
   {
     "step": "039",

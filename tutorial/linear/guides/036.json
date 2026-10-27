@@ -1,30 +1,31 @@
 {
-  "scenario": "父Agent把审阅文档交给子Agent，得到结果后还要补问同一个子Agent，而不是每次重建一次性请求；其他父Agent即使知道child id也不能控制它。",
+  "scenario": "父Agent收到订单任务，通过模型工具创建子Agent、提交单价19元数量3的订单、等待孩子实际调用order_total，再根据wait返回的结果回答57元。原基础测试保留，新增普通demo贯通真实父子Agent；默认固定外部模型响应，不联网。",
   "flow": "Subagents.create(scope,parent,options) → factory创建真实Agent → 记录parent/agent → send提交输入 → wait等待Agent.idle并读会话 → interrupt取消 → 父scope关闭时child.close并撤销id",
-  "try": "先写完src/subagents.mjs和测试，再运行 bun test ./tests/036-subagents.test.mjs。ScriptModel预置first/second，给同一child发送one和two并分别wait；观察model.requests.length=2，stranger取消被拒绝，scope.close后entries为空。不会请求真实模型。",
-  "why": "子Agent管理器保存活的Agent资源和父身份，不只是Promise.all。复用同一child保留它的会话；factory决定模型、工具与配置，本章没有自动复制父权限或历史。",
-  "accept": "测试应1项通过，真实Agent执行两轮、父身份校验、关闭撤销成立。没有验证子孙深度、跨进程提供方、父子权限取交集、完成通知或强制清理失败。",
-  "debug": "在src/subagents.mjs的this.entries.set和get打断点，F10看同一childId对应同一agent；send时F11进入agent.submit，等wait结束再看model.requests从1变2。stranger调用时parent不匹配，agent.cancel不应命中。scope.close时F11进入agent.close，再检查entries.size=0。所有Agent在同一进程，不是worker。",
-  "recall": "闭卷解释factory、parent、childId三个身份各负责什么；列出“同一子Agent继续对话”与“新建第二个子Agent”的历史区别。",
-  "transfer": "安全练习：在临时测试创建两个子Agent，用各自独立ScriptModel，验证一方输入不进入另一方历史。自动继承restrict/guard尚未实现，不能通过同一个parent字符串推断权限已继承。",
-  "wiring": "036只有进程内Agent测试。051真实注册subagent_create/send/wait/interrupt，并由Host创建子会话加入agent.children；没有原版多提供方与权限树组合。",
+  "try": "按本页完整代码创建src/subagent-tools.mjs、src/subagents-demo.mjs和新增测试，保留原管理器。先运行 bun src/subagents-demo.mjs，观察父工具create→send→wait、孩子order_total、父回答57元；再运行原测试和036-subagent-tools.test.mjs。入口只向父Agent.submit，不直接替模型调用管理器。",
+  "why": "Subagents管理孩子，subagentTools把create/send/wait/interrupt包装进父Tools；Loop在每次请求前把catalog交给模型，再把真实工具结果写入message/tool。父模型从create结果读取动态childId，从wait完整事件提取孩子最终结果后才回答。父子各有Agent、Session、Tools和Settings，均在同一Bun进程；parent由闭包绑定父session.id，不自动继承历史或权限。",
+  "accept": "原036与新增测试共5项通过；默认demo父模型4次、子模型3次、孩子2个turn，父工具顺序subagent_create/send/wait且均经过守卫，order_total执行1次，父回答57元且最后模型请求携带wait结果。改成23元×5件应回答115元。正常关闭后父子Agent关闭，管理器、工具表、监听归零；live需另行运行验收。",
+  "debug": "主入口src/subagents-demo.mjs用本页“Bun：036父Agent工具委派”配置F5启动，不经过测试框架。断在src/subagent-tools.mjs的tools.register及create/send/wait处理函数，src/loop.mjs的catalog、model.stream和message/tool，src/tools.mjs的execute，以及demo的order_total与scope.close。用session.id和工具名区分父子，观察动态childId与wait事件进入父模型历史；正常退出后看cleanup。调试新增tests/036-subagent-tools.test.mjs时沿用“Bun：当前测试”长超时配置。",
+  "recall": "闭卷画出tools.register→catalog→父模型工具调用→Tools.execute→Subagents→子Agent→wait→父message/tool→父模型回答；解释为什么create已提交初始化任务、send是第二条输入，为什么父4次请求、子3次请求，以及childId、sessionId、callId各定位什么。",
+  "transfer": "先预测23元×5件时父最终答案，再运行新增测试核对115；不要同时改父回答模板。第二天闭卷复述动态childId如何传到send/wait，第3天换数量重新验证。父取消自动传播、权限取交集和多孩子隔离尚未实现，不能由同parent标签推断。",
+  "wiring": "036已新增subagentTools注册四个父模型工具，并在src/subagents-demo.mjs装配真实父Agent和子Agent，完成create→send→wait→父回答。默认只固定外部模型响应，--live显式让父子都调用DeepSeek；原基础测试的parent仍只是标签。051另在Host中组合持久会话与agent.children，不是本章demo的依赖。",
   "implemented": [
     "factory生成可继续对话的真实Agent",
-    "父身份校验",
-    "发送、等待、取消接口",
-    "父scope持有并关闭子资源"
+    "按parent标签校验子Agent归属，发送、等待、取消接口与父scope正常关闭回收",
+    "将四个Subagents入口注册为父模型工具，经过参数校验、统一守卫与Scope注销",
+    "普通demo贯通父模型create/send/wait、子工具计算、wait结果进入父模型历史后回答",
+    "默认固定响应验收与显式DeepSeek live入口；live未运行不得算作已验证"
   ],
   "missing": [
     "原版subagent有spawn/fork/ACP/DSH SDK/Codex/Claude Code等具名提供方和统一activation生命周期；教程仅factory。",
     "原版有准入/并发/深度预算、完成通知、持久谱系与后代排空；本章没有完整控制。",
     "原版进程内作用域可继承工具限制/守卫；教程新Tools/Settings或Host子会话不等于父权限链。"
   ],
-  "testEvidence": "036-subagents.test.mjs运行真实Agent与ScriptModel两轮，验证model.requests=2、陌生父拒绝和scope清理；不调用远端模型。",
+  "testEvidence": "原036测试验证子Agent两轮和父标签；新增036-subagent-tools.test.mjs实际运行同一个普通demo，验证父4次/子3次请求、create/send/wait、真实order_total与结果回填，并用23×5→115排除写死57；另验参数错误、守卫拒绝、陌生孩子send/wait/interrupt拒绝、Scope注销和live缺Key失败。总计5测试通过，默认不调用远端模型。",
   "sources": [
     "packages/subagent/subagent/README.zh.md",
     "packages/subagent/subagent-spawn-in-process/README.zh.md",
     "packages/subagent/subagent-fork-in-process/README.zh.md",
     "packages/subagent/tool-subagent-control/README.zh.md"
   ],
-  "sequence": "sequenceDiagram\n    participant P as 父调用方\n    participant M as Subagents 管理器\n    participant F as factory 工厂\n    participant A as 子 Agent（同一进程内）\n    participant E as 子会话 Events\n    participant S as 父资源 Scope\n    P->>M: create(scope, parent, options)\n    M->>F: factory(options)\n    F-->>M: 返回真实 Agent\n    M->>M: entries 记录 childId、parent、agent\n    M->>S: own 登记 child.close 与撤销 id\n    M-->>P: childId\n    P->>M: send(parent, childId, text)\n    M->>M: get 校验父身份\n    M->>A: submit(text)\n    A-->>M: 输入 receipt\n    M-->>P: 输入 receipt\n    A->>E: 运行回合并追加会话事件\n    opt 运行中需要取消\n        P->>M: interrupt(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: cancel()\n    end\n    opt 需要等待并读取结果\n        P->>M: wait(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: await idle()\n        A-->>M: 当前活动结束\n        M->>E: session.read()\n        E-->>M: 会话事件副本\n        M-->>P: 原 wait 返回事件\n    end\n    P->>S: close()\n    S->>M: 执行登记的清理回调\n    M->>A: await agent.close()\n    A-->>M: Agent 关闭完成\n    M->>M: entries.delete(childId)\n    M-->>S: 清理完成\n    Note over M,A: 子 Agent 可继续 send；创建子 Agent 不等于创建新进程"
+  "sequence": "sequenceDiagram\n    participant P as 父调用方（036测试函数）\n    participant M as Subagents 管理器\n    participant F as factory 工厂\n    participant A as 子 Agent（同一进程内）\n    participant E as 子会话 Events\n    participant S as 父资源 Scope\n    P->>M: create(scope, parent, options)\n    M->>F: factory(options)\n    F-->>M: 返回真实 Agent\n    M->>M: entries 记录 childId、parent、agent\n    M->>S: own 登记 child.close 与撤销 id\n    M-->>P: childId\n    P->>M: send(parent, childId, text)\n    M->>M: get 校验父身份\n    M->>A: submit(text)\n    A-->>M: 输入 receipt\n    M-->>P: 输入 receipt\n    A->>E: 运行回合并追加会话事件\n    opt 运行中需要取消\n        P->>M: interrupt(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: cancel()\n    end\n    opt 需要等待并读取结果\n        P->>M: wait(parent, childId)\n        M->>M: get 校验父身份\n        M->>A: await idle()\n        A-->>M: 当前活动结束\n        M->>E: session.read()\n        E-->>M: 会话事件副本\n        M-->>P: 原 wait 返回事件\n    end\n    P->>S: close()\n    S->>M: 执行登记的清理回调\n    M->>A: await agent.close()\n    A-->>M: Agent 关闭完成\n    M->>M: entries.delete(childId)\n    M-->>S: 清理完成\n    Note over P,A: 此图仅描述原基础测试；新demo另有真实父Agent和工具调用链\n    Note over M,A: 子 Agent 可继续 send；创建子 Agent 不等于创建新进程"
 }
