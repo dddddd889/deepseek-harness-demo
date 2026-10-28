@@ -2,6 +2,661 @@
 
 返回主文：[039 · 把协作状态和反馈记录成独立事件](../039.md)。
 
+<a id="goal-storage"></a>
+
+## Goal状态存在哪里：持久事件、内存activation与历史工具结果
+
+**下面这份JSON是Goal工具返回给模型的当时状态快照；当前值由持久Goal投影和进程内activation组装。不是单独维护的一份goal.json，也不能直接拿旧工具结果恢复自动续行资格。**
+
+<details>
+<summary>展开用户看到的Goal工具结果（JSON）</summary>
+
+```json
+{
+  "goal": {
+    "id": "goal_example",
+    "revision": 1,
+    "objective": "迁移登录模块并通过测试",
+    "phase": "active",
+    "roundsStarted": 0,
+    "maxGoalRounds": 10
+  },
+  "activation": "armed"
+}
+```
+
+</details>
+
+最容易混淆的是“activation不持久化”这句话：**调度器实际使用的activation只在进程内存中；历史tool/result正文却可以保存当时的`"activation":"armed"`字符串。恢复时不会把历史结果里的armed当成当前运行权限。**
+
+### UML：状态写在哪里，重启后又从哪里读
+
+```mermaid
+sequenceDiagram
+    participant L as 模型与Goal工具
+    participant G as Goal服务
+    participant P as Goal投影缓存
+    participant M as 当前进程内存
+    participant E as Session eventlog与持久化后端
+    L->>G: create_goal，目标与轮数上限
+    G->>E: seq10 goal/change，保存完整Goal快照，不含activation
+    E-->>P: 回放事件，更新目标与计数
+    G->>M: 本次成功创建后启用armed
+    G-->>L: 合并投影与activation，得到工具返回值
+    L->>E: seq11 tool/result，正文保存当时的armed快照
+    Note over M,E: 创建流程已持久化后进程崩溃，旧内存丢失，旧日志保留
+    E-->>P: 新进程回放goal/change及Goal来源消息
+    G->>M: 初始化disarmed，agent创建边界也关闭自动续行
+    Note over P,M: phase仍active，revision仍1，当前activation为disarmed
+    L->>G: get_goal
+    G->>P: 读取当前持久投影
+    G->>M: 读取本进程disarmed
+    G-->>L: 返回active加disarmed
+    L->>E: seq22 tool/result，新增本次观察，不改seq11
+    Note over L,E: 人类明确要求恢复后，update_goal action=resume
+    L->>G: resume，精确Goal id与revision
+    G->>E: seq32 goal/change，operation为resume，revision变2
+    G->>M: 启用armed
+    G-->>L: 返回新的当前视图
+```
+
+| 数据 | 当前值从哪里来 | 怎样持久保存 | 恢复时怎样使用 |
+| --- | --- | --- | --- |
+| id、revision、objective、phase、maxGoalRounds | Goal投影中的当前快照。 | Session的goal/change事件。 | 回放Goal领域事件得到当前值。 |
+| roundsStarted | Goal投影的已准入自动Round计数。 | goal/change携带当时计数；实际准入的Goal来源user/message也记录round。 | 回放两类事件；计数不是统计get_goal次数，也不是统计Step数。 |
+| 当前activation | Goal服务的runtimeStates，按Session保存的WeakMap。 | 不作为Goal恢复状态写入日志。 | 新运行时默认disarmed，不从旧工具结果还原。 |
+| 返回给模型的整份JSON | 工具把当前Goal视图转换成结果。 | Native调用中经JSON.stringify放入tool/result文本。 | 只作为那次调用的历史观察；不作为Goal投影或调度状态的来源。 |
+
+### 阶段1：创建目标，分别保存领域事件和工具结果
+
+本段是独立教学摘录，seq不与本页其他例子相连。为了突出存储关系，省略公共time、消息id/source、assistant stream，以及turn/step边界、system、用户消息和其他事件；因此编号有跳跃，不能把下列数组直接当成可导入的完整原版日志。createdAt/updatedAt使用示例毫秒值。所有例子都假定相应记录已完成持久化；仅append到内存尚不足以保证抗崩溃。
+
+<details>
+<summary>展开创建目标的调用、领域记录和结果（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 8,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "create_goal_1",
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 9,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "create_goal_1",
+      "name": "create_goal",
+      "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+    }
+  },
+  {
+    "seq": 10,
+    "type": "goal/change",
+    "data": {
+      "kind": "goal/change",
+      "version": 1,
+      "operation": "create",
+      "goal": {
+        "id": "goal_example",
+        "revision": 1,
+        "objective": "迁移登录模块并通过测试",
+        "phase": "active",
+        "maxGoalRounds": 10
+      },
+      "roundsStarted": 0,
+      "createdAt": 1000,
+      "updatedAt": 1000
+    }
+  },
+  {
+    "seq": 11,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "toolCallId": "create_goal_1",
+        "isError": false,
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"goal\":{\"id\":\"goal_example\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      9
+    ]
+  }
+]
+```
+
+</details>
+
+这里有两条不同用途的记录：
+
+- **seq10是Goal领域事实。** 它保存当前快照、操作和计数，不带activation，也不带surfaceOp/sourceEventSeqs。
+- **seq11是模型工具结果。** 它可以带当时的armed文本，并用sourceEventSeqs:[9]关联实际工具调用；它不会反过来改变Goal。
+
+在当前运行中，相当于有以下两份内存数据。下面是逻辑内容示意，不是新增的磁盘格式或JSON API：
+
+<details>
+<summary>展开Goal投影与运行时Map中的逻辑内容（JSON）</summary>
+
+```json
+{
+  "goalProjection": {
+    "goal": {
+      "id": "goal_example",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "maxGoalRounds": 10
+    },
+    "roundsStarted": 0,
+    "createdAt": 1000,
+    "updatedAt": 1000
+  },
+  "runtimeForThisSession": {
+    "activation": "armed"
+  }
+}
+```
+
+</details>
+
+原版代码的关键位置如下；类型、变量和辅助函数来自Goal服务，不是让你把这几行独立运行：
+
+```ts
+// 每个Session对应自己的进程内运行时状态，不是持久化存储。
+private readonly runtimeStates = new WeakMap<Session, GoalRuntimeState>()
+
+// 读取注册的Goal投影；该投影回放领域事件与自动Round来源消息。
+const state = this.ctx.sessionProjections.stateOf(session, 'goal')
+
+// 工具把组装好的当前对象序列化为模型可见的结果文本。
+const content = [{ type: 'text', text: JSON.stringify(value) }]
+```
+
+### 阶段2：崩溃后恢复，旧armed文本仍在，当前值是disarmed
+
+假设在任何自动Round实际准入前崩溃。**崩溃前可以是armed；进程并不需要在崩溃瞬间成功运行一次清理函数。旧进程内存消失，新进程重新创建运行时状态，默认就是disarmed。** Goal服务还会在agent/created边界调用setActivation(session, 'disarmed')。
+
+重放一条旧的create或resume事件，只恢复它记录的Goal事实，**不等于在新进程重新调用create或resume方法**，所以不会顺便重新armed。只有当前服务实际成功提交相应操作时，才会启用本次运行的自动续行。
+
+恢复过程按下面的职责读取：
+
+```text
+旧goal/change seq10 → 恢复phase=active、revision=1及目标内容。
+旧tool/result seq11 → 仍是那次调用的历史文本，里面的armed不改。
+新进程runtimeStates → 初始化activation=disarmed。
+```
+
+<details>
+<summary>展开崩溃恢复后的当前逻辑内容（JSON）</summary>
+
+```json
+{
+  "goalProjection": {
+    "goal": {
+      "id": "goal_example",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "maxGoalRounds": 10
+    },
+    "roundsStarted": 0,
+    "createdAt": 1000,
+    "updatedAt": 1000
+  },
+  "runtimeForThisSession": {
+    "activation": "disarmed"
+  }
+}
+```
+
+</details>
+
+**active和armed分别回答“目标处于什么阶段”和“本次运行能否自动续行”。** active不等于正在运行；armed也只表示具备续行资格，仍要等待Agent空闲、竞争输入处理、子Agent和轮数等检查。恢复后不把phase硬改成paused，因为用户并没有因此提交一次暂停Goal的领域操作。
+
+| 路径 | phase | 当前activation | revision怎样变化 |
+| --- | --- | --- | --- |
+| 成功创建Goal | active | armed | 创建为1。 |
+| 新进程恢复或fork继承目标 | 保留继承的phase；本例为active | disarmed | 不因运行时初始化而增加。 |
+| disarm关闭当前自动续行资格 | 保留原phase | disarmed | 不写Goal修订。 |
+| 明确resume一个active且disarmed的Goal | active | armed | 成功的resume领域操作增加修订。 |
+| 明确pause | paused | disarmed | 成功的pause领域操作增加修订。 |
+| 成功block或complete | blocked或complete | disarmed | 相应领域操作增加修订。 |
+
+### 阶段3：恢复后调用get_goal，追加新观察，不改旧结果
+
+在这个例子里，人类先询问当前目标，Agent调用get_goal。**get_goal只是读取，不会因为读取了active目标就自动armed，也不新增goal/change或增加revision。**
+
+<details>
+<summary>展开恢复后get_goal产生的调用与结果（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 20,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "get_goal_2",
+            "name": "get_goal",
+            "arguments": "{}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 21,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "callId": "get_goal_2",
+      "name": "get_goal",
+      "arguments": "{}"
+    }
+  },
+  {
+    "seq": 22,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "toolCallId": "get_goal_2",
+        "isError": false,
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"goal\":{\"id\":\"goal_example\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"disarmed\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      21
+    ]
+  }
+]
+```
+
+</details>
+
+此时日志可以同时保留：
+
+```text
+seq11 tool/result：activation=armed    ← 创建时的观察。
+seq22 tool/result：activation=disarmed ← 新进程读取时的观察。
+当前调度状态：runtimeStates中的disarmed。
+```
+
+这不是两份互相争抢的当前状态。Goal投影只按领域规则回放goal/change和Goal来源的user/message，不解析tool/result里的JSON文本来开启自动执行。历史消息即使被摘要替换，Goal领域事实也不会因此自动被撤销。
+
+### 阶段4：人类明确恢复目标，才产生新的resume修订
+
+假设额度仍足够，人类要求继续这个目标，模型用精确id与revision调用update_goal action=resume。关键事件如下；在这之前，不会只因旧工具结果写着armed就自己完成这一步：
+
+<details>
+<summary>展开明确resume后的调用、领域记录与工具结果（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 30,
+    "type": "assistant/message",
+    "data": {
+      "turn": 3,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "resume_goal_3",
+            "name": "update_goal",
+            "arguments": "{\"goal_id\":\"goal_example\",\"revision\":1,\"action\":\"resume\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 31,
+    "type": "tool/call",
+    "data": {
+      "turn": 3,
+      "step": 1,
+      "callId": "resume_goal_3",
+      "name": "update_goal",
+      "arguments": "{\"goal_id\":\"goal_example\",\"revision\":1,\"action\":\"resume\"}"
+    }
+  },
+  {
+    "seq": 32,
+    "type": "goal/change",
+    "data": {
+      "kind": "goal/change",
+      "version": 1,
+      "operation": "resume",
+      "goal": {
+        "id": "goal_example",
+        "revision": 2,
+        "objective": "迁移登录模块并通过测试",
+        "phase": "active",
+        "maxGoalRounds": 10
+      },
+      "roundsStarted": 0,
+      "createdAt": 1000,
+      "updatedAt": 3000
+    }
+  },
+  {
+    "seq": 33,
+    "type": "tool/result",
+    "data": {
+      "turn": 3,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "toolCallId": "resume_goal_3",
+        "isError": false,
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"goal\":{\"id\":\"goal_example\",\"revision\":2,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      31
+    ]
+  }
+]
+```
+
+</details>
+
+**seq11和seq22仍保持原样。** seq32记录新的resume事实，当前内存变成armed，seq33记录这次的新观察。Goal服务本身不安排工作；挂载的Goal Round驱动器还要检查准入条件，才会发起下一轮。
+
+### 实际磁盘位置与源码对照
+
+原版基础组合挂载session-persistence-jsonl，root取dshHomePath('sessions')：设置DSH_HOME时为其下的sessions目录，否则通常为用户主目录下的.dsh/sessions。日志再按工作目录和会话id分目录，当前generation文件名由版本决定；默认压缩方式为zstd，可配置none。这里展示的是布局约定，不表示已经读取或创建了你机器上的某个会话文件：
+
+```text
+<DSH_HOME>/sessions/
+  <按工作目录划分的目录>/
+    <编码后的Session id>/
+      session.vN.jsonl.zstd
+```
+
+没有单独维护goal.json。Goal领域事件和历史工具结果都属于同一Session日志；当前activation的WeakMap不会随该文件恢复。
+
+| 要核对的行为 | 原版源码 |
+| --- | --- |
+| GoalView、GoalProjection与非持久activation的类型边界 | [goal/types.ts](../../../../deepseek-harness/packages/goal/goal/src/types.ts#L98) |
+| runtimeStates按Session保存、agent创建时disarm | [goal/index.ts](../../../../deepseek-harness/packages/goal/goal/src/index.ts#L248) |
+| 新运行时初始化disarmed | [runtimeState](../../../../deepseek-harness/packages/goal/goal/src/index.ts#L483) |
+| 提交goal/change并组合当前视图 | [commit与view](../../../../deepseek-harness/packages/goal/goal/src/index.ts#L609) |
+| Goal Round实际准入后推进roundsStarted | [applyGoalEvent](../../../../deepseek-harness/packages/goal/goal/src/fold.ts#L313) |
+| 工具组合对象、再JSON.stringify | [goalValue与GOAL_OUTPUT](../../../../deepseek-harness/packages/goal/tool-goal/src/index.ts#L156) |
+| 基础组合的持久化根目录 | [cordis.patch.yml](../../../../deepseek-harness/packages/bundle/base/cordis.patch.yml#L138) |
+| JSONL目录、压缩与落盘行为 | [会话持久化说明](../../../../deepseek-harness/packages/session/session-persistence-jsonl/README.zh.md) |
+
+自查：只调用get_goal会不会重新armed？不会。看到旧结果armed能不能直接认为恢复后也armed？不能。需要查询当前Goal服务，并在明确恢复后重新获得自动续行资格。
+
+## 同一条assistant同时有text和tool-call：怎样落日志，再进入下一次请求
+
+**一条assistant消息保留两个content块；执行工具时另外追加tool/call和tool/result。不会把text和tool-call拆成两条assistant/message。**
+
+场景：用户说“读取 hello.txt，告诉我里面写了什么”。模型先说一句话，同时要求调用read_demo。这里read_demo是教学用的虚构工具，假定文件内容为hello from harness。以下为独立示例，沿用seq=30～32方便看引用，不能拼到其他例子的日志里。
+
+### UML：模型输出 → 一条assistant事件 → 工具执行 → 下一Step请求
+
+```mermaid
+sequenceDiagram
+    participant L as 模型服务
+    participant A as Agent Loop与模型适配器
+    participant E as Session eventlog
+    participant T as 工具执行器
+    A->>L: Turn1 Step1，system和user任务
+    L-->>A: 同一次响应含text与tool_calls
+    Note over A: 累积流式增量，形成一条assistant消息的两个块
+    A->>E: seq30 assistant/message，append，保留两个块
+    Note over A,E: assistant/message不填写sourceEventSeqs
+    A->>A: 从content筛出tool-call块
+    A->>E: seq31 tool/call，记录read_1及参数
+    A->>T: read_demo，path为hello.txt
+    T-->>A: hello from harness
+    A->>E: seq32 tool/result，append，sourceEventSeqs为31
+    Note over A,E: Step1结束；系统文本未变时无须重复添加system消息
+    A->>E: 下一Step读取当前消息视图
+    A->>L: Turn1 Step2，system、user、assistant及tool结果
+    L-->>A: hello.txt里面写的是hello from harness
+```
+
+### 1．模型这一轮输出什么
+
+下面展示OpenAI兼容接口**同一次响应聚合完成后的message**，不是某一个SSE增量包。流式时text、工具名和参数可能分多包到达；适配器收齐后保留它们属于同一条assistant的关系。这里只演示正常完成的响应；输出因max-tokens截断时，Loop不会按这个成功路径直接执行残缺调用。
+
+<details>
+<summary>展开模型输出的完整message（JSON）</summary>
+
+```json
+{
+  "role": "assistant",
+  "content": "我先读取 hello.txt，再根据内容回答。",
+  "tool_calls": [
+    {
+      "id": "read_1",
+      "type": "function",
+      "function": {
+        "name": "read_demo",
+        "arguments": "{\"path\":\"hello.txt\"}"
+      }
+    }
+  ]
+}
+```
+
+</details>
+
+### 2．适配器把它变成什么内部消息
+
+OpenAI接口使用tool_calls；Harness内部使用content里的tool-call块。arguments仍是JSON字符串，执行工具前才按工具参数规则解析。text也原样保留。
+
+<details>
+<summary>展开内部assistant消息（JSON）</summary>
+
+```json
+{
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "我先读取 hello.txt，再根据内容回答。"
+    },
+    {
+      "type": "tool-call",
+      "id": "read_1",
+      "name": "read_demo",
+      "arguments": "{\"path\":\"hello.txt\"}"
+    }
+  ]
+}
+```
+
+</details>
+
+### 3．eventlog实际追加哪三类事件
+
+以下把消息正文、调用参数和结果全部展开；为突出接线，省略公共时间、自动生成的消息id/source、assistant流记录/usage，以及已有历史和step边界等事件。**这是相关事件的教学摘录，不是可直接导入的完整原版落盘记录。** seq30～32都属于Turn1的Step1；下一次请求才进入Step2。
+
+<details>
+<summary>展开assistant、工具调用和工具结果事件（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 30,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "我先读取 hello.txt，再根据内容回答。"
+          },
+          {
+            "type": "tool-call",
+            "id": "read_1",
+            "name": "read_demo",
+            "arguments": "{\"path\":\"hello.txt\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 31,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "read_1",
+      "name": "read_demo",
+      "arguments": "{\"path\":\"hello.txt\"}"
+    }
+  },
+  {
+    "seq": 32,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "toolCallId": "read_1",
+        "content": [
+          {
+            "type": "text",
+            "text": "hello from harness"
+          }
+        ],
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      31
+    ]
+  }
+]
+```
+
+</details>
+
+| 事件 | sourceEventSeqs怎么填 | 为什么 |
+| --- | --- | --- |
+| seq30 assistant/message | 不填 | 原版禁止assistant/message携带此字段；模型输出及流记录另有保存方式。不能自行填用户消息seq或空数组。 |
+| seq31 tool/call | 不填 | 它是执行记录，不是消息surface事件；通过callId=read_1对应assistant里的工具块。 |
+| seq32 tool/result | [31] | 工具结果引用本次实际执行的tool/call事件seq。不是[30]，也不是工具修改了哪些日志。 |
+
+read_1是**工具调用id**：串起assistant中的id、执行事件的callId、结果消息的toolCallId。31是**日志seq**：供sourceEventSeqs引用。两者用途不同。
+
+seq31并非又给模型增加一条工具调用消息。模型所需的调用信息已经在seq30中；seq31记录执行事实。seq32才向消息视图追加工具结果。这里没有replace，也没有改写任何旧日志，更没有更改系统提示词。
+
+### 4．下一次发给模型的完整messages
+
+假设当前只有开头的system和user，没有其他历史、运行时上下文或压缩。内部视图选中system、user、seq30和seq32；OpenAI兼容适配器转换后，完整messages如下。**正文和tool_calls仍在同一个assistant对象里，紧接着一个匹配read_1的tool结果。**
+
+<details>
+<summary>展开Turn1 Step2发给OpenAI兼容接口的完整messages（JSON）</summary>
+
+```json
+[
+  {
+    "role": "system",
+    "content": "你是编码助手。需要文件内容时先调用工具。"
+  },
+  {
+    "role": "user",
+    "content": "读取 hello.txt，告诉我里面写了什么。"
+  },
+  {
+    "role": "assistant",
+    "content": "我先读取 hello.txt，再根据内容回答。",
+    "tool_calls": [
+      {
+        "id": "read_1",
+        "type": "function",
+        "function": {
+          "name": "read_demo",
+          "arguments": "{\"path\":\"hello.txt\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "read_1",
+    "content": "hello from harness"
+  }
+]
+```
+
+</details>
+
+请求还会带模型配置和tools定义；上面完整展开的是messages字段，不是整个HTTP请求体。下一次模型可以据工具结果回答，也可以继续请求其他工具；若继续调用，就再产生新一组assistant/message、tool/call、tool/result。
+
+### 对照原版代码看
+
+- [agent.ts：保存完整assistant，再筛选工具块](../../../../deepseek-harness/packages/core/agent-loop/src/agent.ts#L528)：live.blocks()进入同一个message.content；append assistant/message之后才filter tool-call并执行。
+- [tool-calls.ts：保存执行调用和结果](../../../../deepseek-harness/packages/core/agent-loop/src/tool-calls.ts#L263)：appendToolCall返回callSeq，appendToolResult把它填到sourceEventSeqs:[callSeq]。
+
+合上示例自查：如果tool/call的seq变成41，结果应填[41]；assistant消息中的工具调用id仍然可以叫read_1，不需要跟着改成41。
+
 ## surfaceOp与sourceEventSeqs：旧日志不改，改变的是模型消息视图
 
 **先区分两个对象：eventlog是追加的事实序列，surface是“当前选哪些消息、按什么顺序给模型”的视图。** replace会新增日志事件并改变surface，不会回到磁盘把旧事件正文改掉。
@@ -4063,6 +4718,8 @@ Plan每次批准都由真实的人类评审答案决定；本例固定选择批�
 ### C．Goal：人类Turn结束不等于目标完成，下一Turn由Round驱动器触发
 
 目标允许2个自动Round；人类Turn1不消耗自动Round。Turn1结束后目标仍active、armed，驱动器在空闲且持久化/准入检查通过后发起Round1，这个Round在本例里就是Turn2。Turn2内部4个Step仍只计一个Round，直到工具成功标记complete才停止续行。
+
+关于这些字段保存在哪里、恢复后为什么变成disarmed，先看[Goal存储位置与历史快照](#goal-storage)。下文的activation均表示各阶段当时的运行时观察，不是恢复后自动续行的持久授权。
 
 #### 为什么模型没有工具调用了，Goal还会继续？
 
@@ -8542,8 +9199,10 @@ Todo也如此：UI能展示一份清单，不能单凭这一点断定下一次�
 
 Goal工具内部返回值和Native渲染也有明确约定：内部是当前目标对象，Native的output.render使用JSON.stringify，把该对象变成模型工具结果的文本。下面展示JSON解码后的结构示意：
 
+字段来源、实际磁盘位置及重启前后变化，见[Goal状态存在哪里](#goal-storage)。历史结果中的armed只是当时观察，不会重新启用恢复后的Goal。
+
 <details>
-<summary>展开user角色消息（JSON）</summary>
+<summary>展开Goal工具结果解码后的对象（JSON）</summary>
 
 ```json
 {
