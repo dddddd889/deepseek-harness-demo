@@ -2,6 +2,428 @@
 
 返回主文：[039 · 把协作状态和反馈记录成独立事件](../039.md)。
 
+## surfaceOp与sourceEventSeqs：旧日志不改，改变的是模型消息视图
+
+**先区分两个对象：eventlog是追加的事实序列，surface是“当前选哪些消息、按什么顺序给模型”的视图。** replace会新增日志事件并改变surface，不会回到磁盘把旧事件正文改掉。
+
+| 字段 | 回答什么问题 | 不是做什么 |
+| --- | --- | --- |
+| surfaceOp | 新消息节点追加到尾部，还是替换当前视图里的某段节点？ | 不是Plan状态开关，也不是磁盘删除指令。 |
+| sourceEventSeqs | 新事件引用了哪些已存在的来源事件？ | 不单独执行替换，也不是messages数组下标。 |
+| seq | 这条事件在本会话日志中的编号。 | 不是Turn、Step或工具调用id。 |
+
+### UML：同一日志，两种读取结果
+
+```mermaid
+sequenceDiagram
+    participant P as Plan控制与Loop
+    participant E as 只追加的eventlog
+    participant S as 当前消息surface
+    participant L as LLM
+    P->>E: seq0 system/message，append
+    E->>S: 加入system节点0
+    P->>E: seq1 user/message，append
+    E->>S: 节点顺序为0和1
+    P->>L: messages由0和1生成
+    Note over P,E: 用户批准，待退出决定在合法边界提交
+    P->>E: seq2 plan/mode，active=false
+    Note over E,S: 领域状态日志本身不新增模型消息
+    P->>E: seq3 system/message，replace节点0，来源0
+    E->>S: 节点顺序变为3和1
+    P->>L: 新system和原user任务
+    Note over P,S: 下一Step系统文本未变，不新增system事件
+    P->>E: seq4 plan/mode，active=true
+    P->>E: seq5 system/message，replace节点3，来源3
+    E->>S: 节点顺序变为5和1
+    P->>E: seq6 assistant/message，append
+    E->>S: 追加模型工具调用节点6
+    P->>E: seq7 tool/call，仅执行审计
+    P->>E: seq8 tool/result，append，来源7
+    E->>S: 追加结果节点8
+    P->>L: messages由5、1、6、8生成
+```
+
+下面是**独立的小例子**，seq从0重新编号，不能与后面Plan多Turn例子的seq=30～36混用。system采用简短教学文案，edit_demo是虚构工具。事件仅展开相关字段，省略实际turn/step、消息id、模型流、时间及边界记录；因此seq连续只对应本例摘录，不是完整原版落盘样本。假设期间未压缩，系统更新使用非in-history的归并分支。
+
+### 阶段1：首次system和用户任务都用append
+
+<details>
+<summary>展开阶段1新增eventlog（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 0,
+    "type": "system/message",
+    "data": {
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "你是编码助手。\n\n先规划，通过exit_plan_mode提交方案评审。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 1,
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "修复登录问题。"
+        }
+      ]
+    },
+    "surfaceOp": "append"
+  }
+]
+```
+
+</details>
+<details>
+<summary>展开阶段1发给LLM的完整messages（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。\n\n先规划，通过exit_plan_mode提交方案评审。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录问题。"
+    }
+  ]
+}
+```
+
+</details>
+surface节点顺序为[0,1]。初始消息没有需要替换的旧节点，使用append；首次system没有必要编造sourceEventSeqs:[0]来引用自己，来源只能引用已存在的旧事件。
+
+### 阶段2：退出Plan，新增replace事件，来源指向当前旧system
+
+用户批准、pendingIntents与pre-step过程见后面的seq30～36放大图。这里从边界正式提交退出开始展示：
+
+<details>
+<summary>展开阶段2新增eventlog（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 2,
+    "type": "plan/mode",
+    "data": {
+      "active": false
+    }
+  },
+  {
+    "seq": 3,
+    "type": "system/message",
+    "data": {
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "你是编码助手。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": {
+      "op": "replace",
+      "startSeq": 0,
+      "endSeq": 0
+    },
+    "sourceEventSeqs": [
+      0
+    ]
+  }
+]
+```
+
+</details>
+<details>
+<summary>展开阶段2发给LLM的完整messages（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录问题。"
+    }
+  ]
+}
+```
+
+</details>
+完整日志现在含seq0、1、2、3，但surface是[3,1]。seq3在原system的位置替换seq0，**不是把system挪到user之后**。plan/mode的seq2没有进入surface；它影响后续system组装，不自动成为一条聊天消息。
+
+surfaceOp指定替换目标，sourceEventSeqs:[0]声明来源；只有来源数组不能完成替换。
+
+### 阶段3：下一次system未变，不新增重复日志
+
+<details>
+<summary>展开阶段3系统投影检查（JSON）</summary>
+
+```json
+{
+  "newSystemEvents": [],
+  "surfaceEventSeqs": [
+    3,
+    1
+  ],
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录问题。"
+    }
+  ]
+}
+```
+
+</details>
+这是文档检查结果，newSystemEvents与surfaceEventSeqs不是模型请求字段。只表示这一步不再写system/message；正常请求还可能有其它Step边界、调用或结果事件，不是整个eventlog停止增长。也无需把旧事件的来源数组再改一遍。
+
+### 阶段4：重新进入Plan，为什么来源从0变成3
+
+<details>
+<summary>展开阶段4新增eventlog（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 4,
+    "type": "plan/mode",
+    "data": {
+      "active": true
+    }
+  },
+  {
+    "seq": 5,
+    "type": "system/message",
+    "data": {
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "你是编码助手。\n\n先规划，通过exit_plan_mode提交方案评审。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": {
+      "op": "replace",
+      "startSeq": 3,
+      "endSeq": 3
+    },
+    "sourceEventSeqs": [
+      3
+    ]
+  }
+]
+```
+
+</details>
+<details>
+<summary>展开阶段4发给LLM的完整messages（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。\n\n先规划，通过exit_plan_mode提交方案评审。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录问题。"
+    }
+  ]
+}
+```
+
+</details>
+surface变为[5,1]。此时有效system是seq3，所以新事件引用和替换的是3；seq0已经不在当前surface里，不能再次把它当成有效替换目标。
+
+```text
+完整日志：0 → 1 → 2 → 3 → 4 → 5，旧事件全部保留
+system有效节点：0 → 3 → 5
+新事件来源：seq3引用0；seq5引用3
+```
+
+**变的是新事件引用谁，不是回头把seq3的sourceEventSeqs从[0]改成[3]。** seq3仍永久记录自己当时引用的是0。
+
+### 阶段5：工具结果使用append，也可以有来源seq
+
+<details>
+<summary>展开阶段5新增eventlog（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 6,
+    "type": "assistant/message",
+    "data": {
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "edit_surface",
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 7,
+    "type": "tool/call",
+    "data": {
+      "callId": "edit_surface",
+      "name": "edit_demo",
+      "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+    }
+  },
+  {
+    "seq": 8,
+    "type": "tool/result",
+    "data": {
+      "message": {
+        "role": "tool",
+        "toolCallId": "edit_surface",
+        "content": [
+          {
+            "type": "text",
+            "text": "修改成功"
+          }
+        ],
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      7
+    ]
+  }
+]
+```
+
+</details>
+<details>
+<summary>展开阶段5发给LLM的完整messages（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。\n\n先规划，通过exit_plan_mode提交方案评审。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录问题。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_surface",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_surface",
+      "content": "修改成功"
+    }
+  ]
+}
+```
+
+</details>
+surface为[5,1,6,8]。seq7的tool/call仅审计，所以不直接生成第二条重复工具调用消息；seq6的assistant/message提供模型调用，seq8提供tool结果。
+
+sourceEventSeqs:[7]指向工具调用日志；tool_call_id则关联模型调用身份edit_surface。它们是两套不同编号。本次是append，结果没有替换seq7，不能仅看见sourceEventSeqs就判断发生了替换。原版assistant/message不使用sourceEventSeqs引用来源，它保存自己的提供方流；不要为了对称也给seq6加上该字段。
+
+### 替换一段历史：start/end是当前surface范围，不是日志数字之间的所有事件
+
+压缩器可以新增摘要user消息，替换多个旧surface节点。例如当前surface为[5,1,6,8]，要保留system并压缩后面这段，可以从startSeq=1到endSeq=8，来源包含被覆盖的1、6、8，不包含不在surface中的审计seq7。
+
+<details>
+<summary>展开历史摘要替换示意（JSON）</summary>
+
+```json
+{
+  "seq": 9,
+  "type": "user/message",
+  "data": {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "摘要示意：用户要求修复登录；编辑工具已返回修改成功。"
+      }
+    ]
+  },
+  "surfaceOp": {
+    "op": "replace",
+    "startSeq": 1,
+    "endSeq": 8
+  },
+  "sourceEventSeqs": [
+    1,
+    6,
+    8
+  ]
+}
+```
+
+</details>
+操作后surface是[5,9]，完整日志仍有0～9。这里仅示意surface范围替换，并非原版Compaction完整摘要格式或边界选择算法；原版还要检查可压缩的平衡范围、工具调用与结果完整性，并记录其它压缩标记。startSeq/endSeq两端必须属于当前surface，sourceEventSeqs必须覆盖被遮蔽的所有surface节点。
+
+### 系统改变也可能append：由路由能力决定，不由Plan名字决定
+
+| 情况 | 原版SystemPromptProjection处理 |
+| --- | --- |
+| 从未存在system节点 | append首次system。 |
+| 同一序列且支持in-history，非空文本改变 | 可以append新system更新，旧系统节点仍作为历史保留；不是本节replace示例。 |
+| 不支持in-history，或开始新请求序列，需要规范化 | 清空较晚的非空system节点，再按需replace首个system节点。 |
+| 当前策略比较发现文本相同且无需规范化 | 不写重复system事件。 |
+| 完整渲染变为空 | 清除生效的旧system文本，不能让旧指令继续残留。 |
+
+因此surfaceOp不是“Plan批准专用开关”；sourceEventSeqs也不是“Plan版本号”。Plan模式只决定渲染哪段规则，系统投影再决定消息视图如何更新。
+
+源码：[SurfaceOp、SurfaceIntent与来源字段限制](../../../../deepseek-harness/packages/core/session/src/types.ts)、[system更新的append/replace分支](../../../../deepseek-harness/packages/core/agent-loop/src/runtime-context.ts)、[工具结果append并引用callSeq](../../../../deepseek-harness/packages/core/agent-loop/src/tool-calls.ts)。
+
+---
+
 ## 先分清Session、Goal、Round、Turn、Step
 
 **Session是同一份会话记录；Turn是一次活动执行；Step是Turn内部一次模型步骤及其工具执行。Goal是跨执行保存的目标，Goal Round是驱动器为了推进该目标提交的一次自动工作。** 它们不是五层逐级包含的容器。
@@ -3053,6 +3475,85 @@ Turn1方案批准后，下一Step移除plan:policy，其后的工具调用仍保
 
 </details>
 工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+### 放大seq=30～36：批准、内存待退出和正式退出是三件事
+
+**本段衔接上面的Plan Turn2 / Step1与下面的Step2。** seq属于本页Plan示例会话，不是Todo或Goal会话的seq。用户批准决定“应该退出”；pendingIntents先把决定保存在当前进程；下一次被接受的pre-step才将active:false写入会话日志。这里没有发生turn/end。
+
+```mermaid
+sequenceDiagram
+    participant L as LLM
+    participant A as Agent Loop
+    participant T as exit_plan_mode工具
+    participant U as 用户评审界面
+    participant M as pendingIntents内存Map
+    participant P as Plan边界处理器
+    participant E as Eventlog与surface
+    L-->>A: 提交plan_mt_2工具调用与方案
+    A->>E: seq30 assistant/message，含方案
+    A->>E: seq31 tool/call，开始执行
+    A->>T: 执行exit_plan_mode
+    T->>U: userQuestions.ask展示完整方案
+    U-->>T: 用户选择Approve
+    T->>T: 校验确为批准且无自定义反馈
+    T->>M: set(session, active=false, narrate=false)
+    Note over T,M: 只是内存动作，没有seq<br/>已记录模式仍为active=true
+    T-->>A: 返回approved=true
+    A->>E: seq32 tool/result，渲染批准确认
+    A->>E: seq33 step/end，结束Step1
+    Note over A,E: Turn2仍在执行，没有turn/end
+    A->>P: 下一次agent/pre-step
+    P->>P: 等下游准入结果，确认未拒绝且未取消
+    P->>M: 读取待生效的active=false
+    P->>E: seq34 plan/mode，active=false
+    P->>M: 日志追加成功后delete(session)
+    Note over M,E: 此时正式退出，清理待退出选择
+    A->>E: seq35 step/start，开始Step2
+    A->>A: 渲染不含plan:policy的完整system
+    A->>E: seq36 system/message，本例replace旧节点
+    A->>L: Step2完整messages，方案仍在历史参数中
+```
+
+| 顺序 | 内容 | 属于eventlog吗 | 模式与内存各是什么 |
+| --- | --- | --- | --- |
+| seq=30 | assistant/message包含exit_plan_mode与完整方案。 | 是。 | 日志模式active=true。 |
+| seq=31 | tool/call登记plan_mt_2调用。 | 是。 | 等待用户评审，尚未退出。 |
+| 两条日志之间 | userQuestions.ask拿到用户Approve，工具检查选择。 | 用户交互与校验动作；本页不展开交互组件自己的记录。 | 不能凭空加一条plan/approved领域事件。 |
+| 两条日志之间 | pendingIntents.set(session, {active:false,narrate:false})。 | **不是，进程内Map写入，没有seq。** | 日志仍true，内存待生效目标是false。 |
+| seq=32 | tool/result保存批准确认文本。 | 是。 | 模型后续能看到批准结果，但模式尚待边界提交。 |
+| seq=33 | step/end结束Turn2 / Step1。 | 是。 | 不是turn/end，不会凭该事件自动退出。 |
+| seq=34之前 | 下一次pre-step取得accepted决策，检查signal与pending。 | 是运行时钩子处理，不另造pre-step日志。 | 读取内存待退出决定。 |
+| seq=34 | plan/mode写active:false。 | **是，这是正式记录模式改变的事件。** | 日志模式变为false。 |
+| seq=34之后 | pendingIntents.delete(session)。 | **不是，清理内存，没有seq。** | 待退出决定清除，避免重复提交。 |
+| seq=35 | step/start进入Turn2 / Step2。 | 是。 | 本步骤按退出后的模式组装。 |
+| seq=36 | system/message保存更新后的system与surface操作。 | 是。 | 本例移除规划规则，保留历史方案与批准结果。 |
+
+**工具结果文案里虽然已经写“plan mode exited”，实际模式的日志提交仍在seq=34。** 这是“先确认批准、登记退出，再在边界应用”的设计，不表示批准前就开始了方案执行，也不表示整个方案执行期间都处于Plan mode。同一批已提出的剩余工具调用仍沿用原Step的模式，下一Step才使用退出后的system。
+
+在原版代码里，中间的内存动作相当于：
+
+```ts
+// exit_plan_mode校验用户批准后：先登记待退出，不在这里append plan/mode。
+this.pendingIntents.set(agent.session, { active: false, narrate: false })
+return { approved: true }
+```
+
+边界处理相当于：
+
+```ts
+// 以下为onBoundary中的核心流程；pending与target来自当前会话的待生效选择。
+const pending = this.pendingIntents.get(session)
+if (pending === undefined) return
+const target = pending.active
+// 本例target=false、已记录值=true，因此走正式提交分支。
+session.append('plan/mode', { active: target })
+// 只在append成功后删除；写入失败时保留，供之后的合法边界重试。
+this.pendingIntents.delete(session)
+```
+
+这两段用于解释源码，不是让你在039教学Collaboration里直接粘贴；完整onBoundary还会跳过“目标值已经等于当前值”的重复变更。pre-step被拒绝、已取消或没有pending时不会按本路径写seq=34。待生效选择只在内存里，尚未提交前进程退出，不保证能恢复；不能说工具批准结果一落盘就保证退出选择也落盘。
+
+源码：[批准后pendingIntents.set与approved返回](../../../../deepseek-harness/packages/plan/plan-mode/src/index.ts)、同文件的agent/pre-step监听器与onBoundary；[Loop在准入后写step/start](../../../../deepseek-harness/packages/core/agent-loop/src/agent.ts)。
 
 #### Plan · Turn 2 / Step 2：第二次批准后退出规划，执行新方案
 
