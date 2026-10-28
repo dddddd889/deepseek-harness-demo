@@ -4064,6 +4064,98 @@ Plan每次批准都由真实的人类评审答案决定；本例固定选择批�
 
 目标允许2个自动Round；人类Turn1不消耗自动Round。Turn1结束后目标仍active、armed，驱动器在空闲且持久化/准入检查通过后发起Round1，这个Round在本例里就是Turn2。Turn2内部4个Step仍只计一个Round，直到工具成功标记complete才停止续行。
 
+#### 为什么模型没有工具调用了，Goal还会继续？
+
+**模型不再调用工具，只表示当前Turn可以结束；Goal是否完成，要看目标状态有没有被成功改成complete。Goal驱动器负责自动续行，不负责独立验收代码或测试。**
+
+```mermaid
+sequenceDiagram
+    participant L as LLM
+    participant A as Agent Loop
+    participant E as eventlog
+    participant G as Goal服务
+    participant D as Goal驱动器
+    L-->>A: 最终回答，没有tool_calls
+    A->>E: 追加assistant/message及Turn结束等记录
+    Note over A,E: turn/end的completed表示本Turn正常结束<br/>不会因此自动生成goal/change complete
+    A-->>D: agent/status变成idle
+    D->>G: 读取当前目标
+    G-->>D: phase为active，activation为armed
+    D->>D: 检查轮数、持久化和其他准入条件
+    alt 允许继续
+        D->>A: followup，提交新的goal_round消息
+        A->>E: 新Turn保存user/message，来源为goal
+        A->>L: 当前历史或摘要，加上新的续行指令
+        Note over L: 再判断当前进度，继续执行或补做目标收尾
+    else 条件不满足
+        Note over D: 不开启下一轮，按具体状态等待或停止
+    end
+```
+
+**具体例子：模型说了“还有测试没跑”，却没有调用测试工具。** 下面两份JSON分别是模型响应消息和Harness的Goal业务视图，不是同一层的数据。它们是说明行为的独立示例，不要当成后面多Turn例子中新增的实际事件。
+
+<details>
+<summary>展开模型提前收尾的响应消息（JSON）</summary>
+
+```json
+{
+  "role": "assistant",
+  "content": "登录模块迁移已完成，集成测试还需要进一步运行。",
+  "tool_calls": []
+}
+```
+
+</details>
+
+<details>
+<summary>展开此时仍未关闭的Goal状态（JSON）</summary>
+
+```json
+{
+  "goal": {
+    "id": "goal_mt",
+    "revision": 1,
+    "objective": "迁移登录模块并通过测试",
+    "phase": "active",
+    "roundsStarted": 1,
+    "maxGoalRounds": 2
+  },
+  "activation": "armed"
+}
+```
+
+</details>
+
+Loop不会从正文里的“还需要运行测试”自行推导出测试调用。它在正常响应中筛选工具块；没有工具调用时就返回本Turn正常结束，相关分支没有要求Goal必须已经完成：
+
+```ts
+// 从同一条assistant消息中取出模型要求执行的工具调用。
+const toolCalls = message.content.filter(block => block.type === 'tool-call')
+// completed表示本Turn正常结束，此处没有把Goal状态改成complete。
+if (toolCalls.length === 0) return { kind: 'completed' }
+```
+
+这是[原版Loop的相关分支](../../../../deepseek-harness/packages/core/agent-loop/src/agent.ts#L549)摘录，不是新增的运行文件。`turn/end.data.reason.kind="completed"`和`goal.phase="complete"`是两种不同状态，不能因为名字相似就当成同一个完成条件。
+
+**如果模型确实知道任务未完成，而且还有可以执行的工具，它应该继续调用工具；此时提前输出最终回答，是模型没有遵循持续执行要求，不是原版刻意要求把任务拆成很多Round。**
+
+| 本轮实际发生了什么 | Goal状态 | 后续行为 |
+| --- | --- | --- |
+| 模型继续调用编辑或测试工具 | active | 通常在当前Turn的后续Step继续，不需要开启新Round。 |
+| 模型完成验证，成功执行update_goal complete，再给最终回答 | complete | 本Turn结束后，不再自动续行；完成工具不必是本Turn最后一个事件。 |
+| 模型知道还有工作，却直接给最终回答 | active、armed | 属于提前收尾；驱动器在满足准入条件时再次提交续行提示。 |
+| 模型认为已经完成，但遗漏update_goal complete | active、armed | 再次提示可能让它补充验证和状态收尾；不代表驱动器发现了新的缺陷。 |
+| 模型调用了complete，但参数过期等原因导致工具失败 | 仍可能是active | 没有成功落成complete；后续取决于实际状态及准入条件，不能只看模型有没有发出过调用。 |
+| Goal已暂停、阻塞、关闭自动续行，或发生取消等停止条件 | 不满足自动续行条件 | 不会只因“没有调用complete”就不停续行。 |
+
+驱动器通过[agent/status的idle监听器](../../../../deepseek-harness/packages/goal/goal-round-driver/src/index.ts#L274)请求调度，再由[drive](../../../../deepseek-harness/packages/goal/goal-round-driver/src/index.ts#L145)读取Goal，检查active、armed、空闲、竞争输入、子Agent、持久化及轮数等条件。它不依赖模型先调用get_goal，也不会分析最终回答来判断测试是否通过。
+
+因此，“还没complete就继续”只能作为简写，准确说法是：**Goal仍active且armed，并满足其他调度条件时，才可能开启下一轮。** 达到自动轮数上限时，原版会将目标标记为round-limit阻塞，不会把次数耗尽当成目标完成。
+
+**下一轮不是已经获得了一份新的问题清单。** 驱动器只是根据保存的objective和轮次生成[goal_round指令](../../../../deepseek-harness/packages/goal/goal-round-driver/src/prompt.ts#L12)，作为新的user消息追加；system中的Goal规则不因此改成进度正文。模型仍需结合当前保留的历史或压缩摘要判断进度，必要时检查工作区和运行工具。
+
+自动续行可能促使模型继续工作，也可能只是补调完成工具，还可能重复检查而没有进展。原版没有用这次调度证明“上一轮一定没做完”，也不能保证下一轮一定能发现新问题。**理想情况下，模型在同一个Turn里持续执行，真正完成后成功标记Goal；多Round是额外的续行机制，不是完成任务必经的阶段。**
+
 #### Goal · Turn 1 / Step 1：人类请求创建持久目标
 
 **① 本阶段当前system全文：**
