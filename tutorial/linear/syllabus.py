@@ -174,7 +174,14 @@ add('把协作状态和反馈记录成独立事件', 'R05',
 add('附件先落盘，交付保留当时快照', 'R05', '交付一个文件后马上修改原文件，预测旧turn应该展示哪个内容。', '内容寻址、附件引用、下载授权与交付事实分开。文档转换必须调用真实转换器，不能换扩展名冒充PDF。', '交付快照仍为first；非法hash拒绝；改变原文件不改变已记录附件。', '断在save与session.append；把顺序颠倒会留下指向尚未持久化内容的事实。', '闭卷画出上传、持久化、用户消息、下载四个边界。', '篡改内容文件后read必须报完整性错误；超大上传在写入前拒绝。', 'attachment/document/deliverables；Office引擎、图片像素校验和逐turn修改diff仍未完全对齐。')
 
 
-add('把已有领域装成一个持久Host', 'R05', '创建两个会话，关闭一个，先证明另一个还在运行。', 'Host只装配已有Session/Journal/Agent/Tools/Guard，冷列表不创建Agent；恢复中断轮次标记UNKNOWN，不自动重做副作用。', '双会话owner隔离；关闭后恢复消息；读取列表不调用模型；最后无锁残留。', '断在open恢复判断和closeSession的finally；制造未结束turn后重启，观察interrupted。', '闭卷画出Host持有哪些对象，哪些对象持有文件句柄。', '一个会话进入审批时关闭它，另一个会话仍能继续。', 'Agent server与Session store装配；本工程日志仍是自有格式。')
+add('统一管理多个Agent会话，保存历史，并在重新打开时恢复', 'R05',
+    '打开两个会话，关闭其中一个，再打开它检查旧回复是否仍在。',
+    'Host是会话管理器，把Agent、工具、事件、日志和清理对象接起来；持久保存的是文件，运行对象在open时重新创建。',
+    '现有测试检查owner拒绝、同一Host内关闭再打开仍有历史，以及模拟写盘失败后的资源清理。',
+    '断在open读取Journal、放入loaded和closeSession清理的位置，观察当前会话对象和磁盘历史。',
+    '合上资料解释create、open、list、closeSession分别做什么。',
+    '正常关闭后新建Host，使用同一数据目录和会话id重新打开。',
+    '统一的会话管理入口；日志采用本教程自己的格式，恢复能力与原版仍有差距。')
 add('产品数据和秘密不混进对话', 'R06', '保存一把Key后调用list，检查响应能否找到明文。', 'Store、CredentialRef、Workspaces各有持久域。文件原子替换，凭据在宿主解析，客户端只得到configured描述。', 'Key不出现在list；重建对象仍能解析；工作区归档状态恢复。', '断在Credentials.list与resolve；把secret也返回list，安全断言立即失败。', '合上资料解释CredentialRef和明文Key分别在哪一层。', '删除Key后新请求失败，正在进行的请求仍使用已准备输入。', 'storage/settings/credentials/workspace；账号OAuth和访问控制还需后续完善。')
 add('外层共用领域控制器', 'R06', '让两个不同principal读取同一个sessionId，先让服务端拒绝越权。', 'Remote只映射方法到Host。订阅、提交、等待、取消、审批各有调用；断开订阅不暗中取消任务。该协议是本工程自己的，尚非原版Typert互操作。', 'prompt真实执行，收到事件与完成；陌生owner被RPC拒绝。', '断在session函数和Host.header；去掉owner检查，越权测试会失败。', '闭卷画出prompt响应、流通知、取消请求三条方向。', '断线后让任务完成，再按after游标重连读取剩余事件。', 'api controllers与Connection Remote职责；原版Typert codec/公共方法表是待对齐项。')
 add('Bun原生SDK驱动同一个Host进程', 'R06', '不用直接import Agent，启动一个子进程并通过RPC完成任务。', '高层SDK负责进程所有权、订阅、接收和等待，服务端仍用前一步控制器；EOF结束时Host清理会话。', '跨进程收到通知、结果与落盘事件；close后子进程被回收。', '断在spawn和session.wait；不要把宿主断点误设到SDK父进程。', '合上代码讲清stdout、stderr各放什么。', '让服务端提前退出，所有pending请求都应明确失败。', '原生sdk protocol/client/server的三层职责；当前自有协议不是原版兼容声明。')

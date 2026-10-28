@@ -1,26 +1,27 @@
 {
-  "scenario": "同一个宿主同时打开Alice和Bob的会话，Alice不能读取Bob历史；关闭一个会话不应关闭另一个，重新打开要从磁盘恢复，写盘失败时仍尽量清理全部资源。",
-  "flow": "Host.create写header → Host.open校验owner → Journal恢复Events → 修复未结束turn → new Scope/Tools/Settings/LocalFS/Approvals/Agent → fileTools与guard/batch装配 → submit/idle → closeSession清理Agent/Scope/Journal",
-  "try": "写完src/host.mjs和两项测试再运行 bun test ./tests/041-host.test.mjs。第一项创建a/b两会话，a回复后关闭再打开，检查助手事实仍在；第二项故意把persist改成抛disk full，验证host.close报告AggregateError同时两个scope清理计数均执行。默认OfflineModel不访问DeepSeek。",
-  "why": "Host是把前面模块组装为产品会话的入口，不是第二套Agent Loop。header用于列表和owner/cwd等元数据，events.jsonl才是会话事实；恢复中工具结果不确定时记录interrupted，不自动重放副作用。",
-  "accept": "测试应2项通过：双会话隔离与恢复、持久化失败仍清理。通过只证明这些装配路径，不证明原版V4日志、完整迁移、所有领域工具或跨进程锁已实现。",
-  "debug": "在src/host.mjs的new Journal、fileTools(...)、this.loaded.set与closeSession各清理try处打断点。创建a/b后看loaded.size=2；关闭a后=1；open恢复时检查journal.records包含message/assistant而model不会自动再请求。故障测试F10经过各catch，看errors积累但仍继续scope.close与journal.close，最后loaded.size=0。",
-  "recall": "闭卷画出header.json与events.jsonl的职责，写出关闭会话为什么不能只从loaded Map删除；说明恢复未完成工具为何不能盲目重试。",
-  "transfer": "安全练习：在测试临时home里更新title再冷列表，确认不产生新模型请求；不要直接修改真实学习者历史。原版V4格式迁移需单独实现，本章repair一个turn/end不是完整恢复系统。",
-  "wiring": "041首次把文件工具、批处理、权限与Agent/Journal真正统一装进Host。后续043～048的Remote/SDK/Web/ACP继续调用它，051再附加部分能力；没有装配过的helper不会因Host存在自动启用。",
+  "scenario": "你同时打开Alice和Bob两个会话。给Alice发消息后关闭她的会话，Bob的会话仍留在管理器中；重新打开Alice的会话，还能看到保存过的回复。Host就是统一负责这些创建、列出、打开和关闭操作的会话管理器。",
+  "flow": "Host.create创建会话目录并写header.json → Host.open核对owner，已打开就复用 → Journal读取events.jsonl恢复历史 → 为这份会话创建Agent、工具、审批和资源清理对象 → agent.submit提交任务并持续写日志 → closeSession关闭运行对象但保留文件 → 下次open从文件重新创建会话对象",
+  "try": "先按本章完整代码创建src/host.mjs和tests/041-host.test.mjs，再运行bun test ./tests/041-host.test.mjs。测试使用a/b表示两个会话所属者：关闭a后检查只剩b，重开a后检查旧回复仍在；第二项模拟写盘失败，检查两个会话仍尝试清理资源。随后执行下方的小演示，亲眼看关闭、重新打开和新建管理器后的输出。默认OfflineModel只生成离线回复，不请求DeepSeek。",
+  "why": "Host把前面实现的Agent、事件记录、日志文件、工具、权限和资源清理接成统一的会话入口。header.json保存所属者、标题、工作目录等信息；events.jsonl保存对话和执行事件。持久保存的是这些文件，Host、Agent、Scope等对象在关闭后释放，重新打开时再创建；open不会自动请求模型，也不会自动继续上次的工具。",
+  "accept": "现有两项测试通过：不匹配的owner被拒绝；在同一个Host里关闭再打开会话，仍能读取旧助手消息；模拟persist抛出disk full后，仍尝试清理两个会话的Scope，清空loaded并汇总错误。下方额外演示还应打印关闭前2、关闭Alice后1、Bob继续工作后的回复、重新打开和新建管理器后相同的Alice旧回复。它不代表强杀进程恢复、完整工具结果补齐或原版日志兼容已经实现。",
+  "debug": "VS Code打开自己的PROJECT，使用Bun：当前测试运行tests/041-host.test.mjs。在src/host.mjs的this.header、new Journal、if (this.loaded.has(sessionId))、this.loaded.set和closeSession里的各个try处设断点。停在测试帧时看host.loaded.size由2变1；停在open方法里看sessionId、owner、journal.records和新建的agent。原测试用a/b，演示命令用alice/bob。恢复历史后不会自动进入OfflineModel.stream，下一次submit才会触发。故障测试F10经过每个catch，观察errors积累后仍执行Scope与Journal清理，最后loaded.size为0。",
+  "recall": "合上资料，讲出Host的create、open、list、closeSession各负责什么；画出内存对象和磁盘文件两部分；解释为什么删除loaded条目不等于清理资源，以及为什么恢复历史不等于自动继续任务。",
+  "transfer": "在测试临时home里修改会话title，再调用list查看，确认只改变header.json而不请求模型。把程序正常关闭后重新创建Host并传入同一个home，按保存的sessionId打开旧会话；只使用自己的演示目录，不直接处理真实历史的崩溃锁。",
+  "wiring": "本章把文件工具、批处理、权限审批、Agent和Journal接进同一个会话管理器。open返回record，其中agent负责执行、session提供事件、scope清理资源、journal管理日志。后续043～049的控制接口、SDK、ACP和Web使用这个入口，051再增加部分工具；前面写过但未在open中注册的能力不会自动启用。",
   "implemented": [
-    "持久会话header与事件日志",
-    "owner校验、冷列表与分页参数",
-    "Agent/文件工具/权限/批处理组合",
-    "未结束turn中断标记",
-    "分会话关闭及失败后继续清理"
+    "每个会话保存header.json和events.jsonl",
+    "通过Host方法核对owner，按所属者列出会话并分页",
+    "为每个打开的会话组装Agent、文件工具、权限审批和批处理",
+    "发现上次Turn未结束时，补一个interrupted结束标记",
+    "关闭单个或全部会话；某项清理失败后仍尝试其他清理"
   ],
   "missing": [
-    "原版Agent/Session/Loader/持久化/投影控制器分层，含当前V4结构和历史迁移；本章单Host不兼容原版日志。",
-    "原版冷列表用投影缓存与专门激活策略；教程扫描header文件且未有跨进程占用控制。",
-    "原版插件profile、模型目录、媒体、工具所有权等由组合系统提供；Host当前只默认装文件能力与离线模型。"
+    "本章使用自己的header.json与format=1事件，不兼容原版当前V4日志及历史迁移；原版Agent、Session、Loader、持久化和投影控制器也不是本章这一个Host类。",
+    "本章列表扫描header文件；Journal已有wx独占锁文件，但没有完整处理崩溃遗留锁、并发激活和跨进程协调。关闭再打开测试不是强杀崩溃恢复测试。",
+    "owner是Host调用参数与header字段的匹配检查，不是登录认证、文件系统沙箱或进程隔离。两个会话可以使用相同cwd；本章默认只注册文件工具等明确列出的能力，未接入完整插件、模型目录和媒体能力。",
+    "open仅恢复事件并重建运行对象，Settings重新从默认permission=ask开始；不会恢复所有临时内存状态，也没有实现原版缺失tool/result的补齐和副作用核查。"
   ],
-  "testEvidence": "041-host.test.mjs真实读写临时home并运行OfflineModel Agent；第二项通过抛disk full验证实际清理控制流，不涉及收费模型或原版日志兼容。",
+  "testEvidence": "041-host.test.mjs使用临时目录真实写入日志和运行离线Agent。第一项在同一个Host对象中关闭后重开，检查助手消息和owner拒绝；第二项把persist替换成抛出disk full的函数，检查失败后仍清理两个Scope。没有实际写满磁盘，也没有启动新进程或强杀进程。下方演示补充展示Bob继续提交任务及正常关闭后新建Host读取旧日志。",
   "sources": [
     "packages/core/agent/README.zh.md",
     "packages/core/session/README.zh.md",
@@ -28,5 +29,5 @@
     "packages/session/session-persistence-jsonl/README.zh.md",
     "packages/session/session-projection-cache/README.zh.md"
   ],
-  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant H as Host\n    participant D as header 与 Journal 磁盘\n    participant E as 会话 Events\n    participant A as Agent 与工具能力\n    C->>H: create(cwd, owner) 或 open(id, owner)\n    opt 新建会话\n        H->>D: 写入 header.json\n    end\n    H->>D: 读取 header\n    D-->>H: header\n    H->>H: 校验 owner\n    alt 会话已加载\n        H-->>C: 返回同一 record\n    else 首次加载\n        H->>D: Journal 恢复完整日志\n        D-->>H: 已恢复 records\n        H->>E: 恢复 records，连接 persist 到 journal.append\n        opt 最后一个 turn 尚未结束\n            H->>E: append interrupted，不自动重做工具\n        end\n        H->>A: 创建 Scope、Settings、LocalFS、Tools\n        H->>A: 注册文件工具，安装 batch\n        H->>A: 创建 Approvals 并安装 permissionGuard\n        H->>A: 创建共享上述能力的 Agent\n        H-->>C: 保存 loaded 并返回 record\n    end\n    C->>A: agent.submit(text)，然后 await idle()\n    A->>E: 追加回合、消息、工具和审批事件\n    E->>D: journal.append，先持久化\n    D-->>E: 落盘完成\n    E->>E: records.push，再通知订阅者\n    A-->>C: idle 完成\n    C->>H: closeSession(id, owner)\n    H->>A: await Agent.close，再 await Scope.close\n    A-->>H: 活动与资源清理完成（收集错误后继续）\n    H->>D: Journal.close\n    H->>H: loaded.delete；最后汇总错误\n    Note over H,A: 外层 SDK 和界面共用此 Host；未装配的 helper 不会自动启用"
+  "sequence": "sequenceDiagram\n    participant C as 调用方或测试\n    participant H as Host会话管理器\n    participant D as 磁盘文件\n    participant E as Events事件记录\n    participant A as 本会话Agent和工具\n    C->>H: create(cwd, owner) 或 open(id, owner)\n    opt 创建新会话\n        H->>D: 创建目录，写入header.json\n    end\n    H->>D: 读取header.json\n    D-->>H: 所属者、工作目录、标题等\n    H->>H: 核对传入owner\n    alt 这个会话已在loaded中\n        H-->>C: 返回已有record\n    else 尚未打开\n        H->>D: Journal读取events.jsonl并取得日志锁\n        D-->>H: 已保存的历史事件\n        H->>E: 恢复历史，把新事件保存连接到Journal\n        opt 上次Turn没有结束\n            H->>E: 追加interrupted结束标记，不重做工具\n        end\n        H->>A: 创建Scope、Tools、Settings、LocalFS\n        H->>A: 注册文件工具、批处理、审批与权限检查\n        H->>A: 创建本会话Agent\n        H-->>C: 把record放入loaded并返回\n    end\n    Note over H,A: open只恢复对象和历史，不会自动请求模型\n    C->>A: agent.submit(text)，再等待idle()\n    A->>E: 记录消息和执行事件\n    E->>D: Journal写入并fsync\n    D-->>E: 保存成功\n    E->>E: 更新内存记录，通知订阅者\n    A-->>C: 本轮空闲\n    C->>H: closeSession(id, owner)\n    H->>A: 停止Agent，清理Scope\n    H->>D: 关闭Journal，释放日志锁\n    H->>H: 从loaded移除运行对象，保留历史文件\n    Note over H,D: 其他会话仍保留；清理出错也继续尝试其他资源"
 }
