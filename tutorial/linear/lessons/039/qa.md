@@ -2,6 +2,7501 @@
 
 返回主文：[039 · 把协作状态和反馈记录成独立事件](../039.md)。
 
+## 先分清Session、Goal、Round、Turn、Step
+
+**Session是同一份会话记录；Turn是一次活动执行；Step是Turn内部一次模型步骤及其工具执行。Goal是跨执行保存的目标，Goal Round是驱动器为了推进该目标提交的一次自动工作。** 它们不是五层逐级包含的容器。
+
+### 关系图：哪些是包含，哪些是驱动
+
+```mermaid
+flowchart TD
+    S["Session：同一会话的历史与surface"] --> T1["人类触发Turn 1"]
+    S --> T2["驱动器触发Turn 2"]
+    S -. "会话日志记录目标状态" .-> G["当前Goal：迁移登录并通过测试"]
+    G -. "active且armed且额度足够" .-> D["Goal Round驱动器"]
+    D -. "提交Round 1任务" .-> T2
+    T1 --> A["Step 1：创建Goal"]
+    T1 --> B["Step 2：修改代码"]
+    T1 --> C["Step 3：汇报未完成并结束Turn"]
+    T2 --> E["Step 1：测试"]
+    T2 --> F["Step 2：get_goal"]
+    T2 --> H["Step 3：update_goal complete"]
+    T2 --> I["Step 4：汇报并结束Turn"]
+```
+
+实线表示本例的记录归属与执行组成；虚线表示驱动关系。Goal可以覆盖多个Turn，但一个人类Turn不一定属于自动Goal Round。驱动器也不创建新Session或新Agent；本例继续使用原会话历史。
+
+| 名字 | 在代码中是什么 | 对应边界或判断 |
+| --- | --- | --- |
+| Session | Session对象，拥有事件记录与消息surface。 | append记录事实，deriveMessages读取当前模型历史；一个Turn结束不清空它。 |
+| Goal | 当前目标的持久状态及版本，GoalService提供操作。 | create/edit/pause/resume/complete/block/clear；每会话最多一个当前Goal。 |
+| Goal Round | 驱动器提交并准入的一次自动目标推进输入，携带goalId、revision、round来源。 | 只有准入的Goal user/message才计数；人类Turn不消耗自动Round额度。 |
+| Turn | Agent Loop的一次活动执行，可以含多个Step。 | turn/start开启，turn/end关闭；正常无工具回答、取消、错误等都可能结束。 |
+| Step | Turn内进入的一次模型步骤，以及这次响应对应的工具执行。 | step/start和step/end；本页无重试，所以每Step对应一次LLM请求。 |
+
+一个Step可以有多个工具调用，不能按tool/call数量计算Step。真实提供方重试可能在一个Step内多次尝试请求，本页固定成功示例不展开这条支路。也不是调用一次Agent.followup就立即算一个Round：先排队、后准入，陈旧或被拒绝的输入不应消耗额度。
+
+### 对照已有例子：6个Turn怎么分
+
+下面表格中的三个Session是三组彼此独立的说明会话，不是把Todo Turn1、Plan Turn1、Goal Turn1拼成同一Session。
+
+| 本页完整轨迹 | Session | Turn触发者 | Goal Round编号 | 本Turn里的Step |
+| --- | --- | --- | --- | --- |
+| Todo Turn1 | Todo示例会话 | 人类：修复会话校验。 | 无；本组没有创建Goal。 | 1建Todo→2修改→3更新Todo→4汇报。 |
+| Todo Turn2 | 同一个Todo示例会话 | 人类：补充回归测试。 | 无。 | 1新Todo→2测试→3更新Todo→4汇报。 |
+| Plan Turn1 | Plan示例会话 | 宿主激活规划后，人类提交登录任务。 | 无；Plan不是Goal Round。 | 1方案与批准→2修改→3测试→4汇报。 |
+| Plan Turn2 | 同一个Plan示例会话 | 再次激活规划后，人类提交新需求。 | 无。 | 1新方案与批准→2新测试→3汇报。 |
+| Goal Turn1 | Goal示例会话 | 人类：持续迁移登录。 | 无；这一Turn创建Goal，但不是自动Round。 | 1create_goal→2修改→3汇报部分进展。 |
+| Goal Turn2 | 同一个Goal示例会话 | Goal驱动器准入自动任务。 | **Round 1/2**，不是Round 2。 | 1测试→2get_goal→3标记complete→4汇报。 |
+
+这里“Round 1/2”的2是允许的自动Round上限，不是Turn编号，也不是已经执行的Round数量。本例只执行一个自动Round就完成了目标，因此没有发生Round 2，更没有额外Turn3。
+
+### UML：人类Turn结束后，Goal怎样开启另一个Turn
+
+```mermaid
+sequenceDiagram
+    participant U as 人类
+    participant A as 同一个Agent Loop
+    participant G as Goal服务
+    participant D as Goal Round驱动器
+    participant S as 同一个Session
+    participant L as LLM与工具
+    U->>A: 提交持续目标
+    A->>S: turn/start，turn为1
+    loop Turn 1的Step 1到3
+        A->>S: step/start
+        A->>L: 本Step完整messages
+        L-->>A: 工具调用及结果，或汇报正文
+        opt Step 1执行create_goal
+            A->>G: 创建active且armed目标
+            G->>S: goal/change
+        end
+        A->>S: assistant及tool消息，step/end
+    end
+    A->>S: turn/end，turn为1
+    Note over A,G: 当前活动结束，Goal仍未完成
+    D->>A: 检查Agent与受管后代已空闲
+    D->>G: 检查当前修订、active、armed与额度
+    G-->>D: 可以继续
+    D->>A: followup排入Goal Round 1输入
+    A->>S: turn/start，turn为2
+    A->>S: 准入user/message，source为Goal Round 1
+    loop Turn 2的Step 1到4
+        A->>L: 原历史加本轮目标和后续工具结果
+        L-->>A: 测试、读取目标、标记完成或汇报
+        opt Step 3完成目标
+            A->>G: update_goal action为complete
+            G->>S: goal/change，phase为complete
+        end
+    end
+    A->>S: turn/end，turn为2
+    D->>G: 再检查，目标已complete
+    Note over D,G: 不再提交Round 2
+```
+
+图只概括阶段；system和user准入与step/start的详细先后，以后面各Step的eventlog为准。驱动器实际还有持久化检查与竞争输入防护，不是看到turn/end就无条件继续。
+
+### 两个“完成”一定分开看
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
+```json
+{
+  "turnFinishedButGoalNotFinished": {
+    "event": { "type": "turn/end", "data": { "turn": 1, "reason": { "kind": "completed" } } },
+    "currentGoalPhase": "active",
+    "automaticRoundsStarted": 0,
+    "meaning": "人类Turn正常结束，长期目标还需要自动推进。"
+  },
+  "goalFinishedDuringNextTurn": {
+    "goalPhase": "complete",
+    "automaticRoundsStarted": 1,
+    "turn": 2,
+    "step": 3,
+    "meaning": "目标工具已标记完成，Turn还要到Step4汇报后才结束。"
+  }
+}
+```
+
+</details>
+
+这份JSON是关系对照，不是实际事件协议：只有event字段摘自Turn事件形状，其余是阅读辅助字段。模型在正文说“本轮做完了”不会自动改变Goal phase；原版没有独立评估器，Goal工具的完成操作仍要由调用方按证据提出。
+
+### 代码从哪里读：先找边界，再看数据
+
+下列相对链接从本QA指向本地原版源码；行号是本次核对位置，用于快速查找，之后源码变动时应以函数名为准。
+
+| 想确认什么 | 代码位置与阅读点 |
+| --- | --- |
+| Session保存与派生消息 | [core/session/src/index.ts](../../../../deepseek-harness/packages/core/session/src/index.ts)：Session类约522行，deriveMessages约984行。 |
+| Turn和Step事件结构 | [core/session/src/types.ts](../../../../deepseek-harness/packages/core/session/src/types.ts)：约289～302行的turn/start、turn/end、step/start、step/end。 |
+| 谁开启Turn、递增Step、决定继续 | [core/agent-loop/src/agent.ts](../../../../deepseek-harness/packages/core/agent-loop/src/agent.ts)：turn()约298行，step/start约331行，finally中的turn/end约387行。 |
+| Step内组装请求、模型响应、执行工具 | [core/agent-loop/src/agent.ts](../../../../deepseek-harness/packages/core/agent-loop/src/agent.ts)：step()约400行，buildRequest约442行，assistant/message约539行，工具调用分支在它之后。 |
+| 每次工具调用如何记录 | [core/agent-loop/src/tool-calls.ts](../../../../deepseek-harness/packages/core/agent-loop/src/tool-calls.ts)：appendToolCall约263行，appendToolResult约269行；它们在Step内，不自行开启Turn。 |
+| Goal状态由谁拥有 | [goal/goal/src/index.ts](../../../../deepseek-harness/packages/goal/goal/src/index.ts)：GoalService约240行，create约303行，resume约364行。 |
+| 谁提交下一Round | [goal/goal-round-driver/src/index.ts](../../../../deepseek-harness/packages/goal/goal-round-driver/src/index.ts)：约182行额度检查，190行计算roundsStarted+1，208行followup，后续pre-step/会话事件监听做准入验证。 |
+| Round具体输入和来源长什么样 | [goal/goal-round-driver/src/prompt.ts](../../../../deepseek-harness/packages/goal/goal-round-driver/src/prompt.ts)：renderGoalRoundPrompt生成完整user正文；[goal/goal/src/domain.ts](../../../../deepseek-harness/packages/goal/goal/src/domain.ts)：GoalMessageSource包含goalId、revision、round。 |
+| 新Turn为什么Todo清空但历史还在 | [todo/tool-todo/src/index.ts](../../../../deepseek-harness/packages/todo/tool-todo/src/index.ts)：约119～130行todos投影在turn/start返回null，旧todo/write和assistant历史不因此删除。 |
+
+读本页Goal完整轨迹时，先看Goal Turn1 / Step3的turn/end，再跳到Goal Turn2 / Step1的turn/start与source.round=1；最后对照Turn2 / Step3的goal/change和Step4的turn/end。把这四处找出来，就能区分目标状态、自动轮次和活动执行边界。
+
+---
+
+## 从Turn开始到Turn结束：三组完整流转
+
+**每组是独立会话，连续跨两个Turn；每个阶段按①system→②请求前新增日志→③完整messages→④响应和工具后的新增日志→⑤状态前后阅读。** 同一文本会重复出现，目的是让每次请求能独立核对，不再用消息池或编号代替内容。
+
+以下是根据本地原版源码构造的说明轨迹，未运行模型或业务工具。消息数组是这份简化会话的完整数组；read_demo、edit_demo、run_tests_demo是虚构工具，响应固定成功，system中文规则是教学配置。Native工具schema与模型参数在messages之外，本例无压缩、无运行时context、无取消、无重试、无流式思考回放。
+
+eventlog中的seq是**这份说明轨迹自己连续编号**，保留消息和领域、Turn/Step事件；为了不编造provider协议，省略request/header、request/context、inbox/command生命周期、消息id/source中与本题无关的字段、assistant.stream/usage等。因此它不是可直接导入的完整原版日志。seq和surface引用只在本例内有效，不能和下方旧例子的seq混用。Plan以宿主模式入口进入，不假设发生过/plan命令，因此不虚构command/run/done。Goal Round只在输入被准入时记录user/message，不因排队就虚增Round。
+
+系统变化统一选择非in-history分支：首次append，后来用带sourceEventSeqs的replace更新当前system节点；相同文本不重复提交system事件。旧system事件保存在日志，完整messages只使用当前surface有效文本。Goal的armed/disarmed是进程内状态，不另写一条同名持久事件。
+
+| 本节阶段 | Turn / Step | 会发生什么 |
+| --- | --- | --- |
+| Todo | Turn1的4个Step，Turn2的4个Step | 修复并记录完成→用户补充回归任务→新Todo→测试→再完成。 |
+| Plan | Turn1的4个Step，Turn2的3个Step | 进入规划→批准→修改/测试→新Turn再次规划→批准→新增测试。 |
+| Goal | 人类Turn1的3个Step，自动Round所在Turn2的4个Step | 创建目标→迁移修改→结束当前Turn但目标未完成→自动Round测试→读取目标→标记完成。 |
+
+### 总时序：工具循环和Turn边界在哪里
+
+```mermaid
+sequenceDiagram
+    participant U as 人类或Goal驱动器
+    participant A as Agent Loop
+    participant P as SystemPrompt与surface
+    participant E as Eventlog
+    participant L as LLM
+    participant T as 工具与领域服务
+    U->>A: 提交本Turn输入
+    A->>E: turn/start
+    loop 同一Turn的多个Step
+        A->>E: step/start
+        A->>P: 组装并渲染当前system
+        opt system首次出现或发生变化
+            P->>E: system/message及surface操作
+        end
+        A->>E: 首Step准入user/message
+        A->>L: 当前有效system和完整保留历史
+        L-->>A: assistant正文或工具调用
+        A->>E: assistant/message
+        opt 有工具调用
+            A->>E: tool/call
+            A->>T: 执行
+            T->>E: 必要的todo/write等领域事件
+            T-->>A: 工具结果
+            A->>E: tool/result
+        end
+        A->>E: step/end
+    end
+    A->>E: 无工具且正常结束时turn/end
+    U->>A: 下一条人类输入或合法Goal Round
+    A->>E: 新turn/start，保留已有历史
+```
+
+图中的user/message仅在输入实际准入时追加，不是每个Step重复追加；step/start、system/message与准入的具体顺序以各阶段下面的事件数组为准。这里只画正常路径。
+
+### A．Todo：两次人类输入，两个Turn，8次模型请求
+
+Turn1先修复；用户在Turn1结束后追加“再跑回归测试”，进入Turn2。**新turn/start会让当前todos投影变null，但历史里的旧Todo调用仍保留。** 下面在Turn2第1步的状态beforeRequest能直接看到这个差别。
+
+#### Todo · Turn 1 / Step 1：用户任务进入，模型创建第一份Todo
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 0,
+    "type": "turn/start",
+    "data": {
+      "turn": 1
+    }
+  },
+  {
+    "seq": 1,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 1
+    }
+  },
+  {
+    "seq": 2,
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 3,
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "修复登录的会话校验。"
+        }
+      ]
+    },
+    "surfaceOp": "append"
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 4,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "todo_mt_1",
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 5,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "todo_mt_1",
+      "name": "todo_write",
+      "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+    }
+  },
+  {
+    "seq": 6,
+    "type": "todo/write",
+    "data": {
+      "todos": [
+        {
+          "content": "修复登录",
+          "status": "in_progress"
+        }
+      ]
+    }
+  },
+  {
+    "seq": 7,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+          }
+        ],
+        "toolCallId": "todo_mt_1",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      5
+    ]
+  },
+  {
+    "seq": 8,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 1
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": null
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "修复登录",
+        "status": "in_progress"
+      }
+    ]
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Todo · Turn 1 / Step 2：保留Todo，调用编辑工具
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 9,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_1",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 10,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "edit_todo_mt",
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 11,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "callId": "edit_todo_mt",
+      "name": "edit_demo",
+      "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+    }
+  },
+  {
+    "seq": 12,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "login.ts会话校验修改成功"
+          }
+        ],
+        "toolCallId": "edit_todo_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      11
+    ]
+  },
+  {
+    "seq": 13,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": [
+      {
+        "content": "修复登录",
+        "status": "in_progress"
+      }
+    ]
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "修复登录",
+        "status": "in_progress"
+      }
+    ]
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Todo · Turn 1 / Step 3：读取修改成功证据，更新完整Todo
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 14,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_1",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_todo_mt",
+      "content": "login.ts会话校验修改成功"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 15,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "todo_mt_2",
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"}]}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 16,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "callId": "todo_mt_2",
+      "name": "todo_write",
+      "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"}]}"
+    }
+  },
+  {
+    "seq": 17,
+    "type": "todo/write",
+    "data": {
+      "todos": [
+        {
+          "content": "修复登录",
+          "status": "completed"
+        }
+      ]
+    }
+  },
+  {
+    "seq": 18,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+          }
+        ],
+        "toolCallId": "todo_mt_2",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      16
+    ]
+  },
+  {
+    "seq": 19,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": [
+      {
+        "content": "修复登录",
+        "status": "in_progress"
+      }
+    ]
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "修复登录",
+        "status": "completed"
+      }
+    ]
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Todo · Turn 1 / Step 4：工具结果已回填，汇报并结束Turn1
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 20,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 4
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_1",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_todo_mt",
+      "content": "login.ts会话校验修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_2",
+      "content": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 21,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 4,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "会话校验已修改。当前事项记录为完成，尚未执行回归测试。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 22,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 4
+    }
+  },
+  {
+    "seq": 23,
+    "type": "turn/end",
+    "data": {
+      "turn": 1,
+      "reason": {
+        "kind": "completed"
+      }
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": [
+      {
+        "content": "修复登录",
+        "status": "completed"
+      }
+    ]
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "修复登录",
+        "status": "completed"
+      }
+    ]
+  }
+}
+```
+
+</details>
+本次assistant没有工具调用，Turn在这里结束；这不删除历史，也不自动代表Goal完成。下一阶段如果开始新Turn，会明确写出新的turn/start。
+
+#### Todo · Turn 2 / Step 1：新Turn清空Todo投影，用户新增测试任务
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 24,
+    "type": "turn/start",
+    "data": {
+      "turn": 2
+    }
+  },
+  {
+    "seq": 25,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 1
+    }
+  },
+  {
+    "seq": 26,
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "再运行登录回归测试。"
+        }
+      ]
+    },
+    "surfaceOp": "append"
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_1",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_todo_mt",
+      "content": "login.ts会话校验修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_2",
+      "content": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+    },
+    {
+      "role": "assistant",
+      "content": "会话校验已修改。当前事项记录为完成，尚未执行回归测试。"
+    },
+    {
+      "role": "user",
+      "content": "再运行登录回归测试。"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 27,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "todo_mt_3",
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"in_progress\"}]}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 28,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "callId": "todo_mt_3",
+      "name": "todo_write",
+      "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"in_progress\"}]}"
+    }
+  },
+  {
+    "seq": 29,
+    "type": "todo/write",
+    "data": {
+      "todos": [
+        {
+          "content": "运行登录回归测试",
+          "status": "in_progress"
+        }
+      ]
+    }
+  },
+  {
+    "seq": 30,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+          }
+        ],
+        "toolCallId": "todo_mt_3",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      28
+    ]
+  },
+  {
+    "seq": 31,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 1
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": null
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "运行登录回归测试",
+        "status": "in_progress"
+      }
+    ]
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Todo · Turn 2 / Step 2：根据新Todo调用测试
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 32,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_1",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_todo_mt",
+      "content": "login.ts会话校验修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_2",
+      "content": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+    },
+    {
+      "role": "assistant",
+      "content": "会话校验已修改。当前事项记录为完成，尚未执行回归测试。"
+    },
+    {
+      "role": "user",
+      "content": "再运行登录回归测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_3",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_3",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 33,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "tests_todo_mt",
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login-regression\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 34,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "callId": "tests_todo_mt",
+      "name": "run_tests_demo",
+      "arguments": "{\"suite\":\"login-regression\"}"
+    }
+  },
+  {
+    "seq": 35,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "登录回归测试通过"
+          }
+        ],
+        "toolCallId": "tests_todo_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      34
+    ]
+  },
+  {
+    "seq": 36,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": [
+      {
+        "content": "运行登录回归测试",
+        "status": "in_progress"
+      }
+    ]
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "运行登录回归测试",
+        "status": "in_progress"
+      }
+    ]
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Todo · Turn 2 / Step 3：拿到通过结果，更新第二份任务表
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 37,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_1",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_todo_mt",
+      "content": "login.ts会话校验修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_2",
+      "content": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+    },
+    {
+      "role": "assistant",
+      "content": "会话校验已修改。当前事项记录为完成，尚未执行回归测试。"
+    },
+    {
+      "role": "user",
+      "content": "再运行登录回归测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_3",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_3",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login-regression\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_todo_mt",
+      "content": "登录回归测试通过"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 38,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "todo_mt_4",
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"completed\"}]}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 39,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "callId": "todo_mt_4",
+      "name": "todo_write",
+      "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"completed\"}]}"
+    }
+  },
+  {
+    "seq": 40,
+    "type": "todo/write",
+    "data": {
+      "todos": [
+        {
+          "content": "运行登录回归测试",
+          "status": "completed"
+        }
+      ]
+    }
+  },
+  {
+    "seq": 41,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+          }
+        ],
+        "toolCallId": "todo_mt_4",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      39
+    ]
+  },
+  {
+    "seq": 42,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": [
+      {
+        "content": "运行登录回归测试",
+        "status": "in_progress"
+      }
+    ]
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "运行登录回归测试",
+        "status": "completed"
+      }
+    ]
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Todo · Turn 2 / Step 4：汇报测试证据并结束Turn2
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 43,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 4
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录的会话校验。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_1",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_todo_mt",
+      "content": "login.ts会话校验修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_2",
+      "content": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+    },
+    {
+      "role": "assistant",
+      "content": "会话校验已修改。当前事项记录为完成，尚未执行回归测试。"
+    },
+    {
+      "role": "user",
+      "content": "再运行登录回归测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_3",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_3",
+      "content": "Updated todo list: 0 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_todo_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login-regression\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_todo_mt",
+      "content": "登录回归测试通过"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_mt_4",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"运行登录回归测试\",\"status\":\"completed\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_mt_4",
+      "content": "Updated todo list: 0 pending, 0 in progress, 1 completed."
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 44,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 4,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "登录回归测试通过，当前清单的测试事项已记录完成。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 45,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 4
+    }
+  },
+  {
+    "seq": 46,
+    "type": "turn/end",
+    "data": {
+      "turn": 2,
+      "reason": {
+        "kind": "completed"
+      }
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "todosProjection": [
+      {
+        "content": "运行登录回归测试",
+        "status": "completed"
+      }
+    ]
+  },
+  "afterResponseAndTools": {
+    "todosProjection": [
+      {
+        "content": "运行登录回归测试",
+        "status": "completed"
+      }
+    ]
+  }
+}
+```
+
+</details>
+本次assistant没有工具调用，Turn在这里结束；这不删除历史，也不自动代表Goal完成。下一阶段如果开始新Turn，会明确写出新的turn/start。
+
+### B．Plan：首次方案执行结束，再新建一个规划Turn
+
+Turn1方案批准后，下一Step移除plan:policy，其后的工具调用仍保留方案。Turn2由宿主再次选择Plan模式并提交人类的新需求，system重新加入同一条规划引导；这不是旧方案自动重新启用规划模式。
+
+#### Plan · Turn 1 / Step 1：宿主激活规划，模型提交方案
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 0,
+    "type": "turn/start",
+    "data": {
+      "turn": 1
+    }
+  },
+  {
+    "seq": 1,
+    "type": "plan/mode",
+    "data": {
+      "active": true
+    }
+  },
+  {
+    "seq": 2,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 1
+    }
+  },
+  {
+    "seq": 3,
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 4,
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "先规划登录修复，批准后执行。"
+        }
+      ]
+    },
+    "surfaceOp": "append"
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，批准后执行。"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 5,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "plan_mt_1",
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 6,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "plan_mt_1",
+      "name": "exit_plan_mode",
+      "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+    }
+  },
+  {
+    "seq": 7,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+          }
+        ],
+        "toolCallId": "plan_mt_1",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      6
+    ]
+  },
+  {
+    "seq": 8,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 1
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "planProjection": {
+      "active": true,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  },
+  "afterResponseAndTools": {
+    "planProjection": {
+      "active": true,
+      "pending": false
+    },
+    "controllerPendingTarget": false
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Plan · Turn 1 / Step 2：批准后下一Step退出规划，执行方案第1步
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 9,
+    "type": "plan/mode",
+    "data": {
+      "active": false
+    }
+  },
+  {
+    "seq": 10,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 2
+    }
+  },
+  {
+    "seq": 11,
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": {
+      "op": "replace",
+      "startSeq": 3,
+      "endSeq": 3
+    },
+    "sourceEventSeqs": [
+      3
+    ]
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，批准后执行。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 12,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "edit_plan_mt",
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 13,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "callId": "edit_plan_mt",
+      "name": "edit_demo",
+      "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+    }
+  },
+  {
+    "seq": 14,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "login.ts修改成功"
+          }
+        ],
+        "toolCallId": "edit_plan_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      13
+    ]
+  },
+  {
+    "seq": 15,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  },
+  "afterResponseAndTools": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Plan · Turn 1 / Step 3：仍保留批准的方案，执行方案第2步
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 16,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，批准后执行。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_plan_mt",
+      "content": "login.ts修改成功"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 17,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "tests_plan_mt",
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 18,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "callId": "tests_plan_mt",
+      "name": "run_tests_demo",
+      "arguments": "{\"suite\":\"login\"}"
+    }
+  },
+  {
+    "seq": 19,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "登录测试通过"
+          }
+        ],
+        "toolCallId": "tests_plan_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      18
+    ]
+  },
+  {
+    "seq": 20,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  },
+  "afterResponseAndTools": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Plan · Turn 1 / Step 4：汇报方案执行结果，结束Turn1
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 21,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 4
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，批准后执行。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_plan_mt",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_plan_mt",
+      "content": "登录测试通过"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 22,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 4,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "批准的方案两步已执行，登录测试通过。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 23,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 4
+    }
+  },
+  {
+    "seq": 24,
+    "type": "turn/end",
+    "data": {
+      "turn": 1,
+      "reason": {
+        "kind": "completed"
+      }
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  },
+  "afterResponseAndTools": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  }
+}
+```
+
+</details>
+本次assistant没有工具调用，Turn在这里结束；这不删除历史，也不自动代表Goal完成。下一阶段如果开始新Turn，会明确写出新的turn/start。
+
+#### Plan · Turn 2 / Step 1：新需求再次进入Plan模式，提交新方案
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 25,
+    "type": "turn/start",
+    "data": {
+      "turn": 2
+    }
+  },
+  {
+    "seq": 26,
+    "type": "plan/mode",
+    "data": {
+      "active": true
+    }
+  },
+  {
+    "seq": 27,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 1
+    }
+  },
+  {
+    "seq": 28,
+    "type": "system/message",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": {
+      "op": "replace",
+      "startSeq": 11,
+      "endSeq": 11
+    },
+    "sourceEventSeqs": [
+      11
+    ]
+  },
+  {
+    "seq": 29,
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "再规划一次过期会话回归验证，先给我确认。"
+        }
+      ]
+    },
+    "surfaceOp": "append"
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，批准后执行。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_plan_mt",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_plan_mt",
+      "content": "登录测试通过"
+    },
+    {
+      "role": "assistant",
+      "content": "批准的方案两步已执行，登录测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "再规划一次过期会话回归验证，先给我确认。"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 30,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "plan_mt_2",
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 补充过期会话回归\\n\\n1. 运行过期会话测试并检查结果。\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 31,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "callId": "plan_mt_2",
+      "name": "exit_plan_mode",
+      "arguments": "{\"plan\":\"# 补充过期会话回归\\n\\n1. 运行过期会话测试并检查结果。\"}"
+    }
+  },
+  {
+    "seq": 32,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+          }
+        ],
+        "toolCallId": "plan_mt_2",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      31
+    ]
+  },
+  {
+    "seq": 33,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 1
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "planProjection": {
+      "active": true,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  },
+  "afterResponseAndTools": {
+    "planProjection": {
+      "active": true,
+      "pending": false
+    },
+    "controllerPendingTarget": false
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Plan · Turn 2 / Step 2：第二次批准后退出规划，执行新方案
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 34,
+    "type": "plan/mode",
+    "data": {
+      "active": false
+    }
+  },
+  {
+    "seq": 35,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 2
+    }
+  },
+  {
+    "seq": 36,
+    "type": "system/message",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": {
+      "op": "replace",
+      "startSeq": 28,
+      "endSeq": 28
+    },
+    "sourceEventSeqs": [
+      28
+    ]
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，批准后执行。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_plan_mt",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_plan_mt",
+      "content": "登录测试通过"
+    },
+    {
+      "role": "assistant",
+      "content": "批准的方案两步已执行，登录测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "再规划一次过期会话回归验证，先给我确认。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_2",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 补充过期会话回归\\n\\n1. 运行过期会话测试并检查结果。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_2",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 37,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "tests_plan_mt_2",
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"expired-session\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 38,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "callId": "tests_plan_mt_2",
+      "name": "run_tests_demo",
+      "arguments": "{\"suite\":\"expired-session\"}"
+    }
+  },
+  {
+    "seq": 39,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "过期会话回归测试通过"
+          }
+        ],
+        "toolCallId": "tests_plan_mt_2",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      38
+    ]
+  },
+  {
+    "seq": 40,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  },
+  "afterResponseAndTools": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Plan · Turn 2 / Step 3：两个方案的历史都在，汇报新方案结果
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 41,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，批准后执行。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_plan_mt",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_plan_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_plan_mt",
+      "content": "登录测试通过"
+    },
+    {
+      "role": "assistant",
+      "content": "批准的方案两步已执行，登录测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "再规划一次过期会话回归验证，先给我确认。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_mt_2",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 补充过期会话回归\\n\\n1. 运行过期会话测试并检查结果。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_mt_2",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_plan_mt_2",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"expired-session\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_plan_mt_2",
+      "content": "过期会话回归测试通过"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 42,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "新增方案的过期会话回归测试通过。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 43,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 3
+    }
+  },
+  {
+    "seq": 44,
+    "type": "turn/end",
+    "data": {
+      "turn": 2,
+      "reason": {
+        "kind": "completed"
+      }
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  },
+  "afterResponseAndTools": {
+    "planProjection": {
+      "active": false,
+      "pending": false
+    },
+    "controllerPendingTarget": null
+  }
+}
+```
+
+</details>
+本次assistant没有工具调用，Turn在这里结束；这不删除历史，也不自动代表Goal完成。下一阶段如果开始新Turn，会明确写出新的turn/start。
+
+Plan每次批准都由真实的人类评审答案决定；本例固定选择批准，所以第④部分只展开调用、成功tool结果和待退出的后续边界。它没有额外把批准伪装成人类聊天user消息；评审问答组件内部事件不在这个摘录范围。评审批准后，planProjection.active仍为true；controllerPendingTarget=false表示控制器已登记待退出。这里没有/plan命令，所以仅依日志派生的planProjection.pending仍可为false，不能用它代替控制器的进程内选择。下一Step才落plan/mode=false并清除待退出选择。
+
+### C．Goal：人类Turn结束不等于目标完成，下一Turn由Round驱动器触发
+
+目标允许2个自动Round；人类Turn1不消耗自动Round。Turn1结束后目标仍active、armed，驱动器在空闲且持久化/准入检查通过后发起Round1，这个Round在本例里就是Turn2。Turn2内部4个Step仍只计一个Round，直到工具成功标记complete才停止续行。
+
+#### Goal · Turn 1 / Step 1：人类请求创建持久目标
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 0,
+    "type": "turn/start",
+    "data": {
+      "turn": 1
+    }
+  },
+  {
+    "seq": 1,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 1
+    }
+  },
+  {
+    "seq": 2,
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 3,
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+        }
+      ]
+    },
+    "surfaceOp": "append"
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 4,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "create_mt",
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 5,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "create_mt",
+      "name": "create_goal",
+      "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+    }
+  },
+  {
+    "seq": 6,
+    "type": "goal/change",
+    "data": {
+      "kind": "goal/change",
+      "version": 1,
+      "operation": "create",
+      "goal": {
+        "id": "goal_mt",
+        "revision": 1,
+        "objective": "迁移登录模块并通过测试",
+        "phase": "active",
+        "maxGoalRounds": 2
+      },
+      "roundsStarted": 0,
+      "createdAt": 1000,
+      "updatedAt": 1000
+    }
+  },
+  {
+    "seq": 7,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+          }
+        ],
+        "toolCallId": "create_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      5
+    ]
+  },
+  {
+    "seq": 8,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 1
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "goal": null,
+    "activation": "disarmed"
+  },
+  "afterResponseAndTools": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 0,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Goal · Turn 1 / Step 2：原人类Turn内先推进迁移
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 9,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_mt",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 10,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "edit_goal_mt",
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移登录接口\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 11,
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "callId": "edit_goal_mt",
+      "name": "edit_demo",
+      "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移登录接口\"}"
+    }
+  },
+  {
+    "seq": 12,
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "迁移代码修改成功，测试未运行"
+          }
+        ],
+        "toolCallId": "edit_goal_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      11
+    ]
+  },
+  {
+    "seq": 13,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 0,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  },
+  "afterResponseAndTools": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 0,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Goal · Turn 1 / Step 3：结束人类Turn，但保留active目标
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 14,
+    "type": "step/start",
+    "data": {
+      "turn": 1,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_mt",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移登录接口\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_goal_mt",
+      "content": "迁移代码修改成功，测试未运行"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 15,
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "迁移修改已完成，测试尚未运行，整个目标仍未完成。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 16,
+    "type": "step/end",
+    "data": {
+      "turn": 1,
+      "step": 3
+    }
+  },
+  {
+    "seq": 17,
+    "type": "turn/end",
+    "data": {
+      "turn": 1,
+      "reason": {
+        "kind": "completed"
+      }
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 0,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  },
+  "afterResponseAndTools": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 0,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  }
+}
+```
+
+</details>
+本次assistant没有工具调用，Turn在这里结束；这不删除历史，也不自动代表Goal完成。下一阶段如果开始新Turn，会明确写出新的turn/start。
+
+#### Goal · Turn 2 / Step 1：驱动器准入Round1任务，模型运行测试
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 18,
+    "type": "turn/start",
+    "data": {
+      "turn": 2
+    }
+  },
+  {
+    "seq": 19,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 1
+    }
+  },
+  {
+    "seq": 20,
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/2\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+        }
+      ],
+      "source": {
+        "kind": "goal",
+        "goalId": "goal_mt",
+        "revision": 1,
+        "round": 1
+      }
+    },
+    "surfaceOp": "append"
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_mt",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移登录接口\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_goal_mt",
+      "content": "迁移代码修改成功，测试未运行"
+    },
+    {
+      "role": "assistant",
+      "content": "迁移修改已完成，测试尚未运行，整个目标仍未完成。"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/2\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 21,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "tests_goal_mt",
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login-migration\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 22,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "callId": "tests_goal_mt",
+      "name": "run_tests_demo",
+      "arguments": "{\"suite\":\"login-migration\"}"
+    }
+  },
+  {
+    "seq": 23,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "登录迁移测试通过"
+          }
+        ],
+        "toolCallId": "tests_goal_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      22
+    ]
+  },
+  {
+    "seq": 24,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 1
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  },
+  "afterResponseAndTools": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Goal · Turn 2 / Step 2：测试通过后读取当前Goal版本
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 25,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_mt",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移登录接口\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_goal_mt",
+      "content": "迁移代码修改成功，测试未运行"
+    },
+    {
+      "role": "assistant",
+      "content": "迁移修改已完成，测试尚未运行，整个目标仍未完成。"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/2\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login-migration\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_goal_mt",
+      "content": "登录迁移测试通过"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 26,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "get_goal_mt",
+            "name": "get_goal",
+            "arguments": "{}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 27,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "callId": "get_goal_mt",
+      "name": "get_goal",
+      "arguments": "{}"
+    }
+  },
+  {
+    "seq": 28,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":1,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+          }
+        ],
+        "toolCallId": "get_goal_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      27
+    ]
+  },
+  {
+    "seq": 29,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 2
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  },
+  "afterResponseAndTools": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Goal · Turn 2 / Step 3：带最新id和revision标记整个目标完成
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 30,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_mt",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移登录接口\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_goal_mt",
+      "content": "迁移代码修改成功，测试未运行"
+    },
+    {
+      "role": "assistant",
+      "content": "迁移修改已完成，测试尚未运行，整个目标仍未完成。"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/2\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login-migration\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_goal_mt",
+      "content": "登录迁移测试通过"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "get_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "get_goal",
+            "arguments": "{}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "get_goal_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":1,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 31,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "complete_goal_mt",
+            "name": "update_goal",
+            "arguments": "{\"goal_id\":\"goal_mt\",\"revision\":1,\"action\":\"complete\"}"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 32,
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "callId": "complete_goal_mt",
+      "name": "update_goal",
+      "arguments": "{\"goal_id\":\"goal_mt\",\"revision\":1,\"action\":\"complete\"}"
+    }
+  },
+  {
+    "seq": 33,
+    "type": "goal/change",
+    "data": {
+      "kind": "goal/change",
+      "version": 1,
+      "operation": "complete",
+      "goal": {
+        "id": "goal_mt",
+        "revision": 2,
+        "objective": "迁移登录模块并通过测试",
+        "phase": "complete",
+        "maxGoalRounds": 2
+      },
+      "roundsStarted": 1,
+      "createdAt": 1000,
+      "updatedAt": 2000
+    }
+  },
+  {
+    "seq": 34,
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":2,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"complete\",\"roundsStarted\":1,\"maxGoalRounds\":2},\"activation\":\"disarmed\"}"
+          }
+        ],
+        "toolCallId": "complete_goal_mt",
+        "isError": false
+      }
+    },
+    "surfaceOp": "append",
+    "sourceEventSeqs": [
+      32
+    ]
+  },
+  {
+    "seq": 35,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 3
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 1,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "active",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "armed"
+  },
+  "afterResponseAndTools": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 2,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "complete",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "disarmed"
+  }
+}
+```
+
+</details>
+工具执行完成，但Turn尚未结束。下一Step会把本阶段assistant调用与tool结果追加到完整messages中；不会再次提交相同user任务。
+
+#### Goal · Turn 2 / Step 4：拿到complete视图，汇报并结束Turn2
+
+**① 本阶段当前system全文：**
+
+<details>
+<summary>展开① 本阶段当前system全文（JSON）</summary>
+
+```json
+{
+  "role": "system",
+  "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+**② 发请求前，eventlog新增：**
+
+<details>
+<summary>展开② 发请求前，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 36,
+    "type": "step/start",
+    "data": {
+      "turn": 2,
+      "step": 4
+    }
+  }
+]
+```
+
+</details>
+**③ 实际发给LLM的完整messages（本例）：**
+
+<details>
+<summary>展开③ 实际发给LLM的完整messages（本例）（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多自动推进2轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_mt",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":2}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移登录接口\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_goal_mt",
+      "content": "迁移代码修改成功，测试未运行"
+    },
+    {
+      "role": "assistant",
+      "content": "迁移修改已完成，测试尚未运行，整个目标仍未完成。"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/2\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login-migration\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_goal_mt",
+      "content": "登录迁移测试通过"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "get_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "get_goal",
+            "arguments": "{}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "get_goal_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":1,\"maxGoalRounds\":2},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "complete_goal_mt",
+          "type": "function",
+          "function": {
+            "name": "update_goal",
+            "arguments": "{\"goal_id\":\"goal_mt\",\"revision\":1,\"action\":\"complete\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "complete_goal_mt",
+      "content": "{\"goal\":{\"id\":\"goal_mt\",\"revision\":2,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"complete\",\"roundsStarted\":1,\"maxGoalRounds\":2},\"activation\":\"disarmed\"}"
+    }
+  ]
+}
+```
+
+</details>
+**④ LLM返回、工具执行后，eventlog新增：**
+
+<details>
+<summary>展开④ LLM返回、工具执行后，eventlog新增（JSON）</summary>
+
+```json
+[
+  {
+    "seq": 37,
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 4,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "迁移修改和测试均已验证，Goal已标记complete，不再安排自动续行。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": "append"
+  },
+  {
+    "seq": 38,
+    "type": "step/end",
+    "data": {
+      "turn": 2,
+      "step": 4
+    }
+  },
+  {
+    "seq": 39,
+    "type": "turn/end",
+    "data": {
+      "turn": 2,
+      "reason": {
+        "kind": "completed"
+      }
+    }
+  }
+]
+```
+
+</details>
+**⑤ 本阶段业务状态前后：**
+
+<details>
+<summary>展开⑤ 本阶段业务状态前后（JSON）</summary>
+
+```json
+{
+  "beforeRequest": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 2,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "complete",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "disarmed"
+  },
+  "afterResponseAndTools": {
+    "goal": {
+      "id": "goal_mt",
+      "revision": 2,
+      "objective": "迁移登录模块并通过测试",
+      "phase": "complete",
+      "roundsStarted": 1,
+      "maxGoalRounds": 2
+    },
+    "activation": "disarmed"
+  }
+}
+```
+
+</details>
+本次assistant没有工具调用，Turn在这里结束；这不删除历史，也不自动代表Goal完成。下一阶段如果开始新Turn，会明确写出新的turn/start。
+
+### 看完跨Turn轨迹，核对这四个区别
+
+| 区别 | 本例直接观察的位置 |
+| --- | --- |
+| 事件历史保留，当前状态会变 | Todo Turn2 / Step1：beforeRequest.todosProjection为null，但完整messages仍有Turn1的旧清单。 |
+| system可变，方案不随它消失 | Plan Turn1 / Step2及Turn2 / Step1：规则退出、重新激活；旧方案参数仍在messages。 |
+| 同一Turn的多个Step不重复追加输入 | 各组Step2以后没有新user/message，只新增上一步assistant/tool历史。 |
+| Turn结束和Goal完成是不同边界 | Goal Turn1 / Step3目标仍active；Turn2 / Step3工具标记complete，Step4才结束这个Turn。 |
+
+本节每组eventlog按请求前与响应后两段顺序连接就是**本例所有展示事件**；seq只用来定位日志及surface，JSON中的messages从未用seq或外部消息池替代正文。system未变仍在每次请求里，但不每次重写同一system事件。真实生产日志还含前面明确省略的字段与事件，应以源码和实际运行输出为准。
+
+---
+
+<details>
+<summary>展开此前的单Turn示例、系统组装详解与完整问答</summary>
+
+## 连续请求：Todo、Plan、Goal每次的完整messages
+
+**实线是调用，虚线是返回。每次请求都带当时选中的历史；下面假设没有压缩、遮蔽或截断。** 每个例子使用下方明确配置的system文案，所有messages按时间顺序完整展开；工具定义不在messages内。read_demo、edit_demo、run_tests_demo是为了看清链路而虚构的工具及结果，不是原版真实工具名称或返回格式，也没有实际修改文件、运行测试或请求模型。
+
+本节每次请求都完整写出这个示例的messages数组，不使用消息池、引用编号或省略号。数组包含本例使用的system和截至当时的全部历史，旧消息会在后面的JSON重复出现。**这是简化示例的完整messages，不是生产会话的全量请求**：tools、模型参数和提供方推理回放等字段不属于此处展示范围。system文案是明确写出的教学配置，不是原版固定提示词逐字副本；原版部署可以配置其它内容。工具arguments仍是JSON字符串，tool_call_id必须和前面的调用id对应。
+
+### eventlog怎么和下面的messages对照
+
+每次请求的JSON后面新增一份“本次请求前新增的eventlog”。**messages是本次完整输入，eventlog块只展示从上一次请求到这一次新增的记录**；旧日志保留，不每请求重写一遍。事件内容按原版领域名称展示，和039教学的message/user命名不同。
+
+事件JSON只摘type与data的相关字段，省略实际消息id、时间、provider source、assistant流/用量、surface操作与来源seq、request/header和turn/step边界等字段；不是可直接导入的完整Session事件格式。业务工具仍是虚构示例，它们是否另有文件审计事件不在这里编造。system/message实际含surface替换或规范化规则，下面只显示新系统文本，不能当成“向messages末尾再加一条system”。
+
+| eventlog事件 | 下一次messages里的去向 |
+| --- | --- |
+| system/message | 按当前surface选择和系统更新规则形成system。 |
+| user/message | user消息；Goal Round来源保存在事件source中。 |
+| assistant/message | assistant正文或工具调用；内部content块由适配器转成tool_calls。 |
+| tool/result | tool消息，与调用id配对。 |
+| tool/call | 执行审计，不再多生成一条assistant消息。 |
+| todo/write、plan/mode、goal/change | 状态记录，不直接各自产生一条模型消息。 |
+
+### 1．Todo：建清单 → 修改文件 → 更新清单 → 运行测试
+
+```mermaid
+sequenceDiagram
+    participant A as Agent与请求组装
+    participant L as LLM
+    participant T as 工具执行入口
+    participant S as Todo状态与UI
+    A->>L: T1 用户任务
+    L-->>A: todo_1：完整清单，修复进行中
+    A->>T: 执行todo_write
+    T->>S: 保存第一份清单
+    T-->>A: 更新统计
+    A->>L: T2 用户任务加todo_1调用和结果
+    L-->>A: edit_1：修改登录文件
+    A->>T: 执行edit_demo
+    T-->>A: 文件修改成功
+    A->>L: T3 保留todo_1，再追加edit_1调用和结果
+    L-->>A: todo_2：完整清单，修复完成且测试进行中
+    A->>T: 执行todo_write
+    T->>S: 用第二份清单替换当前状态
+    T-->>A: 新更新统计
+    A->>L: T4 同时带旧todo_1和新todo_2历史
+    L-->>A: tests_1：运行登录测试
+    A->>T: 执行run_tests_demo
+    T-->>A: 测试通过
+    A->>L: T5 保留上述历史，再追加测试结果
+    L-->>A: todo_3：完整清单，两项都完成
+    A->>T: 执行todo_write
+    T->>S: 保存两项完成的清单
+    T-->>A: 全部完成统计
+    A->>L: T6 完整历史加todo_3调用和结果
+    L-->>A: 汇报完成与测试结果
+    Note over A,S: 状态只显示最新清单<br/>模型历史可保留多次提交
+```
+
+#### Todo请求 T1：完整messages
+
+**本次新增：** messages[0]为本例system配置；messages[1]为用户任务。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。根据实际工具结果推进工作；使用todo_write维护完整清单，不提前宣称测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录，再运行测试。"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "你是编码助手。根据实际工具结果推进工作；使用todo_write维护完整清单，不提前宣称测试通过。"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "修复登录，再运行测试。"
+        }
+      ]
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Todo请求 T2：完整messages
+
+**本次新增：** messages[2]：assistant调用todo_write；messages[3]：tool返回todo_1的结果。此前messages[0]～messages[1]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。根据实际工具结果推进工作；使用todo_write维护完整清单，不提前宣称测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录，再运行测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_1",
+      "content": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "todo_1",
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "todo_1",
+      "name": "todo_write",
+      "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
+    }
+  },
+  {
+    "type": "todo/write",
+    "data": {
+      "todos": [
+        {
+          "content": "修复登录",
+          "status": "in_progress"
+        },
+        {
+          "content": "运行测试",
+          "status": "pending"
+        }
+      ]
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+          }
+        ],
+        "toolCallId": "todo_1",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。 todo/write供状态/UI读取，完整清单进入模型靠assistant调用参数。
+
+#### Todo请求 T3：完整messages
+
+**本次新增：** messages[4]：assistant调用edit_demo；messages[5]：tool返回edit_1的结果。此前messages[0]～messages[3]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。根据实际工具结果推进工作；使用todo_write维护完整清单，不提前宣称测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录，再运行测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_1",
+      "content": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_1",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修正会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_1",
+      "content": "login.ts修改成功"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "edit_1",
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修正会话校验\"}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "callId": "edit_1",
+      "name": "edit_demo",
+      "arguments": "{\"path\":\"login.ts\",\"change\":\"修正会话校验\"}"
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "login.ts修改成功"
+          }
+        ],
+        "toolCallId": "edit_1",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Todo请求 T4：完整messages
+
+**本次新增：** messages[6]：assistant调用todo_write；messages[7]：tool返回todo_2的结果。此前messages[0]～messages[5]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。根据实际工具结果推进工作；使用todo_write维护完整清单，不提前宣称测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录，再运行测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_1",
+      "content": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_1",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修正会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_1",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_2",
+      "content": "Updated todo list: 0 pending, 1 in progress, 1 completed."
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "todo_2",
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"in_progress\"}]}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "callId": "todo_2",
+      "name": "todo_write",
+      "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"in_progress\"}]}"
+    }
+  },
+  {
+    "type": "todo/write",
+    "data": {
+      "todos": [
+        {
+          "content": "修复登录",
+          "status": "completed"
+        },
+        {
+          "content": "运行测试",
+          "status": "in_progress"
+        }
+      ]
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Updated todo list: 0 pending, 1 in progress, 1 completed."
+          }
+        ],
+        "toolCallId": "todo_2",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。 todo/write供状态/UI读取，完整清单进入模型靠assistant调用参数。
+
+#### Todo请求 T5：完整messages
+
+**本次新增：** messages[8]：assistant调用run_tests_demo；messages[9]：tool返回tests_1的结果。此前messages[0]～messages[7]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。根据实际工具结果推进工作；使用todo_write维护完整清单，不提前宣称测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录，再运行测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_1",
+      "content": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_1",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修正会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_1",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_2",
+      "content": "Updated todo list: 0 pending, 1 in progress, 1 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_1",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_1",
+      "content": "登录测试通过"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 4,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "tests_1",
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 4,
+      "callId": "tests_1",
+      "name": "run_tests_demo",
+      "arguments": "{\"suite\":\"login\"}"
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 4,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "登录测试通过"
+          }
+        ],
+        "toolCallId": "tests_1",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Todo请求 T6：完整messages
+
+**本次新增：** messages[10]：assistant调用todo_write；messages[11]：tool返回todo_3的结果。此前messages[0]～messages[9]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。根据实际工具结果推进工作；使用todo_write维护完整清单，不提前宣称测试通过。"
+    },
+    {
+      "role": "user",
+      "content": "修复登录，再运行测试。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_1",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_1",
+      "content": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_1",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"修正会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_1",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_2",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"in_progress\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_2",
+      "content": "Updated todo list: 0 pending, 1 in progress, 1 completed."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_1",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_1",
+      "content": "登录测试通过"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "todo_3",
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"completed\"}]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "todo_3",
+      "content": "Updated todo list: 0 pending, 0 in progress, 2 completed."
+    }
+  ]
+}
+```
+
+</details>
+
+**对照T3和T4：T3仍只有旧清单；模型看到修改成功后才产出新清单，T4才包含它。** 新清单不是宿主改写第一次todo_write调用，而是追加第二次完整调用。T5看到测试通过后再调用todo_write；T6已把第三次清单和成功统计都带回，列表才被记录为全完成。测试工具自己不会更新Todo。
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 5,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "todo_3",
+            "name": "todo_write",
+            "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"completed\"}]}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 5,
+      "callId": "todo_3",
+      "name": "todo_write",
+      "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"completed\"},{\"content\":\"运行测试\",\"status\":\"completed\"}]}"
+    }
+  },
+  {
+    "type": "todo/write",
+    "data": {
+      "todos": [
+        {
+          "content": "修复登录",
+          "status": "completed"
+        },
+        {
+          "content": "运行测试",
+          "status": "completed"
+        }
+      ]
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 5,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Updated todo list: 0 pending, 0 in progress, 2 completed."
+          }
+        ],
+        "toolCallId": "todo_3",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。 todo/write供状态/UI读取，完整清单进入模型靠assistant调用参数。
+
+### 2．Plan：批准方案 → 按方案修改 → 按方案测试 → 汇报
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant A as Agent与请求组装
+    participant L as LLM
+    participant T as 工具与Plan控制
+    A->>L: P1 规划system规则和user任务
+    L-->>A: plan_1：exit_plan_mode提交完整方案
+    A->>T: 执行计划评审
+    T->>U: 展示方案
+    U-->>T: 批准
+    T-->>A: 批准结果
+    A->>T: 下一被接受pre-step退出模式
+    A->>L: P2 无规划规则，保留方案和批准历史
+    L-->>A: edit_plan：按方案修改文件
+    A->>T: edit_demo
+    T-->>A: 修改成功
+    A->>L: P3 仍带方案和批准，再追加修改结果
+    L-->>A: tests_plan：按方案运行测试
+    A->>T: run_tests_demo
+    T-->>A: 测试通过
+    A->>L: P4 仍带方案，再追加测试结果
+    L-->>A: 汇报两步完成与测试证据
+    Note over A,L: P2到P4方案都在assistant参数<br/>不需要每次重新批准或注入system
+```
+
+#### Plan请求 P1：完整messages
+
+**本次新增：** messages[0]为本例system配置；messages[1]为用户任务。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，交我确认。"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "plan/mode",
+    "data": {
+      "active": true
+    }
+  },
+  {
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "先规划登录修复，交我确认。"
+        }
+      ]
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Plan请求 P2：完整messages
+
+**本次变化：** messages[0]切换为退出规划后的system配置；messages[1]用户任务保留；新增messages[2]的完整方案调用、messages[3]的批准结果。方案仍在参数里。
+
+<details>
+<summary>展开本次变化（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，交我确认。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "plan_1",
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "plan_1",
+      "name": "exit_plan_mode",
+      "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+          }
+        ],
+        "toolCallId": "plan_1",
+        "isError": false
+      }
+    }
+  },
+  {
+    "type": "plan/mode",
+    "data": {
+      "active": false
+    }
+  },
+  {
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。 批准的tool/result先记录，下一被接受pre-step才记录plan/mode=false并应用system变化；旧方案历史不删除。
+
+#### Plan请求 P3：完整messages
+
+**本次新增：** messages[4]：assistant调用edit_demo；messages[5]：tool返回edit_plan的结果。此前messages[0]～messages[3]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，交我确认。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_plan",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"执行方案第1步，修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_plan",
+      "content": "login.ts修改成功"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "edit_plan",
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"执行方案第1步，修复会话校验\"}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "callId": "edit_plan",
+      "name": "edit_demo",
+      "arguments": "{\"path\":\"login.ts\",\"change\":\"执行方案第1步，修复会话校验\"}"
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "login.ts修改成功"
+          }
+        ],
+        "toolCallId": "edit_plan",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Plan请求 P4：完整messages
+
+**本次新增：** messages[6]：assistant调用run_tests_demo；messages[7]：tool返回tests_plan的结果。此前messages[0]～messages[5]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+    },
+    {
+      "role": "user",
+      "content": "先规划登录修复，交我确认。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "plan_1",
+          "type": "function",
+          "function": {
+            "name": "exit_plan_mode",
+            "arguments": "{\"plan\":\"# 登录修复\\n\\n1. 修复会话校验。\\n2. 运行登录测试。\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "plan_1",
+      "content": "Plan approved — plan mode exited; carry out the plan starting with your next step."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_plan",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"执行方案第1步，修复会话校验\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_plan",
+      "content": "login.ts修改成功"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tests_plan",
+          "type": "function",
+          "function": {
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tests_plan",
+      "content": "登录测试通过"
+    }
+  ]
+}
+```
+
+</details>
+
+P1有plan:policy；批准后的P2在边界退出，因此P2、P3、P4都不再贡献这段规划规则，但其它system规则仍按部署组装。**P3知道要测试，是因为它仍能读此前exit_plan_mode参数里的方案，不是因为Plan状态表自动生成了“方案第2步”用户消息。** 这是一种模型按历史推进的示例，不是运行时强制模型一定按这些步骤执行。
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "tests_plan",
+            "name": "run_tests_demo",
+            "arguments": "{\"suite\":\"login\"}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "callId": "tests_plan",
+      "name": "run_tests_demo",
+      "arguments": "{\"suite\":\"login\"}"
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 3,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "登录测试通过"
+          }
+        ],
+        "toolCallId": "tests_plan",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+### 3．Goal：Round 1里再做两步，再进入Round 2
+
+```mermaid
+sequenceDiagram
+    participant A as Agent与请求组装
+    participant L as LLM
+    participant T as 业务工具
+    participant G as Goal服务与驱动器
+    Note over A,G: 已create_goal成功，当前active且armed
+    G->>A: 准入Round 1目标user消息
+    A->>L: G1 目标和Round 1消息
+    L-->>A: read_goal：读取迁移配置
+    A->>T: read_demo
+    T-->>A: 登录代码仍使用旧接口
+    A->>L: G2 同一Round 1历史，加读取结果
+    L-->>A: edit_goal：迁移到新接口
+    A->>T: edit_demo
+    T-->>A: 修改成功，但回归测试还没完成
+    A->>L: G3 同一Round 1历史，加修改结果
+    L-->>A: 正文汇报部分进展，结束当前Turn
+    A->>G: Agent空闲，目标仍active且armed
+    G->>G: 检查修订和剩余Round额度
+    G->>A: 准入Round 2目标user消息
+    A->>L: G4 旧历史加新的Round 2任务
+    L-->>A: 下一步可运行回归测试
+    Note over A,G: G1到G3只使用一个Round 1消息<br/>G4才新增Round 2消息
+```
+
+#### Goal请求 创建目标前：完整messages
+
+**本次新增：** messages[0]为本例system配置；messages[1]为用户任务。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。通过Goal工具读取和修改目标状态；根据当前工作区和工具结果推进目标，取得证据后再标记完成。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多10轮。"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "你是编码助手。通过Goal工具读取和修改目标状态；根据当前工作区和工具结果推进目标，取得证据后再标记完成。"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "请持续迁移登录模块并通过测试，最多10轮。"
+        }
+      ]
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Goal请求 创建目标后：完整messages
+
+**本次新增：** messages[2]：assistant调用create_goal；messages[3]：tool返回create_goal_1的结果。此前messages[0]～messages[1]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。通过Goal工具读取和修改目标状态；根据当前工作区和工具结果推进目标，取得证据后再标记完成。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多10轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_goal_1",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_goal_1",
+      "content": "{\"goal\":{\"id\":\"goal_1\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "create_goal_1",
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "callId": "create_goal_1",
+      "name": "create_goal",
+      "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+    }
+  },
+  {
+    "type": "goal/change",
+    "data": {
+      "kind": "goal/change",
+      "version": 1,
+      "operation": "create",
+      "goal": {
+        "id": "goal_1",
+        "revision": 1,
+        "objective": "迁移登录模块并通过测试",
+        "phase": "active",
+        "maxGoalRounds": 10
+      },
+      "roundsStarted": 0,
+      "createdAt": 1000,
+      "updatedAt": 1000
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 1,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"goal\":{\"id\":\"goal_1\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+          }
+        ],
+        "toolCallId": "create_goal_1",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Goal请求 G1：完整messages
+
+**本次新增：** messages[4]：user追加Round: 1/10目标任务。此前messages[0]～messages[3]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。通过Goal工具读取和修改目标状态；根据当前工作区和工具结果推进目标，取得证据后再标记完成。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多10轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_goal_1",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_goal_1",
+      "content": "{\"goal\":{\"id\":\"goal_1\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+        }
+      ],
+      "source": {
+        "kind": "goal",
+        "goalId": "goal_1",
+        "revision": 1,
+        "round": 1
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。 新Round的user/message准入推进轮次；不要另造一条round操作的goal/change。
+
+#### Goal请求 G2：完整messages
+
+**本次新增：** messages[5]：assistant调用read_demo；messages[6]：tool返回read_goal的结果。此前messages[0]～messages[4]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。通过Goal工具读取和修改目标状态；根据当前工作区和工具结果推进目标，取得证据后再标记完成。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多10轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_goal_1",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_goal_1",
+      "content": "{\"goal\":{\"id\":\"goal_1\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "read_goal",
+          "type": "function",
+          "function": {
+            "name": "read_demo",
+            "arguments": "{\"path\":\"login.ts\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "read_goal",
+      "content": "登录代码仍使用旧接口"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "read_goal",
+            "name": "read_demo",
+            "arguments": "{\"path\":\"login.ts\"}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "callId": "read_goal",
+      "name": "read_demo",
+      "arguments": "{\"path\":\"login.ts\"}"
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 1,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "登录代码仍使用旧接口"
+          }
+        ],
+        "toolCallId": "read_goal",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Goal请求 G3：完整messages
+
+**本次新增：** messages[7]：assistant调用edit_demo；messages[8]：tool返回edit_goal的结果。此前messages[0]～messages[6]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。通过Goal工具读取和修改目标状态；根据当前工作区和工具结果推进目标，取得证据后再标记完成。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多10轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_goal_1",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_goal_1",
+      "content": "{\"goal\":{\"id\":\"goal_1\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "read_goal",
+          "type": "function",
+          "function": {
+            "name": "read_demo",
+            "arguments": "{\"path\":\"login.ts\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "read_goal",
+      "content": "登录代码仍使用旧接口"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_goal",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移到新接口\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_goal",
+      "content": "迁移代码已修改，回归测试未运行"
+    }
+  ]
+}
+```
+
+</details>
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "id": "edit_goal",
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移到新接口\"}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tool/call",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "callId": "edit_goal",
+      "name": "edit_demo",
+      "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移到新接口\"}"
+    }
+  },
+  {
+    "type": "tool/result",
+    "data": {
+      "turn": 2,
+      "step": 2,
+      "message": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "text",
+            "text": "迁移代码已修改，回归测试未运行"
+          }
+        ],
+        "toolCallId": "edit_goal",
+        "isError": false
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。
+
+#### Goal请求 G4：完整messages
+
+**本次新增：** messages[9]：assistant正文“接口迁移已修改，回归测试还未完成。”；messages[10]：user追加Round: 2/10目标任务。此前messages[0]～messages[8]保持不变，下面逐条重复展开。
+
+<details>
+<summary>展开本次新增（JSON）</summary>
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是编码助手。通过Goal工具读取和修改目标状态；根据当前工作区和工具结果推进目标，取得证据后再标记完成。"
+    },
+    {
+      "role": "user",
+      "content": "请持续迁移登录模块并通过测试，最多10轮。"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "create_goal_1",
+          "type": "function",
+          "function": {
+            "name": "create_goal",
+            "arguments": "{\"objective\":\"迁移登录模块并通过测试\",\"max_goal_rounds\":10}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "create_goal_1",
+      "content": "{\"goal\":{\"id\":\"goal_1\",\"revision\":1,\"objective\":\"迁移登录模块并通过测试\",\"phase\":\"active\",\"roundsStarted\":0,\"maxGoalRounds\":10},\"activation\":\"armed\"}"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 1/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "read_goal",
+          "type": "function",
+          "function": {
+            "name": "read_demo",
+            "arguments": "{\"path\":\"login.ts\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "read_goal",
+      "content": "登录代码仍使用旧接口"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "edit_goal",
+          "type": "function",
+          "function": {
+            "name": "edit_demo",
+            "arguments": "{\"path\":\"login.ts\",\"change\":\"迁移到新接口\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "edit_goal",
+      "content": "迁移代码已修改，回归测试未运行"
+    },
+    {
+      "role": "assistant",
+      "content": "接口迁移已修改，回归测试还未完成。"
+    },
+    {
+      "role": "user",
+      "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 2/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+    }
+  ]
+}
+```
+
+</details>
+
+**G2、G3不新增目标user消息，也不因多调一个工具就消耗新Round；G4才新增ROUND2。** G3用普通完成响应结束本Turn，但目标还未complete，因此驱动器在满足准入条件后可以继续下一Round；“一个Turn结束”和“整个Goal完成”是两件事。若目标被暂停、阻塞、完成、取消停用或额度耗尽，就不能照此继续G4。
+
+创建结果tool消息里的roundsStarted=0是创建时的旧工具快照，不会随着准入自动改成1或2。两条goal_round用户消息分别携带本轮目标任务；想取得当前Goal的准确phase、revision和轮次，需另调用get_goal。上面沿用同一objective只是本例期间没有编辑目标，不代表新Round永远使用创建时的旧版本。
+
+**本次请求前新增的eventlog（相关字段，按发生顺序）：**
+
+<details>
+<summary>展开本次请求前新增的eventlog（相关字段，按发生顺序）（JSON）</summary>
+
+```json
+[
+  {
+    "type": "assistant/message",
+    "data": {
+      "turn": 2,
+      "step": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "接口迁移已修改，回归测试还未完成。"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "user/message",
+    "data": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 2/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
+        }
+      ],
+      "source": {
+        "kind": "goal",
+        "goalId": "goal_1",
+        "revision": 1,
+        "round": 2
+      }
+    }
+  }
+]
+```
+
+</details>
+
+这批只追加上述新事实；此前事件仍保留。assistant/message和tool/result分别提供上方新增的assistant、tool消息；tool/call仅审计，不重复投影。 新Round的user/message准入推进轮次；不要另造一条round操作的goal/change。
+
+## 系统提示词：从注册段落到eventlog，再到上方Plan请求
+
+下面继续用上方P1～P4，**本例system不是手写两份互不相关的文本，而是同一组段落在Plan批准前后重新求值的结果。** 身份文本和order取自原版；中文persona、规划/Goal规则与后缀是本例部署文案，不是原版完整默认配置。只选这五段展示，其它插件未在本例注册；Todo/Goal的具体数据和方案正文仍按前面的消息路径进入。
+
+### 组装时序：注册一次，按请求状态求值
+
+```mermaid
+sequenceDiagram
+    participant P as 部署与领域插件
+    participant R as systemPrompt注册表
+    participant A as Agent Loop
+    participant E as Session与surface
+    participant L as LLM
+    P->>R: 注册section，提供name、order、text
+    A->>R: 当前Agent作用域assemble
+    R->>R: 合并全局与作用域，同名就近覆盖
+    R->>R: 按order和name排序，求动态text与变量
+    R-->>A: assembly：sections、contexts、tools、variables
+    A->>A: renderPrompt，替换变量并跳过空段
+    A->>A: 非空段之间用两个换行连接
+    A->>E: 首次提交system/message，append到surface
+    A->>L: P1 完整system和user任务
+    L-->>A: exit_plan_mode调用，含方案
+    A->>A: 执行工具，等待用户批准
+    A->>E: 记录assistant调用和tool批准结果
+    A->>E: 下一被接受pre-step记录plan/mode为false
+    A->>R: P2组装，plan规则text返回空串
+    A->>A: 生成不含plan规则的新system
+    A->>E: 本例以replace更新system surface节点
+    A->>L: P2 新system，仍保留方案与批准历史
+    A->>R: P3与P4继续组装
+    R-->>A: 与P2相同的系统文本
+    Note over A,E: 本例文本未变且无新序列规范化需要<br/>不为每次请求重复写system事件
+```
+
+原版是在进入模型步骤时结合准入流程组装，Loop再调用renderPrompt和SystemPromptProjection；不是等请求已经发出后再修改system。注册的text既可以是静态字符串，也可以是接收当前Agent上下文的函数。
+
+### 1．注册的是有名字的段，不是提前拼好的长字符串
+
+以下JSON描述本例注册输入。textProvider表示文字说明，不是原版注册API的JSON字段；真实API的text可传函数。Goal段在本例已加载，Todo插件没有另注册“当前清单”system段。
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
+```json
+{
+  "registrationExample": [
+    {
+      "name": "deployment:persona-suffix",
+      "order": 10200,
+      "text": "用中文回答，并说明实际验证结果。"
+    },
+    {
+      "name": "tool:goal",
+      "order": 2400,
+      "text": "使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。"
+    },
+    {
+      "name": "harness:identity",
+      "order": -1000,
+      "text": "You are an AI agent powered by DeepSeek Harness."
+    },
+    {
+      "name": "plan:policy",
+      "order": 500,
+      "textProvider": "当前Agent处于规划模式时返回部署规划文案，否则返回空字符串"
+    },
+    {
+      "name": "deployment:persona-prefix",
+      "order": 0,
+      "text": "你是编码助手。"
+    }
+  ]
+}
+```
+
+</details>
+上面的注册顺序故意打乱。**最终顺序由order决定，不由插件谁先加载决定。** 默认先合并当前Agent作用域与全局贡献，同名按作用域链由更近的一层覆盖，再按order升序；order相同按name的代码单元顺序排序。这些order只是拼接顺序，不赋予更高指令权限。
+
+### 2．P1：Plan激活，排序后的段落与拼接结果
+
+<details>
+<summary>展开最终顺序由order决定，不由插件谁先加载决定。（JSON）</summary>
+
+```json
+{
+  "planActive": true,
+  "sortedResolvedSections": [
+    {
+      "name": "harness:identity",
+      "order": -1000,
+      "text": "You are an AI agent powered by DeepSeek Harness."
+    },
+    {
+      "name": "deployment:persona-prefix",
+      "order": 0,
+      "text": "你是编码助手。"
+    },
+    {
+      "name": "plan:policy",
+      "order": 500,
+      "text": "当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。"
+    },
+    {
+      "name": "tool:goal",
+      "order": 2400,
+      "text": "使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。"
+    },
+    {
+      "name": "deployment:persona-suffix",
+      "order": 10200,
+      "text": "用中文回答，并说明实际验证结果。"
+    }
+  ],
+  "joinSeparator": "\n\n",
+  "renderedSystem": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+renderPrompt对允许插值的文本替换{{variable}}，跳过空段，再以两个换行连接。未知变量或缺少值会报错，不会悄悄发出残缺提示词；本例没有变量。插件也可以通过组装waterfall改写结果；本例未加监听器。若注册complete=true的有效段，会采用完整提示词模式，不是上述普通多段拼接；本例没有complete段。
+
+### 3．首次写eventlog：完整system文本进入system/message
+
+下面保留与本题有关的事件字段，假设本例第一条事件seq=0就是系统消息。实际事件还包含会话身份、时间与消息id等，本段不是可导入的完整落盘信封。段落注册表本身不会自动逐段写成五条system事件。
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
+```json
+{
+  "seq": 0,
+  "type": "system/message",
+  "data": {
+    "turn": 1,
+    "step": 1,
+    "message": {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+        }
+      ]
+    }
+  },
+  "surfaceOp": "append"
+}
+```
+
+</details>
+这条事件经当前surface派生为上方P1.messages[0]，其content就是renderedSystem全文。没有额外独立request.system字段：原版Loop的系统内容是派生messages中的system消息，再由模型适配器转换为所选协议。
+
+### 4．批准后P2：同一组段落，只有plan段变空
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
+```json
+{
+  "planActive": false,
+  "sortedResolvedSections": [
+    {
+      "name": "harness:identity",
+      "order": -1000,
+      "text": "You are an AI agent powered by DeepSeek Harness."
+    },
+    {
+      "name": "deployment:persona-prefix",
+      "order": 0,
+      "text": "你是编码助手。"
+    },
+    {
+      "name": "plan:policy",
+      "order": 500,
+      "text": ""
+    },
+    {
+      "name": "tool:goal",
+      "order": 2400,
+      "text": "使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。"
+    },
+    {
+      "name": "deployment:persona-suffix",
+      "order": 10200,
+      "text": "用中文回答，并说明实际验证结果。"
+    }
+  ],
+  "emptySectionDropped": "plan:policy",
+  "joinSeparator": "\n\n",
+  "renderedSystem": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+}
+```
+
+</details>
+身份、persona、Goal规则与后缀都没改。**被移除的是plan:policy那段规则，不是assistant历史里plan参数的方案。** plan/mode只保存开关；方案正文来自exit_plan_mode调用历史。
+
+### 5．P2的eventlog：批准结果之后，边界退出，再更新系统surface
+
+本例明确选择不使用systemPromptUpdate=in-history的归并分支，而且此前只有一个system节点，因此以replace替换seq=0对应的surface节点。替换本身是新增事件，不是物理改写旧日志。用户批准的tool/result已在前面的P2事件中展示，这里摘出紧接其后的模式与系统变更：
+
+<details>
+<summary>展开被移除的是plan:policy那段规则，不是assistant历史里plan参数的方案。（JSON）</summary>
+
+```json
+[
+  {
+    "type": "plan/mode",
+    "data": {
+      "active": false
+    }
+  },
+  {
+    "type": "system/message",
+    "data": {
+      "turn": 1,
+      "step": 2,
+      "message": {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。"
+          }
+        ]
+      }
+    },
+    "surfaceOp": {
+      "op": "replace",
+      "startSeq": 0,
+      "endSeq": 0
+    },
+    "sourceEventSeqs": [
+      0
+    ]
+  }
+]
+```
+
+</details>
+startSeq/endSeq指向被替换的旧surface事件，不是上方messages数组的下标。完整日志仍保存批准前的system文本，当前surface选择的是更新后的文本；因此下一次请求不会继续把旧规划规则当有效system发送。
+
+如果路由支持in-history且在同一请求序列允许历史内更新，原版也可能append新的系统消息，而不是上面的replace。其它分支可能清空较晚的旧system节点并归并首节点；完整系统渲染为空时也会清除旧的生效指令。**本节P1～P4明确使用replace示例，不把所有路由都画成同一种更新方式。**
+
+### 6．与已有完整messages对照：P1～P4到底怎么变化
+
+<details>
+<summary>展开本节P1～P4明确使用replace示例，不把所有路由都画成同一种更新方式。（JSON）</summary>
+
+```json
+{
+  "P1": {
+    "system": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n当前处于规划模式：先探索和设计，通过exit_plan_mode提交完整方案给用户评审。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。",
+    "planPolicyPresent": true
+  },
+  "P2": {
+    "system": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。",
+    "planPolicyPresent": false
+  },
+  "P3": {
+    "system": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。",
+    "planPolicyPresent": false
+  },
+  "P4": {
+    "system": "You are an AI agent powered by DeepSeek Harness.\n\n你是编码助手。\n\n使用Goal工具读取和修改目标状态，根据实际证据决定完成或阻塞。\n\n用中文回答，并说明实际验证结果。",
+    "planPolicyPresent": false
+  }
+}
+```
+
+</details>
+上方P1～P4每份完整messages[0]和相应system/message片段已同步为这里的全文，没有使用引用占位。P2已有完整方案调用与批准结果；P3在它们之后追加编辑结果；P4再追加测试结果。方案始终保留在assistant工具调用参数里，而不是复制进system。
+
+| 项目 | 请求里有无 | 是否每次追加同样eventlog |
+| --- | --- | --- |
+| P2～P4相同的完整system | 本例每次都有messages[0] | 文本未变且无需规范化时，不必反复追加system/message。 |
+| Todo当前清单 | 来自已有assistant调用参数 | todo/write不自动注入system。 |
+| Plan方案 | 来自exit_plan_mode历史参数 | 批准后仍保留；不随plan规则消失。 |
+| Goal规则 | 本例tool:goal系统段 | 规则不包含当前objective快照。 |
+| Goal目标正文 | 来自工具结果和goal_round用户消息 | 不因有tool:goal规则就自动常驻system。 |
+
+systemPrompt的assembly还含contexts与tools，但它们不是都拼入system：原版动态运行时context渲染为带来源的user快照，Native工具schema走请求tools；PTC生成SDK文档可能另有系统段。本例把运行时context关闭、不采用PTC，仅展示普通Native与这五个系统段，不能把systemPrompt这个服务名理解为“它返回的一切都是system角色”。
+
+源码：[注册、顺序与renderPrompt](../../../../deepseek-harness/packages/core/system-prompt/src/index.ts)、[Plan动态段](../../../../deepseek-harness/packages/plan/plan-mode/src/index.ts)、[Goal规则段](../../../../deepseek-harness/packages/goal/tool-goal/src/index.ts)、[Loop提交系统消息](../../../../deepseek-harness/packages/core/agent-loop/src/agent.ts)、[system surface更新分支](../../../../deepseek-harness/packages/core/agent-loop/src/runtime-context.ts)。
+
+### 只看新增量，区别就出来了
+
+| 相邻请求 | 旧数据保留什么 | 新增什么 | 没发生什么 |
+| --- | --- | --- | --- |
+| Todo T2→T3 | 初始完整Todo调用 | 编辑调用和编辑结果 | 宿主没有改写旧Todo。 |
+| Todo T3→T4 | 旧Todo和编辑结果 | 新完整Todo调用和统计 | 状态只显示新清单，但历史不自动删旧清单。 |
+| Plan P2→P3→P4 | 方案参数和批准结果 | 修改、测试各自的调用和结果 | 没重新提交方案，也没把方案提升为system。 |
+| Goal G1→G2→G3 | 同一条Round 1任务 | 本轮业务调用和结果 | 没有每Step新增一条Goal消息。 |
+| Goal G3→G4 | Round 1及执行历史 | 新的Round 2 user任务 | 没改写历史Goal工具快照。 |
+
+Plan评审分支、Goal更新/暂停以及源码对照仍在下方详细问答中。请求标题只用于阅读定位，JSON中的messages已经全部展开，虚构业务工具不代表已执行的轨迹。
+
+---
+
+<details>
+<summary>展开此前的详细问答与源码对照（需要时再读）</summary>
+
 这份补充保留本轮问答中的问题、具体例子、调用参数、返回结构和后续追问，供看完039主文后继续阅读。原版行为以本仓库deepseek-harness目录中的源码为准；这里解释原版，不表示039的Collaboration已经实现了这些功能。示例里的登录任务、调用编号和目标编号用于说明结构，没有实际执行登录开发或请求模型。
 
 **先统一一个此前容易混淆的说法：todo_write内部execute返回的是包含完整todos与counts的对象；普通Native工具通道再经output.render，给模型提供数量统计文本。** 因此，“返回值是不是全量列表”必须说明问的是内部结构化值，还是已经渲染的模型工具结果。之前只说“工具不返回全量列表”不够准确，本页按源码把这两层分别写清楚。
@@ -27,6 +7522,9 @@
 
 例如模型刚提交两条事项：检查登录代码已完成，运行测试正在进行。执行成功后，**下一次模型请求相关的messages**包含下面两条：
 
+<details>
+<summary>展开下一次模型请求相关的messages（JSON）</summary>
+
 ```json
 [
   {
@@ -51,6 +7549,8 @@
 ]
 ```
 
+</details>
+
 模型既会读到自己先前提交的两条完整事项，也会读到工具执行成功的统计文本。所以即使tool.content只有统计，模型也不是只能看见两个数字。
 
 这里有两份用途不同的记录：todo/write保存当前清单给投影与UI；assistant工具调用历史保存模型提交过什么。**原版Todo插件没有另加一段“当前Todo清单”的system注入。** 也没有用状态表重新覆盖历史assistant参数：若后来又调用todo_write，历史里可以同时保留旧清单和新清单，后一次完整提交代表这次更新。
@@ -64,6 +7564,9 @@
 ### B．Plan：用户批准后，完整方案还会投喂吗？会，走历史参数
 
 假设模型生成“先修会话校验，再运行登录测试”，通过exit_plan_mode提交评审。用户批准以后，下一次请求会保留：
+
+<details>
+<summary>展开状态投影清空不等于模型忘记。（JSON）</summary>
 
 ```json
 [
@@ -89,6 +7592,8 @@
 ]
 ```
 
+</details>
+
 **方案还在第一条assistant调用的plan参数里，批准结果在第二条tool消息里。** 模型同时知道“要做哪两步”和“用户已经批准”。工具结果没有必要再复制一次整篇方案；用户审批界面拿到的args.plan与这条调用里的正文来自同一份提交。
 
 批准后的下一次被接受pre-step应用退出，系统组装不再贡献plan:policy。因此必须区分：
@@ -112,6 +7617,9 @@
 
 例如Goal是“迁移登录模块并通过测试”，create_goal或get_goal执行后，Native工具结果的content是当前视图的JSON文本。解码后实际能读到如下字段：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "goal": {
@@ -126,9 +7634,14 @@
 }
 ```
 
+</details>
+
 **这整份JSON会作为tool.content文本交给模型**，不只是返回“创建成功”。create_goal的assistant调用参数本身也带有objective；get_goal不用让模型先知道目标正文，也能从工具结果读到它。blocked时，视图还会带blockedReason；具体字段以工具当时返回的视图为准。
 
 自动续行时是第二条路径：驱动器等待Agent空闲，并检查active、armed与轮次额度，然后根据有效Goal生成一条新user消息。下面是它进入请求后的内容示意，正文保留原版固定措辞，目标与编号为示例数据：
+
+<details>
+<summary>展开这整份JSON会作为tool.content文本交给模型（JSON）</summary>
 
 ```json
 {
@@ -136,6 +7649,8 @@
   "content": "<goal_round>\nObjective: \"迁移登录模块并通过测试\"\nRound: 2/10\n\nContinue working toward the objective in this same session. Treat the current workspace, tool results, and durable session state as authoritative; inspect them instead of assuming earlier narration is still current. Make concrete progress and verify the result. Before claiming completion, gather evidence that the whole objective is achieved, read the current goal, and mark it complete. If work remains, leave the goal active for the next round. Follow the configured goal-tool policy before reporting a blocker.\n</goal_round>"
 }
 ```
+
+</details>
 
 模型因此不仅看到“有个目标”，还看到目标全文、本次Round编号、上限和实际推进要求。这是user角色的续行任务，不是system。领域日志里用source.kind=goal标记其来源；该来源元数据不应被误当成OpenAI请求必须原样带上的字段。
 
@@ -177,6 +7692,9 @@ Goal Round 2的Step 3：上述内容＋新增调用及结果
 
 第一次请求中，用户说“修复登录并验证”，模型看到todo_write定义后提出工具调用。下面是工具执行结束后，下一次请求里的相关消息：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "messages": [
@@ -206,6 +7724,8 @@ Goal Round 2的Step 3：上述内容＋新增调用及结果
   ]
 }
 ```
+
+</details>
 逐条看：user是人提出的任务；assistant是模型刚才产出的完整工具调用，todos仍在参数中；tool是宿主执行后的更新确认。下一轮LLM从自己的assistant历史读到具体事项，不需要把Todo再伪装成一条用户发言。
 
 宿主还另写todo/write供UI读取，但这个状态事件没有在上面额外变成第四条消息。如果随后模型把第一项标为completed，它会再次提交完整todos：旧assistant调用不会被改写，新调用作为新的历史追加。
@@ -213,6 +7733,9 @@ Goal Round 2的Step 3：上述内容＋新增调用及结果
 ### 例2：用户直接给了方案，先以user正文进入；评审后的方案还会作为assistant调用保留
 
 用户直接说“方案是先修会话校验，再补测试”，只要这句话被提交为聊天输入，它就是下面这条user消息：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 {
@@ -224,9 +7747,14 @@ Goal Round 2的Step 3：上述内容＋新增调用及结果
   ]
 }
 ```
+
+</details>
 这已经让模型读到了方案，但不会仅凭用户说了“方案”两个字就自动激活Plan mode，或凭空生成exit_plan_mode评审。若使用/plan命令，应区分命令开关与提交的任务正文：激活后的system会增加部署的规划引导，/plan附带的任务正文经steer作为user内容进入。
 
 假设规划模式已激活，模型整理完整方案并调用exit_plan_mode，用户批准。批准后的下一次请求片段是：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 {
@@ -257,6 +7785,8 @@ Goal Round 2的Step 3：上述内容＋新增调用及结果
   ]
 }
 ```
+
+</details>
 此时模型从assistant参数读取方案，从tool结果知道已批准。批准后的模式退出在下一次被接受的pre-step生效，因此这次组装不再贡献plan:policy；其它system段落仍按部署配置存在，上面只是省略它们。**退出规划模式删除的是规划规则的本次贡献，不会因此删除历史中的方案正文。**
 
 规划模式激活时，system中可能有“先探索并设计，通过exit_plan_mode提交完整方案”的部署引导；这句话是工作规则，不能代替“修会话校验、补测试”这份具体方案。如果用户选择继续修改，意见通过这次工具的失败结果交回，模型根据原方案和反馈重新提交方案。
@@ -264,6 +7794,9 @@ Goal Round 2的Step 3：上述内容＋新增调用及结果
 ### 例3：用户直接指定Goal，用户原话与持久目标是两个阶段
 
 用户说“目标是迁移登录模块并通过全部测试，最多自动推进10轮”，这段具体目标首先作为user进入。满足原版Goal工具的授权与使用规则后，模型可调用create_goal，把它登记为持久目标。执行后下一次请求的相关内容是：
+
+<details>
+<summary>展开退出规划模式删除的是规划规则的本次贡献，不会因此删除历史中的方案正文。（JSON）</summary>
 
 ```json
 {
@@ -294,6 +7827,8 @@ Goal Round 2的Step 3：上述内容＋新增调用及结果
   ]
 }
 ```
+
+</details>
 这次目标正文同时出现在user原话、assistant调用参数和tool返回的当前视图里；不是必须同时复制到system。工具结果还告诉模型id、revision、phase、轮次与activation，方便后续操作；没有Goal时get_goal会返回goal为null，而不是虚构一个目标。
 
 需要自动继续时，由驱动器另提交goal_round用户消息，包含当前有效Objective、Round编号和完整推进要求。上面的“先直接回答”C节给出了完整消息示例。它有以下区别：
@@ -414,6 +7949,9 @@ Todo也如此：UI能展示一份清单，不能单凭这一点断定下一次�
 
 Goal工具内部返回值和Native渲染也有明确约定：内部是当前目标对象，Native的output.render使用JSON.stringify，把该对象变成模型工具结果的文本。下面展示JSON解码后的结构示意：
 
+<details>
+<summary>展开user角色消息（JSON）</summary>
+
 ```json
 {
   "goal": {
@@ -427,6 +7965,8 @@ Goal工具内部返回值和Native渲染也有明确约定：内部是当前目�
   "activation": "armed"
 }
 ```
+
+</details>
 
 因此，不能把“系统里有Goal使用规则”误读成“当前目标正文一直作为系统提示词注入”。这两种内容由不同组件提供。
 
@@ -459,6 +7999,9 @@ Todo主要通过工具调用维护。模型调用todo_write时提交完整清单
 
 为便于阅读，先看调用参数已经解析成对象后的简化表示；这不是完整HTTP响应：
 
+<details>
+<summary>展开工具调用，工具调用里携带JSON参数（JSON）</summary>
+
 ```json
 {
   "name": "todo_write",
@@ -471,6 +8014,8 @@ Todo主要通过工具调用维护。模型调用todo_write时提交完整清单
   }
 }
 ```
+
+</details>
 
 接下来是实际处理方向：
 
@@ -492,6 +8037,9 @@ Todo本身不会监控代码文件或测试进程，也不会独立证明complet
 ## 5．模型返回的工具调用，具体结构是什么？
 
 以OpenAI兼容接口的非流式响应为例，下面保留与本次工具调用相关的响应字段。协议外层不等于前一节解析后的{name, arguments}简化结构：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 {
@@ -518,6 +8066,8 @@ Todo本身不会监控代码文件或测试进程，也不会独立证明complet
 }
 ```
 
+</details>
+
 要看清三个编号和字段：
 
 - name是工具名todo_write，不是某条任务的名称。
@@ -528,6 +8078,9 @@ Todo本身不会监控代码文件或测试进程，也不会独立证明complet
 
 执行后，下一次请求可以包含下面这条Native工具结果消息示意：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "role": "tool",
@@ -535,6 +8088,8 @@ Todo本身不会监控代码文件或测试进程，也不会独立证明complet
   "content": "Updated todo list: 1 pending, 1 in progress, 1 completed."
 }
 ```
+
+</details>
 
 tool_call_id必须关联前面的调用id。这里的content是渲染后的模型内容，不能据此断言内部execute只返回这一句话。
 
@@ -544,6 +8099,9 @@ tool_call_id必须关联前面的调用id。这里的content是渲染后的模�
 是。原版todo_write的todos参数表示完整任务清单，新清单整体替换旧清单。
 
 即使只修改“修复登录问题”的状态，也要提交希望继续保留的全部条目：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 {
@@ -555,7 +8113,12 @@ tool_call_id必须关联前面的调用id。这里的content是渲染后的模�
 }
 ```
 
+</details>
+
 如果只提交下面这一项：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 {
@@ -564,6 +8127,8 @@ tool_call_id必须关联前面的调用id。这里的content是渲染后的模�
   ]
 }
 ```
+
+</details>
 
 那么当前清单只剩这一项。它不是“按名称找到第二项并局部更新”，另外两项会从当前清单中消失。之前的todo/write事件仍保留在历史中，整表替换不等于物理删除旧事件。
 
@@ -610,6 +8175,9 @@ tool_call_id必须关联前面的调用id。这里的content是渲染后的模�
 
 以上面三项清单为例，**内部execute返回值**是：
 
+<details>
+<summary>展开内部execute返回值（JSON）</summary>
+
 ```json
 {
   "todos": [
@@ -625,7 +8193,12 @@ tool_call_id必须关联前面的调用id。这里的content是渲染后的模�
 }
 ```
 
+</details>
+
 output.render把它渲染为内容块：
+
+<details>
+<summary>展开内部execute返回值（JSON）</summary>
 
 ```json
 [
@@ -635,6 +8208,8 @@ output.render把它渲染为内容块：
   }
 ]
 ```
+
+</details>
 
 普通Native模型工具结果使用后面这份内容。在程序化调用路径，程序可以取得前面那个结构化对象；外层模型最终看到哪些数据，还取决于run_code程序返回或输出了什么。
 
@@ -651,6 +8226,9 @@ output.render把它渲染为内容块：
 
 模型调用todo_write，参数为：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "todos": [
@@ -660,6 +8238,8 @@ output.render把它渲染为内容块：
   ]
 }
 ```
+
+</details>
 
 工具保存整个清单，内部返回同一份todos加上counts；Native渲染结果是：
 
@@ -671,6 +8251,9 @@ Updated todo list: 2 pending, 1 in progress, 0 completed.
 
 模型先调用实际的读取或搜索工具，收到结果并确认检查完成，然后再次调用todo_write：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "todos": [
@@ -680,6 +8263,8 @@ Updated todo list: 2 pending, 1 in progress, 0 completed.
   ]
 }
 ```
+
+</details>
 
 Native结果：
 
@@ -691,6 +8276,9 @@ Updated todo list: 1 pending, 1 in progress, 1 completed.
 
 模型收到实际编辑工具的结果后，再提交完整清单：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "todos": [
@@ -700,6 +8288,8 @@ Updated todo list: 1 pending, 1 in progress, 1 completed.
   ]
 }
 ```
+
+</details>
 
 Native结果：
 
@@ -711,6 +8301,9 @@ Updated todo list: 0 pending, 1 in progress, 2 completed.
 
 这里必须先获得实际测试结果，不能仅因准备运行测试就提前标记completed。确认后再调用todo_write：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "todos": [
@@ -720,6 +8313,8 @@ Updated todo list: 0 pending, 1 in progress, 2 completed.
   ]
 }
 ```
+
+</details>
 
 Native结果：
 
@@ -746,6 +8341,9 @@ Updated todo list: 0 pending, 0 in progress, 3 completed.
 
 工具调用的参数解析后类似：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "name": "exit_plan_mode",
@@ -754,6 +8352,8 @@ Updated todo list: 0 pending, 0 in progress, 3 completed.
   }
 }
 ```
+
+</details>
 
 用户批准时，工具内部返回`{ "approved": true }`；Native渲染为：
 
@@ -773,6 +8373,9 @@ Plan mode没有一个用来逐项打勾的通用plan_update进度表。规划或
 Native路径主要通过已保留的工具调用历史。完整清单已经在模型上一次todo_write的参数中，宿主构造后续请求时带上这些历史。
 
 下面是下一次OpenAI兼容请求的messages部分示意。完整工具参数仍是JSON字符串，tool_call_id与前面调用id配对：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 [
@@ -801,6 +8404,8 @@ Native路径主要通过已保留的工具调用历史。完整清单已经在�
   }
 ]
 ```
+
+</details>
 
 模型从assistant工具调用的function.arguments中看到清单，从tool消息中看到更新成功的统计。界面即使把工具调用显示成卡片，它在模型上下文中仍可以是一条带工具调用的assistant消息。
 
@@ -975,6 +8580,9 @@ todo/write、plan/mode、goal/change、tool/call、command/run、command/done、
 
 以下是适配器统一后的原版ToolCallBlock示意，不是普通聊天文字，也不是OpenAI的完整HTTP响应：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "type": "tool-call",
@@ -983,6 +8591,8 @@ todo/write、plan/mode、goal/change、tool/call、command/run、command/done、
   "arguments": "{\"todos\":[{\"content\":\"修复登录\",\"status\":\"in_progress\"},{\"content\":\"运行测试\",\"status\":\"pending\"}]}"
 }
 ```
+
+</details>
 
 arguments保留模型生成的原始JSON字符串。Loop在收到并整理模型响应后，将这类内容块连同本次assistant消息写入assistant/message；该事件还可保存原始流记录与用量信息。模型输出还没有修改清单，真正修改在后面的工具执行发生。
 
@@ -1001,6 +8611,9 @@ user/message：用户要求修复登录
 
 tool/call的type/data相关字段示意：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "type": "tool/call",
@@ -1014,7 +8627,12 @@ tool/call的type/data相关字段示意：
 }
 ```
 
+</details>
+
 工具自己追加的领域事件是：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 {
@@ -1027,6 +8645,8 @@ tool/call的type/data相关字段示意：
   }
 }
 ```
+
+</details>
 
 execute内部返回完整todos与counts，但这个规范值不会作为tool/result的value字段自动持久化。Native的output.render先生成“Updated todo list: 1 pending, 1 in progress, 0 completed.”内容块，再由Loop封装成data.message.role为tool的tool/result，携带toolCallId、content与isError。用于保留完整清单的领域快照是上面的todo/write；用于模型对话的完整清单还存在assistant/message的工具调用参数中。
 
@@ -1082,12 +8702,17 @@ sequenceDiagram
 
 真正持久的模式事件type/data是：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "type": "plan/mode",
   "data": { "active": true }
 }
 ```
+
+</details>
 
 它只保存模式开关，没有完整方案正文。pending选择主要在进程内等待生效，不能假定尚未提交的选择也一定跨重启保留。
 
@@ -1176,6 +8801,9 @@ sequenceDiagram
 
 模型依据用户目标提出create_goal调用，参数解析后的例子是：
 
+<details>
+<summary>展开JSON示例（JSON）</summary>
+
 ```json
 {
   "name": "create_goal",
@@ -1186,11 +8814,16 @@ sequenceDiagram
 }
 ```
 
+</details>
+
 Loop记录assistant/message与tool/call，再执行Goal工具。工具检查调用来源等规则后，调用Goal服务。目标id、revision、创建时间和续行许可由宿主管理，不是相信模型随意填一份完整Goal快照。
 
 ### B．创建、编辑和完成，eventlog具体存什么
 
 创建成功时，Goal服务写goal/change，以下为type/data示意，编号与时间仅是示例值：
+
+<details>
+<summary>展开JSON示例（JSON）</summary>
 
 ```json
 {
@@ -1212,6 +8845,8 @@ Loop记录assistant/message与tool/call，再执行Goal工具。工具检查调�
   }
 }
 ```
+
+</details>
 
 非clear变更保存变更后的完整目标快照，operation说明create、edit、pause、resume、complete或block；clear则写带cleared引用与clearedAt的墓碑结构。严格回放会验证版本、revision连续性、状态转换和轮次等信息。
 
@@ -1242,6 +8877,9 @@ create_goal调用
 
 这条消息相关字段示意：
 
+<details>
+<summary>展开这条续行文本是宿主驱动器生成的，不是LLM在空闲时自行输出的。（JSON）</summary>
+
 ```json
 {
   "role": "user",
@@ -1259,6 +8897,8 @@ create_goal调用
   ]
 }
 ```
+
+</details>
 
 上面的content由直接调用本仓库renderGoalRoundPrompt生成，保留完整英文正文，未缩写其中的指令。这里省略了运行时生成的消息id。source.kind=goal说明这是驱动器生成的用户角色输入，不是假装真人刚打了这段文字；适配器可以将其content作为user消息发给模型，源信息则供宿主归属与校验。
 
@@ -1355,3 +8995,7 @@ sequenceDiagram
 | 具体目标提示词生成 | [goal/goal-round-driver/src/prompt.ts](../../../../deepseek-harness/packages/goal/goal-round-driver/src/prompt.ts) |
 
 返回：[039主文](../039.md)。
+
+</details>
+
+</details>
