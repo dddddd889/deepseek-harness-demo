@@ -38,6 +38,19 @@
       "type": "bun",
       "request": "attach",
       "url": "${input:bunInspectorUrl}"
+    },
+    {
+      "name": "044：SDK运行演示",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/sdk-demo.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "stopOnEntry": false
     }
   ],
   "inputs": [

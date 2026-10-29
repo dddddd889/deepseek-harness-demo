@@ -7,7 +7,8 @@ export class HarnessSDK {
   constructor({ home, cwd, env = process.env }) {
     if (!home) throw Error('SDK需要显式home')
     this.cwd = cwd
-    this.child = spawn(process.execPath, [fileURLToPath(new URL('./sdk-server.mjs', import.meta.url))], { cwd, env: { ...env, HARNESS_HOME: home }, stdio: ['pipe', 'pipe', 'pipe'] })
+    // 禁止子进程自动加载.env；模型密钥等配置以显式传入的env为准。
+    this.child = spawn(process.execPath, ['--no-env-file', fileURLToPath(new URL('./sdk-server.mjs', import.meta.url))], { cwd, env: { ...env, HARNESS_HOME: home }, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stderr.resume()
     this.peer = framing(new Peer(), this.child.stdout, this.child.stdin)
     this.child.on('error', () => this.peer.close())

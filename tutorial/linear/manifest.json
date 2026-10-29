@@ -607,7 +607,12 @@
   {
     "step": "044",
     "path": ".vscode/launch.json",
-    "sha256": "4560f4b96889da599d2ae80f180cc65bca3c6bfc19407a19c133d5eddcfc55d9"
+    "sha256": "9e9cd6180d238335b6a6ffe4daeb88bb4c287fce4be1e0f04496894422e41ebe"
+  },
+  {
+    "step": "044",
+    "path": "src/sdk-demo.mjs",
+    "sha256": "718e170cd2e7d15d30b7c0488a4bb0ceef41bfce7d83a03e0c60ac661d131854"
   },
   {
     "step": "044",
@@ -617,12 +622,12 @@
   {
     "step": "044",
     "path": "src/sdk.mjs",
-    "sha256": "42323dc27b729d48a10d9f54bbc4775d92cf7a8790aaa1ed8046d7e485c64a93"
+    "sha256": "a4f8a1053b778d3595c7fc309a76c3dbb32f23c432393483f7cb48b323f5dc5a"
   },
   {
     "step": "044",
     "path": "tests/044-sdk.test.mjs",
-    "sha256": "b05205202deab767e822b4a0d0d3c3cbe50bf48b86e7e03144caa6645fa47a3d"
+    "sha256": "0588d0144ea86f90ab5341d6ecc192d830c0e32595ad435a8dcd4064e3ba574f"
   },
   {
     "step": "045",

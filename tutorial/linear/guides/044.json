@@ -1,10 +1,10 @@
 {
   "scenario": "别的Bun程序想使用自己的Harness，不需要导入整个Agent内部。SDK负责启动隔离运行时，通过协议创建会话、接收通知、等待完成和回收进程。",
   "flow": "HarnessSDK spawn sdk-server → stdio Peer/framing → remote绑定Host → create → run中watch/submit/wait/read → 返回ending/events/text → stdin.end使服务端清理并退出",
-  "try": "先写完src/sdk.mjs、src/sdk-server.mjs及测试，再运行 bun test ./tests/044-sdk.test.mjs。测试删除DEEPSEEK_API_KEY，只用OfflineModel，真实启动Bun服务子进程，发送hello，检查completed、文本含hello、通知含turn/end，最后等待子进程退出。",
+  "try": "先写完本章文件，再在PROJECT运行 bun src/sdk-demo.mjs。演示打印父子进程PID、会话ID、事件通知、离线回复、退出码和数据目录；然后运行 bun test ./tests/044-sdk.test.mjs 做自动验收。SDK会自己启动服务子进程，不需要手动启动sdk-server。",
   "why": "SDK是对领域协议的高层包装，不应该再实现工具或Loop。HARNESS_HOME必须显式给定，避免测试写真实家目录；stdout只传NDJSON，诊断必须stderr。create拿会话身份，run只是组合几个已有领域请求。",
-  "accept": "测试应1项通过，真实子进程返回结果与事件一致且正常退出。没有验证真实DeepSeek、审批交互、初始化协商、恢复历史或多会话并发通知过滤。",
-  "debug": "父进程在src/sdk.mjs的spawn、peer.request(\"session.submit\"...)和run返回处打断点，查看child.pid、id、ending与events。F10跨await等服务端回复，不能从父自动F11进sdk-server。调试服务子进程须独立Inspector端口并避免继承父BUN_INSPECT；032的rpc-worker专用开关不会自动适用SDK。想先看服务端逻辑可附加后在src/sdk-server.mjs的remote调用和host.open处停，但需要额外启动参数配置，当前本章没有一键双进程配置。",
+  "accept": "演示输出“[离线演示] 你好，044 SDK”、completed、通知和Host退出码0；磁盘日志包含这次任务。测试应1项通过。没有验证真实DeepSeek、审批交互、初始化协商、恢复历史或多会话并发通知过滤。",
+  "debug": "打开src/sdk-demo.mjs，选择“044：SDK运行演示”按F5，先在sdk.create()、sdk.run(...)和sdk.close()处断点；再到src/sdk.mjs的spawn、peer.request(\"session.submit\"...)和run返回处，查看child.pid、id、ending与events。F10跨await等待子进程回复，父进程不能自动F11进入sdk-server。若看Host内部，按文末临时Inspector步骤附加子进程；032的rpc-worker开关不适用于SDK。",
   "recall": "闭卷画出SDK→stdio→remote→Host→Agent，不看源码列出run内部watch、submit、wait、read的先后顺序。",
   "transfer": "安全练习：同一个SDK创建两个临时会话顺序run，验证各自text与sessionId；保持测试中删除真实Key，避免无意收费。原版initialize/resume/shutdown需要显式实现，不能改个方法名就兼容。",
   "wiring": "044确实通过真实Bun子进程复用043领域控制器和041 Host。它与033 MCP/047 ACP SDK不是同一个协议；其cancel只是教程自定义方法。",
