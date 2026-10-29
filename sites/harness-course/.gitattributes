@@ -1,0 +1,2 @@
+# 第三方分发文件保留官方原始字节，空白检查不改写依赖中的字符串和模板。
+public/vendor/** -whitespace linguist-vendored
