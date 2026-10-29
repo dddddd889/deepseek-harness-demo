@@ -62,6 +62,19 @@
       "runtime": "bun",
       "runtimeArgs": ["--preload", "${workspaceFolder}/scripts/vscode-debug.mjs"],
       "stopOnEntry": false
+    },
+    {
+      "name": "041：会话管理演示",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/host-demo.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "stopOnEntry": false
     }
   ]
 }
