@@ -8,3 +8,4 @@ release/
 __pycache__/
 .runtime/
 tmp/
+.data-python-debug/
