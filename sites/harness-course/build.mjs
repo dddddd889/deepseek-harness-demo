@@ -115,8 +115,30 @@ function markdownLinks(markdown) {
   return links;
 }
 
+// 网页只链接当前提交中已有的练习文件，工作区里尚未提交的文件不能生成线上地址。
+async function collectProjectReferences() {
+  const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
+  const entries = execFileSync('git', ['ls-tree', '-r', '-z', revision, '--', 'harness-own'], { cwd: repositoryRoot, encoding: 'utf8' });
+  const tracked = new Set(entries.split('\0').flatMap((entry) => {
+    const match = entry.match(/^100(?:644|755) blob [a-f\d]+\t(harness-own\/.+)$/);
+    return match ? [match[1]] : [];
+  }));
+  if (!tracked.size) throw new Error('当前提交没有 harness-own 源码，无法生成可访问的工程链接');
+  const settings = JSON.parse(await readFile(resolve(sourceRoot, 'harness-links.json'), 'utf8'));
+  if (settings.schemaVersion !== 1 || !settings.aliases || typeof settings.aliases !== 'object') throw new Error('练习文件映射格式不正确');
+  for (const [lesson, aliases] of Object.entries(settings.aliases)) {
+    if (!/^\d{3}$/.test(lesson) || !aliases || typeof aliases !== 'object') throw new Error('练习文件映射缺少课次');
+    for (const [from, to] of Object.entries(aliases)) {
+      if (typeof to !== 'string' || !/^[\w./-]+$/.test(from) || !/^[\w./-]+$/.test(to) || posix.normalize(to) !== to || !tracked.has(`harness-own/${to}`)) {
+        throw new Error(`练习文件映射目标没有提交：${lesson} · ${from} → ${to}`);
+      }
+    }
+  }
+  return { revision, tracked, aliases: settings.aliases, checkedLinks: 0, targets: new Set() };
+}
+
 // 相对链接按当前文档解析；原版及同仓练习源码只提供链接，不复制进教材静态正文。
-async function localTarget(document, link) {
+async function localTarget(document, link, project) {
   const value = decodeEntities(link);
   if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(value)) return null;
   const rawPath = decodeURIComponent(value.split(/[?#]/, 1)[0]);
@@ -127,7 +149,11 @@ async function localTarget(document, link) {
   if (!isWithin(sourceRoot, target)) {
     if (isWithin(resolve(repositoryRoot, 'deepseek-harness'), target)) return null;
     if (isWithin(resolve(repositoryRoot, 'harness-own'), target)) {
+      const repositoryPath = relativePath(repositoryRoot, target);
+      if (!project.tracked.has(repositoryPath)) throw new Error(`练习源码链接指向未提交或不存在的文件：${relativePath(sourceRoot, document)} → ${link}`);
       if (!(await fileInfo(target))?.isFile()) throw new Error(`同仓练习源码引用不存在：${relativePath(sourceRoot, document)} → ${link}`);
+      project.checkedLinks++;
+      project.targets.add(repositoryPath);
       return null;
     }
     throw new Error(`链接越出教程目录：${relativePath(sourceRoot, document)} → ${link}`);
@@ -136,7 +162,7 @@ async function localTarget(document, link) {
 }
 
 // 从教材成品和根说明出发，沿实际链接收集附件，不执行任何教程代码。
-async function collectSourceFiles() {
+async function collectSourceFiles(project) {
   const lessonFiles = (await listFiles(resolve(sourceRoot, 'lessons'))).filter((path) => extname(path).toLowerCase() === '.md');
   const queue = [...rootDocuments.map((name) => resolve(sourceRoot, name)), ...lessonFiles];
   const files = new Map();
@@ -153,7 +179,7 @@ async function collectSourceFiles() {
     files.set(relative, content);
     if (extname(path).toLowerCase() !== '.md') continue;
     for (const link of markdownLinks(textDecoder.decode(content))) {
-      const target = await localTarget(path, link);
+      const target = await localTarget(path, link, project);
       if (target === null) continue;
       checkedLocalLinks++;
       const targetInfo = await fileInfo(target);
@@ -215,7 +241,8 @@ function checkHtmlAssets(expectedFiles) {
 
 // 先完整收集并验证源文件，之后才允许写入生成目录。
 async function generate() {
-  const { files, warnings, checkedLocalLinks } = await collectSourceFiles();
+  const project = await collectProjectReferences();
+  const { files, warnings, checkedLocalLinks } = await collectSourceFiles(project);
   const ids = Array.from({ length: 70 }, (_, index) => String(index).padStart(3, '0'));
   const metadata = JSON.parse(await readFile(resolve(sourceRoot, 'lessons.json'), 'utf8'));
   if (JSON.stringify(metadata.map((lesson) => lesson.id)) !== JSON.stringify(ids)) throw new Error('lessons.json 必须按顺序包含且仅包含 000～069 共 70 课');
@@ -235,15 +262,18 @@ async function generate() {
     const documentHeadings = headings(textDecoder.decode(files.get(path)));
     return { path, title: documentHeadings[0]?.text || posix.basename(path, '.md') };
   });
-  const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
+  const revision = project.revision;
   const course = {
     title: '从空工程逐步实现 Harness',
     description: '70 节连续教程：从命令行入口开始，逐步接通模型、工具、会话、Web 与 Electron。',
     sourceRevision: revision, upstreamBase, chapters, documents,
+    projectFiles: [...project.tracked].map((path) => path.slice('harness-own/'.length)).sort(compareText),
+    projectAliases: project.aliases,
   };
   const manifest = {
     schemaVersion: 1, sourceRoot: 'tutorial/linear', sourceRevision: revision,
     chapterCount: chapters.length, documentCount: documents.length, checkedLocalLinks,
+    checkedProjectLinks: project.checkedLinks, projectLinkTargets: [...project.targets].sort(compareText),
     files: [...files].sort(([left], [right]) => compareText(left, right)).map(([path, content]) => ({ path, bytes: content.length, sha256: sha256(content) })),
     warnings,
   };
@@ -300,6 +330,7 @@ async function main() {
   const operation = arguments_.includes('--check') ? '只读校验通过' : '静态站构建并校验通过';
   console.log(`${operation}：70 课，${course.documents.length} 份补充文档，${files.size} 个原样内容文件，${expectedFiles.size} 个静态产物。`);
   console.log(`教材正文 ${[...files.values()].reduce((total, content) => total + content.length, 0).toLocaleString('en-US')} 字节；已检查 ${manifest.checkedLocalLinks} 处教材内部引用。`);
+  console.log(`已核对 ${manifest.checkedProjectLinks} 处 harness-own 链接，覆盖 ${manifest.projectLinkTargets.length} 个已提交文件。`);
   console.log('输出：sites/harness-course/dist/index.html；阅读和部署均不需要 Python 或后台进程。');
   for (const warning of manifest.warnings) console.log(`历史资料提示：${warning.document} → ${warning.target}（${warning.reason}）`);
 }

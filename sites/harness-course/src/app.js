@@ -152,6 +152,26 @@ function rewriteLinks(container, path) {
   for (const image of container.querySelectorAll('img[src]')) image.src = new URL(image.getAttribute('src'), base).href;
 }
 
+// 把正文里单独标出的工程路径变为源码链接；围栏代码、已有链接和未提交文件保持原样。
+function linkProjectCode(container, path) {
+  const lesson = path.match(/^lessons\/(\d{3})(?:\.md|\/)/)?.[1];
+  const available = new Set(course.projectFiles || []);
+  const aliases = course.projectAliases?.[lesson] || {};
+  for (const code of container.querySelectorAll('code')) {
+    if (code.closest('pre, a, .diagram')) continue;
+    const reference = code.textContent.trim().replace(/^(?:\$PROJECT\/|\.\/|harness-own\/)/, '');
+    const target = aliases[reference] || reference;
+    if (!available.has(target)) continue;
+    const link = element('a', 'project-file-link');
+    const encoded = target.split('/').map(encodeURIComponent).join('/');
+    link.href = `https://github.com/dddddd889/deepseek-harness-demo/blob/${course.sourceRevision}/harness-own/${encoded}`;
+    link.target = '_blank'; link.rel = 'noopener noreferrer';
+    link.title = `查看当前练习工程：harness-own/${target}`;
+    link.dataset.projectFile = target;
+    code.replaceWith(link); link.append(code);
+  }
+}
+
 // 复制以教材原文为准，代码高亮和显示换行不会改写复制结果。
 async function copyText(text, button) {
   try {
@@ -297,6 +317,7 @@ async function loadPage() {
     const html = window.marked.parse(markdown, { gfm: true, breaks: false });
     $('markdown-content').innerHTML = window.DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
     rewriteLinks($('markdown-content'), currentPath);
+    linkProjectCode($('markdown-content'), currentPath);
     if ('IntersectionObserver' in window) {
       diagramObserver = new IntersectionObserver((entries) => {
         for (const entry of entries) if (entry.isIntersecting) { diagramObserver.unobserve(entry.target); entry.target.renderDiagram(); }

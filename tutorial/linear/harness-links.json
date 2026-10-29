@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "aliases": {
+    "012": {
+      "src/loop.mjs": "src/loop_012.mjs"
+    },
+    "013": {
+      "src/demo.mjs": "src/agent-demo.mjs"
+    },
+    "014": {
+      "src/loop.mjs": "src/loop_014.mjs"
+    },
+    "016": {
+      "src/demo.mjs": "src/deepseek-demo.mjs"
+    },
+    "022": {
+      "src/edit-demo.mjs": "src/file-tools-edit-demo.mjs"
+    }
+  }
+}
