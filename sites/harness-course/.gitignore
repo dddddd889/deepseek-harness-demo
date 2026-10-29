@@ -1,0 +1,4 @@
+# CI 按源 Markdown 重建静态产物；本机交付包和验证截图不进入源码提交。
+/dist/
+/harness-course-static.zip
+/preview*.jpg

@@ -8,6 +8,8 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const output = process.argv[2] && resolve(process.argv[2]);
 const repository = process.env.GITHUB_REPOSITORY;
 if (!output || !/^[\w.-]+\/[\w.-]+$/.test(repository ?? '')) throw new Error('请指定新输出目录，并设置 GITHUB_REPOSITORY=组织/仓库。');
+// 发布前用同一个 Node 运行时构建阅读站，确保最新 Markdown 已进入静态产物。
+execFileSync(process.execPath, [resolve(root, 'sites/harness-course/build.mjs')], { cwd: root, stdio: 'inherit' });
 await mkdir(output);
 const revision = process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 const extensions = new Set(['.html', '.css', '.svg', '.mmd', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.woff', '.woff2']);
@@ -25,7 +27,14 @@ for (const [directory, repo] of [['deepseek-harness', 'deepseek-ai/deepseek-harn
 
 // 将站外源码引用改为 GitHub 地址，保留站内相对路径以兼容项目型 Pages 子路径。
 function rewrite(html, path) {
-  return html.replace(/href="([^"#]+)(#[^"]*)?"/g, (match, href, fragment = '') => {
+  // 在已有课程首页加入新阅读站入口，发布时生成，避免改动正在编辑的课程原文。
+  let page = html;
+  if (path === 'reference/deepseek-harness-build-roadmap.html' && !html.includes('id="linear-course"')) {
+    const courseEntry = '\n  <section id="linear-course"><h2><a href="../sites/harness-course/dist/index.html">70 节连续教程：从空工程逐步实现 Harness →</a></h2><p>按 000～069 顺序学习，直接阅读 Markdown、搜索正文、复制代码并查看时序图；支持手机阅读和本地学习进度。</p></section>\n';
+    page = html.replace(/(<p class="lead">[\s\S]*?<\/p>)/, `$1${courseEntry}`);
+    if (page === html) throw new Error('课程首页缺少 lead 段落，无法加入 70 节教程入口。');
+  }
+  return page.replace(/href="([^"#]+)(#[^"]*)?"/g, (match, href, fragment = '') => {
     if (/^[a-z][a-z0-9+.-]*:|^\/\//i.test(href)) return match;
     const target = relative(root, resolve(root, dirname(path), decodeURIComponent(href))).replaceAll('\\', '/');
     if (target.startsWith('../')) throw new Error(`链接越出仓库：${path} → ${href}`);
@@ -39,10 +48,14 @@ function rewrite(html, path) {
 // 递归处理站点目录；preserveHtml 用于原样发布带沙盒和 CSP 的独立可视化。
 async function publish(directory, preserveHtml = false) {
   for (const entry of await readdir(resolve(root, directory), { withFileTypes: true })) {
+    // 阅读站只发布构建后的 dist，不把 src、构建脚本或交付压缩包当作网页发布。
+    if (directory === 'sites/harness-course' && entry.name !== 'dist') continue;
     const path = `${directory}/${entry.name}`;
     if (entry.isSymbolicLink()) throw new Error(`不允许发布符号链接：${path}`);
     if (entry.isDirectory()) { await publish(path, preserveHtml); continue; }
-    if (!extensions.has(extname(path))) continue;
+    // 新阅读站直接在浏览器渲染 Markdown，完整保留其明确发布目录内的脚本、正文和依赖许可。
+    const markdownReaderAsset = path.startsWith('sites/harness-course/dist/');
+    if (!extensions.has(extname(path)) && !markdownReaderAsset) continue;
     await mkdir(dirname(resolve(output, path)), { recursive: true });
     if (extname(path) === '.html') {
       // 独立可视化按字节复制，其他课程页面继续转换源码链接。

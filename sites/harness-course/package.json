@@ -1,0 +1,15 @@
+{
+  "name": "harness-course-static",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "零依赖构建 Harness 70 节 Markdown 静态阅读站。",
+  "scripts": {
+    "build": "bun build.mjs",
+    "check": "bun build.mjs --check"
+  },
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.14"
+  }
+}

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="description" content="70 节连续教程，从空工程逐步实现自己的 Harness。直接阅读 Markdown、观察时序图、运行代码并完成练习。">
+    <title>从零实现 Harness · 70 节实践教程</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23224e42'/%3E%3Cpath d='M19 17v30m26-30v30M19 32h26' stroke='%23f9f7ef' stroke-width='7'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-theme="light" data-font="normal">
+    <a class="skip-link" href="#markdown-content">跳到正文</a>
+    <div id="reading-progress" class="reading-progress" aria-hidden="true"></div>
+    <button id="sidebar-overlay" class="sidebar-overlay" type="button" aria-label="关闭课程目录" tabindex="-1"></button>
+
+    <aside id="sidebar" class="sidebar" aria-label="课程导航">
+      <a class="brand" href="#/README.md" aria-label="从零实现 Harness，课程说明">
+        <span class="brand-mark" aria-hidden="true">H<span>_</span></span>
+        <span class="brand-copy"><strong>从零实现 Harness</strong><span>把原理写成自己的代码</span></span>
+      </a>
+
+      <div class="course-summary"><span class="eyebrow">实践课程</span><span class="lesson-count">70 节 · 连续进阶</span></div>
+
+      <div class="search-box">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
+        <label class="sr-only" for="search-input">搜索课程标题和正文</label>
+        <input id="search-input" type="search" placeholder="搜索课程与正文…" autocomplete="off" spellcheck="false">
+        <button id="search-clear" class="search-clear" type="button" aria-label="清空搜索" hidden>×</button>
+      </div>
+
+      <div id="search-results" class="search-results" aria-live="polite" hidden></div>
+      <nav id="course-list" class="course-list" aria-label="70 节课程目录"><div class="nav-loading">正在载入课程目录…</div></nav>
+
+      <div class="sidebar-footer">
+        <div class="progress-caption"><span>我的学习进度</span><strong id="progress-count">0 / 70</strong></div>
+        <div class="progress-track" aria-hidden="true"><span id="progress-fill"></span></div>
+        <a id="continue-link" class="continue-link" href="#/lessons/000.md"><span>从第 000 节开始</span><span aria-hidden="true">↗</span></a>
+        <a class="course-about" href="#/README.md">课程说明与使用方式 <span aria-hidden="true">→</span></a>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-location">
+          <button id="menu-toggle" class="icon-button menu-toggle" type="button" aria-label="打开课程目录" aria-controls="sidebar" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+          <a class="topbar-home" href="#/README.md">课程</a><span class="breadcrumb-divider" aria-hidden="true">/</span><span id="breadcrumb">开始阅读</span>
+        </div>
+        <div class="reader-actions" aria-label="阅读设置">
+          <button id="raw-toggle" class="text-button raw-toggle" type="button" aria-pressed="false" title="切换 Markdown 原文"><span class="code-symbol" aria-hidden="true">&lt;/&gt;</span><span>原文</span></button>
+          <span class="action-divider" aria-hidden="true"></span>
+          <button id="font-toggle" class="icon-button font-toggle" type="button" aria-label="放大正文字号" aria-pressed="false" title="调整正文字号">Aa</button>
+          <button id="theme-toggle" class="icon-button theme-toggle" type="button" aria-label="切换深色模式" aria-pressed="false" title="切换明暗主题"><svg class="moon-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20.7 13.1A8.8 8.8 0 0 1 10.9 3.3 8.8 8.8 0 1 0 20.7 13.1Z"></path></svg><svg class="sun-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg></button>
+        </div>
+      </header>
+
+      <main id="main" class="reader-layout">
+        <div class="article-column">
+          <div id="chapter-meta" class="chapter-meta"><span class="eyebrow">从零开始 · 逐步构建</span><span>Markdown 阅读</span></div>
+          <div id="notice" class="notice" role="status" hidden></div>
+          <article id="markdown-content" class="markdown-body" aria-label="课程正文" tabindex="-1"><div class="content-loading"><span class="loading-dot"></span><p>正在打开教材…</p></div></article>
+          <pre id="raw-content" class="raw-content" aria-label="Markdown 原始文本" hidden><code id="raw-code"></code></pre>
+
+          <div class="lesson-footer">
+            <div class="lesson-footer-copy"><span class="eyebrow">学完，再亲手试一次</span><p>能运行、能解释、能换个条件验证。</p></div>
+            <button id="complete-button" class="complete-button" type="button" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg><span>标记本节已完成</span></button>
+          </div>
+          <nav id="lesson-navigation" class="lesson-navigation" aria-label="前后课程"><a id="previous-link" class="lesson-nav-card previous-link" href="#/README.md"><span class="nav-direction">← 上一节</span><strong>课程介绍</strong></a><a id="next-link" class="lesson-nav-card next-link" href="#/lessons/000.md"><span class="nav-direction">下一节 →</span><strong>从空工程开始</strong></a></nav>
+          <footer class="page-footer"><span>一步一步，写出自己的 Harness。</span><a id="source-link" href="content/README.md" target="_blank" rel="noopener noreferrer">查看 Markdown <span aria-hidden="true">↗</span></a></footer>
+        </div>
+
+        <aside id="toc-panel" class="toc-panel" aria-label="本页目录"><div class="toc-heading"><span>本页内容</span><span class="toc-decoration" aria-hidden="true">≡</span></div><nav id="toc" class="toc"></nav><div class="toc-note"><span class="note-line" aria-hidden="true"></span><p>先读场景，再写代码。<br>在断点里看见变化。</p></div></aside>
+      </main>
+    </div>
+
+    <!-- 渲染依赖随网站保存，阅读时不依赖第三方 CDN。 -->
+    <script src="vendor/marked.umd.js"></script>
+    <script src="vendor/purify.min.js"></script>
+    <script src="vendor/highlight.min.js"></script>
+    <script src="vendor/mermaid.min.js"></script>
+    <!-- 构建时打包原始 Markdown，经典脚本可在静态托管及 file:// 下直接读取。 -->
+    <script src="course-data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
