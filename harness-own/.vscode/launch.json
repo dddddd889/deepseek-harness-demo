@@ -111,7 +111,8 @@
       ],
       "stopOnEntry": false,
       "env": {
-        "SDK_DEBUG_HOST": "1"
+        "SDK_DEBUG_HOST": "1",
+        "ACP_TRACE": "1",
       }
     },
     {
