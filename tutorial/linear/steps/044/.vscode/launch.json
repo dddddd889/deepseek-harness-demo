@@ -31,7 +31,10 @@
         "--timeout",
         "3600000"
       ],
-      "stopOnEntry": false
+      "stopOnEntry": false,
+      "env": {
+        "SDK_DEBUG_HOST": "0"
+      }
     },
     {
       "name": "Bun：附加子进程",
@@ -50,6 +53,44 @@
         "--preload",
         "${workspaceFolder}/scripts/vscode-debug.mjs"
       ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "044：SDK固定测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/044-sdk.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "env": {
+        "SDK_DEBUG_HOST": "0"
+      },
+      "stopOnEntry": false
+    },
+    {
+      "name": "044：SDK测试（等待附加Host）",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/044-sdk.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "env": {
+        "SDK_DEBUG_HOST": "1"
+      },
       "stopOnEntry": false
     }
   ],

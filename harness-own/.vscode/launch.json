@@ -60,7 +60,10 @@
       "program": "${workspaceFolder}/src/collaboration-demo.mjs",
       "cwd": "${workspaceFolder}",
       "runtime": "bun",
-      "runtimeArgs": ["--preload", "${workspaceFolder}/scripts/vscode-debug.mjs"],
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
       "stopOnEntry": false
     },
     {
@@ -77,6 +80,47 @@
       "stopOnEntry": false
     },
     {
+      "name": "Bun：044：SDK运行演示 CLI 入口",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/main.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "args": [
+        "读取 README"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：当前测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false,
+      "env": {
+        "SDK_DEBUG_HOST": "0"
+      }
+    },
+    {
+      "name": "Bun：044：SDK运行演示 附加子进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "${input:bunInspectorUrl}"
+    },
+    {
       "name": "044：SDK运行演示",
       "type": "bun",
       "request": "launch",
@@ -90,10 +134,10 @@
       "stopOnEntry": false
     },
     {
-      "name": "Bun：Bun原生SDK驱动同一个Host进程 当前测试",
+      "name": "044：SDK固定测试",
       "type": "bun",
       "request": "launch",
-      "program": "${file}",
+      "program": "${workspaceFolder}/tests/044-sdk.test.mjs",
       "cwd": "${workspaceFolder}",
       "runtime": "bun",
       "runtimeArgs": [
@@ -103,13 +147,29 @@
         "--timeout",
         "3600000"
       ],
+      "env": {
+        "SDK_DEBUG_HOST": "0"
+      },
       "stopOnEntry": false
     },
     {
-      "name": "Bun：Bun原生SDK驱动同一个Host进程 附加子进程",
+      "name": "044：SDK测试（等待附加Host）",
       "type": "bun",
-      "request": "attach",
-      "url": "${input:bunInspectorUrl}"
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/044-sdk.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "env": {
+        "SDK_DEBUG_HOST": "1"
+      },
+      "stopOnEntry": false
     }
   ],
   "inputs": [
