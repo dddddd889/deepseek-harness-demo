@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1360" viewBox="0 0 1320 1360" role="img" aria-labelledby="title desc">
+<title id="title">Web API 与 ACP：领域、独立接入和共用运行时</title>
+<desc id="desc">用户侧分别连接 Web 客户端和 ACP 客户端。两种协议进入 Agent Server 各自的接入层，通过同进程方法和事件复用 Agent、Inbox、Loop、Session、审批与模型能力。两入口可分开部署，共用实现不代表共用同一个会话。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#667085"/></marker></defs>
+<rect width="1320" height="1360" fill="#fbfcfe"/>
+<g font-family="PingFang SC,Microsoft YaHei,sans-serif">
+<text x="660" y="36" text-anchor="middle" fill="#172033" font-size="24"><tspan x="660" dy="0">Web API 与 ACP：不同入口，共用服务端业务能力</tspan></text>
+<text x="660" y="64" text-anchor="middle" fill="#172033" font-size="17"><tspan x="660" dy="0">蓝色：Web 自有实现　橙色：ACP 自有实现　绿色：共用实现与服务约定</tspan></text>
+<rect x="30" y="85" width="1260" height="80" rx="12" fill="#f4f6fa" stroke="#667085"/>
+<text x="660.0" y="131" text-anchor="middle" fill="#172033" font-size="19"><tspan x="660.0" dy="0">用户侧：Web 用户，或 IDE / 父 Agent 的使用者</tspan></text>
+<rect x="30" y="205" width="610" height="230" rx="12" fill="#edf2ff" stroke="#3157d5"/>
+<text x="335.0" y="237" text-anchor="middle" fill="#172033" font-size="19"><tspan x="335.0" dy="0">原生 Web 客户端进程</tspan></text>
+<rect x="680" y="205" width="610" height="230" rx="12" fill="#fff5e5" stroke="#9a5a15"/>
+<text x="985.0" y="237" text-anchor="middle" fill="#172033" font-size="19"><tspan x="985.0" dy="0">ACP 客户端进程</tspan></text>
+<rect x="30" y="565" width="1260" height="560" rx="12" fill="#f4f6fa" stroke="#667085"/>
+<text x="660.0" y="597" text-anchor="middle" fill="#172033" font-size="19"><tspan x="660.0" dy="0">Agent Server 端：宿主职责合画，两个入口可分别装配 / 部署</tspan></text>
+<rect x="30" y="1200" width="1260" height="105" rx="12" fill="#f4f6fa" stroke="#667085"/>
+<text x="660.0" y="1232" text-anchor="middle" fill="#172033" font-size="19"><tspan x="660.0" dy="0">远端模型服务（独立于 ACP / Web 协议）</tspan></text>
+<rect x="55" y="260" width="560" height="65" rx="10" fill="white" stroke="#3157d5" stroke-width="2"/>
+<text x="335.0" y="298.5" text-anchor="middle" fill="#172033" font-size="18"><tspan x="335.0" dy="0">Web UI：输入、展示、审批、停止</tspan></text>
+<rect x="55" y="350" width="560" height="65" rx="10" fill="white" stroke="#3157d5" stroke-width="2"/>
+<text x="335.0" y="374.5" text-anchor="middle" fill="#172033" font-size="18"><tspan x="335.0" dy="0">SessionRuntime / ctx.remote / Connection</tspan><tspan x="335.0" dy="28">原生客户端状态镜像与 API 调用</tspan></text>
+<rect x="705" y="260" width="560" height="65" rx="10" fill="white" stroke="#9a5a15" stroke-width="2"/>
+<text x="985.0" y="298.5" text-anchor="middle" fill="#172033" font-size="18"><tspan x="985.0" dy="0">IDE UI / 父 Agent / 自动化程序</tspan></text>
+<rect x="705" y="350" width="560" height="65" rx="10" fill="white" stroke="#9a5a15" stroke-width="2"/>
+<text x="985.0" y="374.5" text-anchor="middle" fill="#172033" font-size="18"><tspan x="985.0" dy="0">ACP Client SDK：ClientSideConnection</tspan><tspan x="985.0" dy="28">处理输出通知与权限请求</tspan></text>
+<rect x="55" y="625" width="560" height="190" rx="10" fill="white" stroke="#3157d5" stroke-width="2"/>
+<text x="335.0" y="684.0" text-anchor="middle" fill="#172033" font-size="18"><tspan x="335.0" dy="0">Web 接入：Connection + API Proxy / Gateway</tspan><tspan x="335.0" dy="28">prompt：session.prompt → accepted</tspan><tspan x="335.0" dy="28">输出：events.mux / events.host WebSocket</tspan><tspan x="335.0" dy="28">取消：session.cancel；审批：POST /api/respond</tspan></text>
+<rect x="705" y="625" width="560" height="190" rx="10" fill="white" stroke="#9a5a15" stroke-width="2"/>
+<text x="985.0" y="684.0" text-anchor="middle" fill="#172033" font-size="18"><tspan x="985.0" dy="0">ACP 接入：AgentSideConnection + dsh-acp</tspan><tspan x="985.0" dy="28">prompt：session/prompt → 最终 stopReason</tspan><tspan x="985.0" dy="28">输出：session/update（已提交文本 / 图片）</tspan><tspan x="985.0" dy="28">取消：session/cancel；审批：request_permission</tspan></text>
+<rect x="110" y="915" width="1100" height="160" rx="10" fill="white" stroke="#28734d" stroke-width="2"/>
+<text x="660.0" y="973.0" text-anchor="middle" fill="#172033" font-size="18"><tspan x="660.0" dy="0">共用业务实现与接口：Agent 管理 / Agent 句柄 / Inbox / Agent Loop</tspan><tspan x="660.0" dy="28">共用事实与扩展点：Session / SessionEvent / approval/request</tspan><tspan x="660.0" dy="28">共用执行能力：工具管线 / LLM 接口 / 模型适配器</tspan></text>
+<polyline points="335,165 335,205" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" />
+<polyline points="985,165 985,205" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" />
+<polyline points="335,325 335,350" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<polyline points="985,325 985,350" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<polyline points="335,415 335,625" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<rect x="37.5" y="465" width="595" height="34" rx="5" fill="#fbfcfe"/>
+<text x="335" y="488" text-anchor="middle" fill="#172033" font-size="17"><tspan x="335" dy="0">跨进程：HTTP POST 上行；双 WebSocket 下行</tspan></text>
+<polyline points="985,415 985,625" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<rect x="687.5" y="465" width="595" height="34" rx="5" fill="#fbfcfe"/>
+<text x="985" y="488" text-anchor="middle" fill="#172033" font-size="17"><tspan x="985" dy="0">跨进程：stdio 双向 JSON-RPC / NDJSON</tspan></text>
+<polyline points="335,815 335,915" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<rect x="65.0" y="840" width="540" height="34" rx="5" fill="#fbfcfe"/>
+<text x="335" y="863" text-anchor="middle" fill="#172033" font-size="17"><tspan x="335" dy="0">本地调用 / 事件；Web 接入策略</tspan></text>
+<polyline points="985,815 985,915" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<rect x="715.0" y="840" width="540" height="34" rx="5" fill="#fbfcfe"/>
+<text x="985" y="863" text-anchor="middle" fill="#172033" font-size="17"><tspan x="985" dy="0">本地调用 / 事件；ACP 接入策略</tspan></text>
+<polyline points="1100,1075 1100,1140 660,1140 660,1200" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<rect x="390.0" y="1142" width="540" height="34" rx="5" fill="#fbfcfe"/>
+<text x="660" y="1165" text-anchor="middle" fill="#172033" font-size="17"><tspan x="660" dy="0">跨网络：模型适配器 → HTTPS / SSE 等模型协议</tspan></text>
+<text x="660" y="1105" text-anchor="middle" fill="#172033" font-size="17"><tspan x="660" dy="0">共用代码与接口 ≠ 自动共享会话、Agent 实例或连接所有权</tspan></text>
+<text x="660" y="1272" text-anchor="middle" fill="#172033" font-size="19"><tspan x="660" dy="0">DeepSeek 等模型 API；Agent Loop 经适配器发起请求、接收分片</tspan></text>
+<text x="660" y="1338" text-anchor="middle" fill="#172033" font-size="17"><tspan x="660" dy="0">当前实现：Web 可展示模型增量；dsh-acp 仅发送已提交消息；客户端没有通用的双后端适配层。</tspan></text>
+</g></svg>

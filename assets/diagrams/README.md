@@ -23,6 +23,20 @@ python3 assets/diagrams/verify.py
 
 ## 阅读边界
 
+### 全量功能与调试路线总图
+
+在仓库根目录运行 `python3 scripts/build-feature-debug-plan.py`，从同一份功能与步骤定义生成两份专题页面和 `feature-plan/overview.svg`、`feature-plan/overview.mmd`。功能编号与调试步骤双向链接；生成器核对源码包组覆盖、步骤依赖和参考测试路径。该图表示建议建设顺序，不表示一次请求的调用顺序；具体依赖和短路线见调试卡，也不计入固定的逐课图数量。
+
+### Web API 与 ACP 专题总图
+
+`build-web-acp.py` 从同一份领域、节点和连线定义生成 `web-acp/overview.svg` 与 `web-acp/overview.mmd`，由 `reference/web-api-acp-domain-comparison.html` 引用。专题文件位于子目录，不计入固定的逐课图数量。
+
+```sh
+python3 assets/diagrams/build-web-acp.py
+```
+
+总图区分用户、两种客户端进程、Host 内部独立接入与共用运行时、远端模型服务。两个入口按职责合画，不声称默认同进程同时装配；共用实现也不表示共享同一会话或 Agent 实例。图中只画当前实现，未来通用 UI 后端接口的建议留在正文中明确标注。
+
 模块图是本课职责关系，不等同于每个节点都对应独立类；时序图是一个代表性场景，不表示所有外部能力都会在一次请求中调用。
 
 总图中的实线表示当前实现关系，虚线表示可选或独立教学扩展。当前 HeadlessHost 创建 Agent 时没有默认注入 ToolRegistry；实验室 TelemetrySink 是可替换接口，不能据此推断已经向真实 Collector 发送 OTLP。
@@ -53,3 +67,5 @@ bun assets/diagrams/verify-concepts.mjs --partial
 正文校验从 HTML 能力清单推导覆盖范围，检查概念唯一性、实际所在小节、清单锚点、问题、三框架列、区别说明与本地依据存在性。远程来源只校验 URL 和官方域名，不以此声称已验证网页内容；论述是否准确、依据是否充分仍需逐项人工审阅。`--partial` 通过不代表工作完成。
 
 校验器检查全部 69 个 SVG 的 XML、标题、可见图形、数字坐标范围、对应 Mermaid 标签，以及 18 个 HTML 页面的图片、图源和总体图回链；另检查每课四项定位说明、三框架条目与本地来源。图像可以用 macOS `sips` 离线栅格化抽查，不需要执行网页脚本。结构检查不能证明论述正确，语义须对照来源审阅。Mermaid 仅检查图类型与标签一致性，不宣称已经通过第三方 Mermaid 引擎解析。
+
+Electron 桌面扩展图位于 `feature-plan/desktop.svg` / `.mmd`，以及更新后的里程碑 `feature-plan/overview.svg` / `.mmd`；均由 `scripts/build-feature-debug-plan.py` 生成。桌面由 24～27 的 Web 闭环分支进入 40～46，图中区分 Renderer、preload、main、Host、Agent Loop 与模型。

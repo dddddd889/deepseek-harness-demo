@@ -1,0 +1,225 @@
+[
+  {
+    "id": "00",
+    "title": "在真正的空目录接收第一个任务",
+    "files": [
+      ".gitignore",
+      "package.json",
+      "src/main.ts",
+      "tests/00-entry.test.ts"
+    ]
+  },
+  {
+    "id": "01",
+    "title": "统一身份、事件和会话历史",
+    "files": [
+      "src/domain.ts",
+      "src/session.ts",
+      "tests/01-session.test.ts"
+    ]
+  },
+  {
+    "id": "02",
+    "title": "先把模型看成一条流",
+    "files": [
+      "scripts/stream-demo.ts",
+      "src/fake-model.ts",
+      "tests/02-stream.test.ts"
+    ]
+  },
+  {
+    "id": "03",
+    "title": "给模型准备第一个真实文件工具",
+    "files": [
+      "src/tools.ts",
+      "tests/03-tools.test.ts"
+    ]
+  },
+  {
+    "id": "04",
+    "title": "实现第一次模型—工具—模型循环",
+    "files": [
+      "scripts/loop-demo.ts",
+      "src/agent.ts",
+      "tests/04-loop.test.ts"
+    ]
+  },
+  {
+    "id": "05",
+    "title": "把取消贯穿整个运行",
+    "files": [
+      "src/host.ts",
+      "tests/05-cancel.test.ts"
+    ]
+  },
+  {
+    "id": "06",
+    "title": "写入前等待本次审批",
+    "files": [
+      "src/approval.ts",
+      "src/write-tool.ts",
+      "tests/06-approval.test.ts"
+    ]
+  },
+  {
+    "id": "07",
+    "title": "把事件落盘并恢复会话",
+    "files": [
+      "src/session.ts",
+      "tests/07-journal.test.ts"
+    ]
+  },
+  {
+    "id": "08",
+    "title": "执行命令并回收子进程",
+    "files": [
+      "src/process-tool.ts",
+      "tests/08-process.test.ts"
+    ]
+  },
+  {
+    "id": "09",
+    "title": "接入真实 DeepSeek 流与工具参数",
+    "files": [
+      "src/deepseek.ts",
+      "src/sse.ts",
+      "tests/09-provider.test.ts"
+    ]
+  },
+  {
+    "id": "10",
+    "title": "固定配置与上下文边界",
+    "files": [
+      ".env.example",
+      "src/config.ts",
+      "src/context.ts",
+      "tests/10-context.test.ts"
+    ]
+  },
+  {
+    "id": "11",
+    "title": "装配插件、Skill 和项目记忆",
+    "files": [
+      "AGENTS.md",
+      "MEMORY.md",
+      "skills/review/SKILL.md",
+      "src/plugins.ts",
+      "tests/11-plugin.test.ts"
+    ]
+  },
+  {
+    "id": "12",
+    "title": "把核心组装成同一个 Runtime",
+    "files": [
+      "scripts/host-demo.ts",
+      "src/runtime.ts",
+      "tests/12-runtime.test.ts"
+    ]
+  },
+  {
+    "id": "13",
+    "title": "用 CLI 完成真实模型工具闭环",
+    "files": [
+      "src/main.ts",
+      "tests/00-entry.test.ts"
+    ]
+  },
+  {
+    "id": "14",
+    "title": "增加 HTTP API、事件重放与取消审批",
+    "files": [
+      "src/http.ts",
+      "src/server.ts",
+      "tests/14-http.test.ts"
+    ]
+  },
+  {
+    "id": "15",
+    "title": "让 Web 操作完整同一会话",
+    "files": [
+      "web/app.js",
+      "web/index.html"
+    ]
+  },
+  {
+    "id": "16",
+    "title": "实现自己的 ACP 粘合层",
+    "files": [
+      "scripts/acp-client.ts",
+      "src/acp.ts"
+    ]
+  },
+  {
+    "id": "17",
+    "title": "用 pi-ai 替换模型适配器",
+    "files": [
+      "src/pi.ts",
+      "src/runtime.ts",
+      "tests/17-pi.test.ts"
+    ]
+  },
+  {
+    "id": "18",
+    "title": "通过 MCP 接入外部工具进程",
+    "files": [
+      "scripts/mcp-server.ts",
+      "src/mcp.ts",
+      "src/runtime.ts",
+      "tests/18-mcp.test.ts"
+    ]
+  },
+  {
+    "id": "19",
+    "title": "通过 LSP 获取语言诊断",
+    "files": [
+      "scripts/lsp-server.ts",
+      "src/lsp.ts",
+      "src/runtime.ts",
+      "tests/19-lsp.test.ts"
+    ]
+  },
+  {
+    "id": "20",
+    "title": "让一个只读子 Agent 完成委派",
+    "files": [
+      "src/runtime.ts",
+      "src/subagent.ts",
+      "tests/20-subagent.test.ts"
+    ]
+  },
+  {
+    "id": "21",
+    "title": "用 Electron 主进程托管自己的 Host",
+    "files": [
+      "desktop/main.cjs",
+      "desktop/package.json",
+      "desktop/preload.cjs",
+      "src/http.ts",
+      "src/server.ts"
+    ]
+  },
+  {
+    "id": "22",
+    "title": "加上不会阻塞任务的观测与资源 Compose",
+    "files": [
+      "compose.yaml",
+      "infra/otel-collector.yaml",
+      "src/host.ts",
+      "src/runtime.ts",
+      "src/telemetry.ts",
+      "tests/22-telemetry.test.ts"
+    ]
+  },
+  {
+    "id": "23",
+    "title": "构建、打包并完成整条链路验收",
+    "files": [
+      "scripts/package.ts",
+      "src/launcher.ts",
+      "src/lsp.ts",
+      "src/mcp.ts",
+      "tests/23-acceptance.test.ts",
+      "tsconfig.json"
+    ]
+  }
+]

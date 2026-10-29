@@ -1,0 +1,4 @@
+# 只启动外部依赖；Bun、Host、Web、ACP、Electron 在本机运行。
+name: harness-learning-resources
+include:
+  - path: ./harness-from-zero/compose.yaml

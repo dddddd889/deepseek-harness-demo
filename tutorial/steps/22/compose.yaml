@@ -1,0 +1,7 @@
+# Docker 只运行外部接收器；Harness、Web、ACP 与 Electron 全在本机。
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes: ["./infra/otel-collector.yaml:/etc/otelcol/config.yaml:ro"]
+    ports: ["127.0.0.1:14318:4318", "127.0.0.1:13133:13133"]

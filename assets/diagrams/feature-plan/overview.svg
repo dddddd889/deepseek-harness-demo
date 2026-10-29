@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="590" viewBox="0 0 1080 590" role="img" aria-labelledby="title desc"><title id="title">从零实现的九个里程碑</title><desc id="desc">核心路线向下展开，桌面 40～46 从 Web 24～27 处分支，可独立进入。</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#667085"/></marker></defs><rect width="1080" height="590" fill="#fbfcfe"/><g font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="18" fill="#172033">
+<rect x="40" y="20" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="49" text-anchor="middle">00–03　工程、协议与 Session</text>
+<path d="M335 65V80" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="81" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="110" text-anchor="middle">04–09　模型、工具与取消</text>
+<path d="M335 126V141" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="142" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="171" text-anchor="middle">10–17　执行、恢复与上下文</text>
+<path d="M335 187V202" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="203" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="232" text-anchor="middle">18–23　能力接入与编排</text>
+<path d="M335 248V263" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="264" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="293" text-anchor="middle">24–27　Host 与教学 Web</text>
+<path d="M335 309V324" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="325" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="354" text-anchor="middle">28–29　ACP 与独立 SDK</text>
+<path d="M335 370V385" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="386" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="415" text-anchor="middle">30–36　产品面与高级扩展</text>
+<path d="M335 431V446" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="447" width="590" height="45" rx="9" fill="#edf2ff" stroke="#b9c8df"/><text x="335" y="476" text-anchor="middle">37–39　观测、加固与发布</text>
+<path d="M630 286H710" stroke="#667085" fill="none" marker-end="url(#arrow)"/>
+<rect x="720" y="260" width="330" height="120" rx="9" fill="#eaf5ef" stroke="#90b69e"/><text x="885" y="292" text-anchor="middle">40–46　Electron 桌面</text><text x="885" y="324" text-anchor="middle">窗口 → IPC → Host → 任务链</text><text x="885" y="354" text-anchor="middle">原生能力 → 恢复 → 安装更新</text>
+<text x="885" y="420" text-anchor="middle">复用 24–27 的业务与界面</text><text x="885" y="450" text-anchor="middle">GUI 在宿主机实现与验收</text>
+<text x="540" y="551" text-anchor="middle">桌面快捷路线：00–17 → 24–27 → 40–46；不要求先实现全部高级扩展。</text></g></svg>

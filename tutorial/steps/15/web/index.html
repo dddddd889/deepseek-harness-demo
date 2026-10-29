@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>我的 Harness</title><style>
+body{font:16px system-ui;max-width:900px;margin:32px auto;padding:16px}textarea{width:100%;height:90px}button,select{padding:8px;margin:4px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f4f6;padding:16px}#status{color:#555}
+</style></head><body><h1>我的 Harness</h1>
+<select id="sessions" aria-label="会话"></select><button id="new">新会话</button>
+<p id="status"></p><pre id="output"></pre><div id="approvals"></div>
+<textarea id="prompt" aria-label="任务" placeholder="输入任务；固定样本：/tool read {&quot;path&quot;:&quot;package.json&quot;}"></textarea>
+<button id="send">发送</button><button id="cancel">取消当前任务</button>
+<script src="/app.js" defer></script></body></html>

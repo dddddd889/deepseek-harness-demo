@@ -1,5 +1,11 @@
 # DeepSeek Harness 学习资源
 
+## 本地运行资源
+
+- [Docker Compose 学习资源](infra/README.md)：独立空项目、本机 Bun / Electron 调试、可选 OTel Collector 与本机静态学习站点，附首步实现、启动和排查说明。站点的“环境与资源”也提供同一说明。
+
+- [Electron 从空项目学习任务书](harness-from-zero/ELECTRON.md)：进程领域、7 步桌面实现、四条业务链路与平台发布验收。
+
 ## Knowledge
 
 - [DeepSeek Harness 架构](deepseek-harness/docs/architecture.md)

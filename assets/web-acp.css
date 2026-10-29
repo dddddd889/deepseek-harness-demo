@@ -1,0 +1,12 @@
+/* 专题总图保留文字可读宽度；窄屏可以横向查看，不缩成不可读的小字。 */
+.web-acp-page .map-scroll { overflow-x: auto; }
+.web-acp-page .map-scroll img { min-width: 1000px; }
+.web-acp-page .operation-table th:first-child { width: 16%; }
+.web-acp-page .operation-table td { width: 42%; }
+.web-acp-page .source-list { overflow-wrap: anywhere; }
+/* 固定版本的长提交号在窄屏可断行，避免正文撑宽整页。 */
+.web-acp-page code { overflow-wrap: anywhere; }
+@media print {
+  .web-acp-page .map-scroll { overflow: visible; }
+  .web-acp-page .map-scroll img { min-width: 0; }
+}

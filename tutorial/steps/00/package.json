@@ -1,0 +1,8 @@
+{
+  "name": "my-harness", "private": true, "type": "module",
+  "scripts": {
+    "dev": "bun src/main.ts", "test": "bun test",
+    "debug": "bun --inspect-brk src/main.ts",
+    "build": "bun build src/main.ts --target=bun --outdir dist --sourcemap=external"
+  }
+}

@@ -13,6 +13,7 @@
   <p class="eyebrow">DEEPSEEK HARNESS × OPENHANDS · AGENT CLIENT PROTOCOL</p>
   <h1>同样使用 ACP，输出与恢复差在哪？<br>DeepSeek Harness × OpenHands</h1>
   <p class="lead">比较 eventlog 怎样变成协议消息、什么时候发出正文，以及重连以后能恢复什么。先看两家的输出边界，再展开对外服务与接入外部 Agent 两个方向的源码链路。</p>
+  <p><a href="web-api-acp-domain-comparison.html">先看 Harness 内部的 Web API × ACP 领域总图：哪些共用、哪些独立，以及 prompt / 输出 / 取消 / 审批的完整路径 →</a></p>
   <div class="callout"><strong>最关键的差别：</strong>DeepSeek Harness 的 ACP 面向自动化，只发送已提交助手消息中的文本 / 图片；OpenHands CLI 面向客户端展示，会投影工具、思考、计划，并可选实时 token 输出。Harness 核心能恢复 Session，但当前 ACP 适配器没有历史加载入口；OpenHands CLI 实现了 <code>session/load</code>。</div>
   <div class="facts">
     <div class="fact"><strong>2 种输出边界</strong><span>已提交消息内容，与实时展示增量</span></div>

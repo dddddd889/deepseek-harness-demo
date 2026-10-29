@@ -1,0 +1,6 @@
+# Compose 的本地密钥配置不进入版本管理。
+/.env.compose
+
+# 忽略系统缓存和文档生成器缓存。
+.DS_Store
+__pycache__/

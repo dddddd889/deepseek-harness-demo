@@ -10,6 +10,12 @@
   <h1>DeepSeek Harness：17 个可调试阶段</h1>
   <p class="lead">目标不是一次复制整个 monorepo，而是按依赖顺序构建 17 个始终可运行的垂直切片。</p>
 
+  <section id="feature-debug-plan">
+    <h2>先列全功能，再按调试闭环实现</h2>
+    <p><a href="harness-feature-inventory.html">全量功能清单</a>按 19 类职责列出 115 项功能，覆盖原版 49 个包组及 Python SDK，并新增独立桌面领域，标明源码归属和首次实现步骤。</p>
+    <p><a href="harness-debug-roadmap.html">47 步实现与调试路线</a>给出前置依赖、已有运行入口、断点、观察值、稳定异常路径与新增验收，区分教学参考和待补能力。先完成 00～09 的模型工具闭环，再加入真实文件、审批、恢复、Web、ACP、Electron 和完整产品面。桌面在 Web 闭环后进入 40～46 分支，无需先完成 ACP。</p>
+  </section>
+
   <section id="agent-patterns">
     <h2><a href="../sites/agent-patterns/dist/index.html">Agent 模式：ReAct 与十种增强方向 →</a></h2>
     <p>切换模式，对照规划、并行执行、反思、多 Agent 协作、记忆和跨会话持续运行的核心区别，并查看中文注释伪代码、具体例子和代表实现。附 ReAct 与 Goal 的执行骨架。</p>
@@ -264,6 +270,12 @@
   <p><a href="../lessons/0015-agent-server.html">第 15 课：Agent Server →</a></p>
   <p><a href="../lessons/0016-web-production-loop.html">第 16 课：Web Client 与生产闭环 →</a></p>
   <p><a href="../lessons/0017-hardening-release.html">第 17 课：可观测、成本与发布加固 →</a></p>
+
+  <section id="web-acp-reading">
+    <h2>Web API 与 ACP 的领域和调用对照</h2>
+    <p><a href="web-api-acp-domain-comparison.html">一张领域总图：两套接入共用哪些层，prompt / 输出 / 取消 / 审批各自怎样处理？→</a></p>
+    <p>附当前源码快照的 52 个普通 Web RPC、24 个 Remote 方法、事件流 / 应答 / 导出与 dsh-acp API 对照。区分服务端共用能力、客户端状态抽象和未来同 UI 双后端设计。</p>
+  </section>
 
   <section id="agent-loop-deployment-reading">
     <h2>Agent Loop 的部署与会话评估</h2>

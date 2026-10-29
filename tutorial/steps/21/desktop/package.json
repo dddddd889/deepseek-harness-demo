@@ -1,0 +1,11 @@
+{
+  "name": "my-harness-desktop", "version": "0.1.0", "private": true,
+  "main": "main.cjs",
+  "scripts": { "start": "electron .", "package": "electron-builder --dir" },
+  "devDependencies": { "electron": "45.0.0", "electron-builder": "26.0.12" },
+  "build": {
+    "appId": "local.myharness.desktop", "productName": "My Harness", "directories": { "output": "out" },
+    "files": ["main.cjs", "preload.cjs", "package.json"],
+    "extraResources": [{ "from": "host", "to": "host" }, { "from": "../web", "to": "web" }]
+  }
+}

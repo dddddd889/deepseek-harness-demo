@@ -571,6 +571,11 @@
   },
   {
     "step": "041",
+    "path": "src/host-demo.mjs",
+    "sha256": "719dc57661a9b16868d41f5ef4763fbf84a39a636f50677e6b2aaa7f795cc6c2"
+  },
+  {
+    "step": "041",
     "path": "src/host.mjs",
     "sha256": "b4386b35758202d84a31ac4ea24be6cc3feef191c3265078652d1e825931aa62"
   },

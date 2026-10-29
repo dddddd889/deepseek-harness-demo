@@ -1,0 +1,7 @@
+flowchart LR
+  R["Renderer：共用 UI / 投影 + DesktopClient"] <--> P["Preload：窄接口"]
+  P <--> M["Main：IPC 校验 / 原生能力 / 连接凭证"]
+  M <-->|业务 RPC / SSE| H["Host：会话 / 审批 / 输入接收"]
+  M -. ready / shutdown 生命周期 .-> H
+  H <--> L["Agent Loop：工具 / 取消 / 事实"]
+  L <--> A["固定模型 / DeepSeek / pi-ai"]

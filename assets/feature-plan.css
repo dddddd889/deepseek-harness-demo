@@ -1,0 +1,14 @@
+/* 功能表和调试卡保持离线可读；窄屏只在表格内部滚动。 */
+.feature-plan nav { margin: 20px 0; padding: 14px; background: var(--soft); border-radius: 8px; }
+.feature-plan code, .feature-plan a { overflow-wrap: anywhere; }
+.feature-plan table { min-width: 660px; }
+.feature-plan th:first-child { width: 25%; }
+.feature-plan td:last-child { width: 29%; }
+.feature-plan .muted, .feature-plan .source-list { color: var(--muted); font-size: .9rem; }
+.feature-plan .debug-step { scroll-margin-top: 20px; }
+.feature-plan .debug-step dd { color: var(--ink); }
+.feature-plan .badge { display: inline-block; border: 1px solid #b9c8df; border-radius: 5px; padding: 1px 8px; background: var(--soft); font-size: .85rem; }
+@media (max-width: 600px) {
+  .feature-plan { padding: 28px 16px 60px; }
+  .feature-plan h1 { font-size: 1.85rem; }
+}

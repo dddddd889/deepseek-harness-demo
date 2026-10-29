@@ -1,0 +1,35 @@
+flowchart TD
+  subgraph users["用户侧：Web 用户，或 IDE / 父 Agent 的使用者"]
+    usersNode["用户侧：Web 用户，或 IDE / 父 Agent 的使用者"]
+  end
+  subgraph webClient["原生 Web 客户端进程"]
+    webUi["Web UI：输入、展示、审批、停止"]
+    webRuntime["SessionRuntime / ctx.remote / Connection<br/>原生客户端状态镜像与 API 调用"]
+  end
+  subgraph acpClient["ACP 客户端进程"]
+    acpUi["IDE UI / 父 Agent / 自动化程序"]
+    acpSdk["ACP Client SDK：ClientSideConnection<br/>处理输出通知与权限请求"]
+  end
+  subgraph host["Agent Server 端：宿主职责合画，两个入口可分别装配 / 部署"]
+    webEntry["Web 接入：Connection + API Proxy / Gateway<br/>prompt：session.prompt → accepted<br/>输出：events.mux / events.host WebSocket<br/>取消：session.cancel；审批：POST /api/respond"]
+    acpEntry["ACP 接入：AgentSideConnection + dsh-acp<br/>prompt：session/prompt → 最终 stopReason<br/>输出：session/update（已提交文本 / 图片）<br/>取消：session/cancel；审批：request_permission"]
+    shared["共用业务实现与接口：Agent 管理 / Agent 句柄 / Inbox / Agent Loop<br/>共用事实与扩展点：Session / SessionEvent / approval/request<br/>共用执行能力：工具管线 / LLM 接口 / 模型适配器"]
+  end
+  subgraph models["远端模型服务（独立于 ACP / Web 协议）"]
+    modelsNode["远端模型服务（独立于 ACP / Web 协议）"]
+  end
+  users -->|"用户操作"| webClient
+  users -->|"用户操作 / 程序调用"| acpClient
+  webUi <-->|"本地调用"| webRuntime
+  acpUi <-->|"本地调用"| acpSdk
+  webRuntime <-->|"跨进程：HTTP POST 上行；双 WebSocket 下行"| webEntry
+  acpSdk <-->|"跨进程：stdio 双向 JSON-RPC / NDJSON"| acpEntry
+  webEntry <-->|"本地调用 / 事件；Web 接入策略"| shared
+  acpEntry <-->|"本地调用 / 事件；ACP 接入策略"| shared
+  shared <-->|"跨网络：模型适配器 → HTTPS / SSE 等模型协议"| models
+  classDef web fill:#edf2ff,stroke:#3157d5;
+  classDef acp fill:#fff5e5,stroke:#9a5a15;
+  classDef shared fill:#eaf5ef,stroke:#28734d;
+  class webUi,webRuntime,webEntry web;
+  class acpUi,acpSdk,acpEntry acp;
+  class shared shared;

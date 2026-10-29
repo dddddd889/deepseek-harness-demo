@@ -181,7 +181,8 @@ add('统一管理多个Agent会话，保存历史，并在重新打开时恢复'
     '断在open读取Journal、放入loaded和closeSession清理的位置，观察当前会话对象和磁盘历史。',
     '合上资料解释create、open、list、closeSession分别做什么。',
     '正常关闭后新建Host，使用同一数据目录和会话id重新打开。',
-    '统一的会话管理入口；日志采用本教程自己的格式，恢复能力与原版仍有差距。')
+    '统一的会话管理入口；日志采用本教程自己的格式，恢复能力与原版仍有差距。',
+    run='bun src/host-demo.mjs\nbun test ./tests/041-host.test.mjs')
 add('产品数据和秘密不混进对话', 'R06', '保存一把Key后调用list，检查响应能否找到明文。', 'Store、CredentialRef、Workspaces各有持久域。文件原子替换，凭据在宿主解析，客户端只得到configured描述。', 'Key不出现在list；重建对象仍能解析；工作区归档状态恢复。', '断在Credentials.list与resolve；把secret也返回list，安全断言立即失败。', '合上资料解释CredentialRef和明文Key分别在哪一层。', '删除Key后新请求失败，正在进行的请求仍使用已准备输入。', 'storage/settings/credentials/workspace；账号OAuth和访问控制还需后续完善。')
 add('外层共用领域控制器', 'R06', '让两个不同principal读取同一个sessionId，先让服务端拒绝越权。', 'Remote只映射方法到Host。订阅、提交、等待、取消、审批各有调用；断开订阅不暗中取消任务。该协议是本工程自己的，尚非原版Typert互操作。', 'prompt真实执行，收到事件与完成；陌生owner被RPC拒绝。', '断在session函数和Host.header；去掉owner检查，越权测试会失败。', '闭卷画出prompt响应、流通知、取消请求三条方向。', '断线后让任务完成，再按after游标重连读取剩余事件。', 'api controllers与Connection Remote职责；原版Typert codec/公共方法表是待对齐项。')
 add('Bun原生SDK驱动同一个Host进程', 'R06', '不用直接import Agent，启动一个子进程并通过RPC完成任务。', '高层SDK负责进程所有权、订阅、接收和等待，服务端仍用前一步控制器；EOF结束时Host清理会话。', '跨进程收到通知、结果与落盘事件；close后子进程被回收。', '断在spawn和session.wait；不要把宿主断点误设到SDK父进程。', '合上代码讲清stdout、stderr各放什么。', '让服务端提前退出，所有pending请求都应明确失败。', '原生sdk protocol/client/server的三层职责；当前自有协议不是原版兼容声明。')

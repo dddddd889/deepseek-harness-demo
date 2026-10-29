@@ -1,6 +1,10 @@
 # VS Code 调试指南
 
+> 从空项目开始请打开 [harness-from-zero](harness-from-zero/README.md)，按 [47 步任务卡](harness-from-zero/ROADMAP.md) 写自己的源码和测试。下面的现成实验室调试入口仅供参考。
+
 项目的调试控制面统一放在根目录 [`.vscode/launch.json`](.vscode/launch.json)。不再维护 `debug:*` package scripts。
+
+从零实现时，先用 [全量功能清单](reference/harness-feature-inventory.html) 确认范围，再按 [47 步实现与调试路线](reference/harness-debug-roadmap.html) 查看每步的前置、断点、观察值和异常复现。路线中的“待补入口”没有现成实验室配置，需要后续实现；现有配置仍按下表选择。
 
 ## 首次准备
 
