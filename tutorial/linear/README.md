@@ -8,23 +8,27 @@
 
 固定主线先在 macOS ARM64 编码，使用 Bun 1.3.14、Python 3、Git、Xcode Command Line Tools。第 059 步需要本机 Chrome；第 052 步首次启动会下载固定 Electron 二进制。平台交付是最终资格，不是让你选择另一条学习路线。
 
-打开终端，逐行执行：
+练习工程已经放在本仓库的 [harness-own 目录](../../harness-own/README.md)，保留现有代码和练习进度。可以在 VS Code 打开仓库根目录的 `harness-course.code-workspace`，同时查看教材和练习工程；运行与调试选择其中的 `harness-own` 文件夹。
+
+在当前仓库目录中打开终端，逐行执行；`git rev-parse` 会找到你的实际仓库位置：
 
 ```sh
 bun --version
 python3 --version
 git --version
-export COURSE="/Users/yhding/ws/github.com/deepseek-harness-demo/tutorial/linear"
-export PROJECT="$HOME/ws/harness-own"
-mkdir -p "$PROJECT"
+export REPO="$(git rev-parse --show-toplevel)"
+export COURSE="$REPO/tutorial/linear"
+export PROJECT="$REPO/harness-own"
 cd "$PROJECT"
 ```
 
-第一次从000开始时，确认Bun输出`1.3.14`，PROJECT是空目录。已经做到032等后续步骤时，继续使用已有工程和当前页，不清空、不重建，也不重新复制前面步骤覆盖自己的修改。编辑器打开这个目录，接着打开 [第 000 步](lessons/000.md)，按文件位置创建代码。后续命令全部在 PROJECT 执行；本目录只用来阅读教材，不是运行目标。已有 `harness-from-zero` 不覆盖。
+确认Bun输出`1.3.14`。上面的PROJECT指向保留当前进度的现有工程，不是第000步要求的新空目录；已经做到032等后续步骤时，继续使用已有工程和当前页，不清空、不重建，也不把第000步或前面步骤的代码重新覆盖进去。编辑器中的断点也设在这份工程里。后续命令全部在PROJECT执行；本目录只用来阅读教材，不是运行目标。已有 `harness-from-zero` 不覆盖。
+
+若要从 [第000步](lessons/000.md) 独立重做，先显式选择一个新的同仓目录，例如把PROJECT改为 `$REPO/harness-practice-000`。确认该目录名尚未使用后，自行创建空目录，再进入该目录按第000步写代码；本教程不会自动创建、清空或覆盖这个练习目录。独立重做期间，后续新终端也要继续使用你明确选定的PROJECT，不要切回已有进度的 `harness-own`。
 
 命令、测试与包管理统一使用 Bun。源码里的 `node:fs`、`node:path`、`node:child_process` 等是 Bun 支持的兼容 API，不需要启动 Node。测试使用 `bun:test`，SQLite 使用 `bun:sqlite`，PTY 使用 `Bun.Terminal`。Electron 自带的主进程运行时属于 Electron；领域 Host 仍运行在独立 Bun 进程，开发模式显式传 Bun 路径，本机打包时携带同架构 Bun。
 
-每个新终端先重新执行两条 export 和 `cd "$PROJECT"`。COURSE 只提供教材和第三方依赖锁；业务代码写在 PROJECT。原版只在第 067 步进入独立对照进程。
+每个新终端先在本仓库目录重新设置REPO、COURSE和PROJECT，再执行 `cd "$PROJECT"`；独立重做时把PROJECT设为自己选定的新目录。COURSE只提供教材和第三方依赖锁；业务代码写在PROJECT。原版只在第067步进入独立对照进程。
 
 引入第三方包的步骤使用课程自有 Bun 安装结果生成的锁文件：只复制该步 `locks/步骤号.bun.lock` 为工程中的 `bun.lock`，再执行 bun install --frozen-lockfile --ignore-scripts。锁文件不是原版业务实现，不会替你填 src；它让后续复习使用同一依赖树。统一加 `--ignore-scripts`，Electron 二进制到第 052 步再显式运行安装器。
 

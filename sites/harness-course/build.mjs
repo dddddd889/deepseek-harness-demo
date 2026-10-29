@@ -115,7 +115,7 @@ function markdownLinks(markdown) {
   return links;
 }
 
-// 相对链接按当前文档目录解析；只有固定原版源码可以越出教材目录。
+// 相对链接按当前文档解析；原版及同仓练习源码只提供链接，不复制进教材静态正文。
 async function localTarget(document, link) {
   const value = decodeEntities(link);
   if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(value)) return null;
@@ -126,6 +126,10 @@ async function localTarget(document, link) {
   if (await fileInfo(target)) target = await realpath(target);
   if (!isWithin(sourceRoot, target)) {
     if (isWithin(resolve(repositoryRoot, 'deepseek-harness'), target)) return null;
+    if (isWithin(resolve(repositoryRoot, 'harness-own'), target)) {
+      if (!(await fileInfo(target))?.isFile()) throw new Error(`同仓练习源码引用不存在：${relativePath(sourceRoot, document)} → ${link}`);
+      return null;
+    }
     throw new Error(`链接越出教程目录：${relativePath(sourceRoot, document)} → ${link}`);
   }
   return target;

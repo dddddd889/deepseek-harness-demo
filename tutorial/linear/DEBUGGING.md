@@ -1,6 +1,8 @@
 # 在 VS Code 里调试自己的 Harness
 
-在 VS Code 用“文件 → 打开文件夹”打开自己的 PROJECT，例如 `/Users/yhding/ws/harness-own`。教材可以另开窗口阅读；断点与 `.vscode` 配置必须放在练习工程。当前只做第000步时，只读下面第一段操作。
+先按 [README](README.md) 初始化REPO、COURSE和PROJECT，默认练习工程是本仓库的 `$REPO/harness-own`。在 VS Code 打开仓库根目录的 `harness-course.code-workspace`，运行和调试选择 `harness-own` 文件夹；也可以用“文件 → 打开文件夹”单独打开 `$PROJECT`。断点与 `.vscode` 配置仍放在练习工程，`${workspaceFolder}` 指向这份练习目录。
+
+现有 `harness-own` 保留当前进度，不要按第000步清空或覆盖它。只有显式选择并自行创建了新的同仓空目录，才从第000步独立重做；这时在 VS Code 单独打开这个PROJECT。当前只做第000步时，只读下面第一段操作。
 
 ## 第000步：亲手停在 input
 

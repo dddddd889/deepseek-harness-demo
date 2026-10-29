@@ -1,0 +1,9 @@
+{
+  "folders": [
+    { "name": "教材与网站", "path": "." },
+    { "name": "harness-own", "path": "harness-own" }
+  ],
+  "extensions": {
+    "recommendations": ["oven.bun-vscode"]
+  }
+}

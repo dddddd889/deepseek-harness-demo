@@ -36,7 +36,12 @@ def main():
             position = lines.index('## 在哪里写、写什么')
             lines[position:position] = [scenario.read_text().rstrip(), '']
         if number == '000':
-            lines += ['', '```sh', 'bun --version', 'export COURSE=' + shlex.quote(str(ROOT)), 'export PROJECT="$HOME/ws/harness-own"', 'mkdir -p "$PROJECT"', 'cd "$PROJECT"', '```', '', '固定使用 Bun 1.3.14。目标目录必须为空；不要进入原版仓库或已有 harness-from-zero。以下 package.json 和源码由你创建，不克隆、不展开原版。']
+            # 已迁入的harness-own保留现有进度，000的创建操作必须使用学习者显式选定的新空目录。
+            lines += ['', '本仓库的 `harness-own/` 是保留当前进度的现有练习工程，不能清空，也不能把下面第000步的文件覆盖进去。先在仓库目录按 [README](../README.md) 初始化环境：', '',
+                      '```sh', 'bun --version', 'export REPO="$(git rev-parse --show-toplevel)"', 'export COURSE="$REPO/tutorial/linear"', 'export PROJECT="$REPO/harness-own"', '```', '',
+                      '继续已有进度时使用上面的PROJECT和当前课次。若要从第000步独立重做，请先显式选择一个新的同仓目录，例如下面的 `harness-practice-000`；确认该目录名尚未使用后，自行创建空目录，再执行进入目录的命令。这里不会自动创建、清空或覆盖目录：', '',
+                      '```sh', 'export PROJECT="$REPO/harness-practice-000"', 'cd "$PROJECT"', '```', '',
+                      '固定使用 Bun 1.3.14。第000步的目标目录必须为空；不要使用已有进度的harness-own、原版仓库或已有harness-from-zero。以下package.json和源码由你在新空目录创建，不克隆、不展开原版。后续新终端继续使用你选定的PROJECT。']
         for path in files:
             relative = path.relative_to(ROOT / 'steps' / number).as_posix()
             text = path.read_text()
