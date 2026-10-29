@@ -75,6 +75,48 @@
         "${workspaceFolder}/scripts/vscode-debug.mjs"
       ],
       "stopOnEntry": false
+    },
+    {
+      "name": "044：SDK运行演示",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/sdk-demo.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：Bun原生SDK驱动同一个Host进程 当前测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：Bun原生SDK驱动同一个Host进程 附加子进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "${input:bunInspectorUrl}"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "bunInspectorUrl",
+      "type": "promptString",
+      "description": "粘贴子进程 Bun Inspector 打印的完整 ws:// 地址"
     }
   ]
 }
