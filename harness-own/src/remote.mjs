@@ -7,9 +7,7 @@ export function remote(peer, host, principal) {
   bind('session.list', params => host.list(principal, params ?? {}))
   bind('session.metadata', params => host.metadata(params.id, principal, params.patch))
   bind('session.read', params => session(params.id).session.read(params.after ?? -1))
-  bind('session.submit', params => {
-    return ({ inputId: session(params.id).agent.submit(params.content, params.destination ?? 'turn') })
-  })
+  bind('session.submit', params => ({ inputId: session(params.id).agent.submit(params.content, params.destination ?? 'turn') }))
   bind('session.wait', async params => { const record = session(params.id); await record.agent.idle(); return record.session.read().filter(event => event.type === 'turn/end').at(-1)?.data })
   bind('session.cancel', async params => { const record = session(params.id); record.agent.cancel(); await record.agent.idle(); return {} })
   bind('session.edit', params => { session(params.id).agent.inbox.update(params.inputId, params.content); return {} })
@@ -26,6 +24,7 @@ export function remote(peer, host, principal) {
   })
   /** 断线取消订阅，不暗中取消仍在运行的会话；显式关闭Host才结束活动。 */
   const dispose = () => { for (const cancel of subscriptions.values()) cancel(); subscriptions.clear(); disposers.splice(0).forEach(remove => remove()) }
+  const extra = host.attachPeer?.(peer, principal); if (extra) disposers.push(extra)
   peer.once('closed', dispose)
   return dispose
 }
