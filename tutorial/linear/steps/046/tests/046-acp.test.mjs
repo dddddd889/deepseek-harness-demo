@@ -9,13 +9,37 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
+/** 开关控制双向协议日志；原消息继续转发，日志只写stderr。 */
+function traceACPStream(stream) {
+  if (process.env.ACP_TRACE !== '1') return stream
+  // 持有原写端，把ACP发出的每条消息打印后再原样交给SDK序列化。
+  const writer = stream.writable.getWriter()
+  return {
+    readable: stream.readable.pipeThrough(new TransformStream({
+      transform(message, controller) {
+        console.error('[ACP Host → Client]', JSON.stringify(message))
+        controller.enqueue(message)
+      },
+    })),
+    writable: new WritableStream({
+      write(message) {
+        console.error('[ACP Client → Host]', JSON.stringify(message))
+        return writer.write(message)
+      },
+      async close() { try { await writer.close() } finally { writer.releaseLock() } },
+      async abort(reason) { try { await writer.abort(reason) } finally { writer.releaseLock() } },
+    }),
+  }
+}
+
 test('真实ACP SDK跨进程握手、prompt、语义输出、列表、关闭和恢复', async () => {
   const root = mkdtempSync(join(tmpdir(), 'own-acp-')), child = spawn(process.execPath, ['src/acp-server.mjs'], { env: { ...process.env, HARNESS_HOME: root }, stdio: ['pipe', 'pipe', 'pipe'] })
   child.stderr.resume()
   const exited = once(child, 'close')
   const updates = []
   const app = acp.client({ name: 'course' }).onNotification('session/update', ctx => { updates.push(ctx.params) }).onRequest('session/request_permission', () => ({ outcome: { outcome: 'selected', optionId: 'allow' } }))
-  const connection = app.connect(acp.ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout)))
+  const stream = acp.ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout))
+  const connection = app.connect(traceACPStream(stream))
   try {
     const client = connection.agent
     await client.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: {} })

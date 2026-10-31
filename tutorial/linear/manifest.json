@@ -672,7 +672,7 @@
   {
     "step": "046",
     "path": "tests/046-acp.test.mjs",
-    "sha256": "bc4d266ab6c599c0aa9bb37b61cddfb46a7b8777bb484cb456a23f72b9abb978"
+    "sha256": "86ef367239bad92927bb0c1dff988e44b69c4cb9de2a1a748b5bd50d47b7649c"
   },
   {
     "step": "047",
