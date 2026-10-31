@@ -7,7 +7,9 @@ export function remote(peer, host, principal) {
   bind('session.list', params => host.list(principal, params ?? {}))
   bind('session.metadata', params => host.metadata(params.id, principal, params.patch))
   bind('session.read', params => session(params.id).session.read(params.after ?? -1))
-  bind('session.submit', params => ({ inputId: session(params.id).agent.submit(params.content, params.destination ?? 'turn') }))
+  bind('session.submit', params => {
+    return ({ inputId: session(params.id).agent.submit(params.content, params.destination ?? 'turn') })
+  })
   bind('session.wait', async params => { const record = session(params.id); await record.agent.idle(); return record.session.read().filter(event => event.type === 'turn/end').at(-1)?.data })
   bind('session.cancel', async params => { const record = session(params.id); record.agent.cancel(); await record.agent.idle(); return {} })
   bind('session.edit', params => { session(params.id).agent.inbox.update(params.inputId, params.content); return {} })
