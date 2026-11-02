@@ -265,6 +265,66 @@ sequenceDiagram
 
 这里 Main 读取 Host 的 stdout，是为了取得网页启动地址；后续聊天业务走 HTTP / WebSocket。它与第 044～046 节通过 stdio 长期传 SDK/ACP JSON 的方式不同。
 
+
+### loadURL 到底在哪里请求 index.html？
+
+Main中的 `window.loadURL(address)` 把地址交给窗口内的Chromium。随后是Chromium发HTTP请求，Bun服务端选择返回哪份文件，不是Main调用fetch，也不是preload替你下载HTML。
+
+```mermaid
+sequenceDiagram
+    participant M as Electron Main
+    participant C as 窗口内Chromium与页面
+    participant H as Bun HTTP服务
+    participant P as Renderer侧preload
+    M->>M: new BrowserWindow，设置preload绝对路径
+    M->>C: loadURL，本次地址/?token=...
+    C->>H: GET /?token=...
+    H->>H: 检查Host与URL中的token
+    H-->>C: 302，Location /，Set-Cookie harness=...
+    C->>C: 保存Cookie，跟随重定向
+    C->>H: GET /，请求携带Cookie
+    H->>H: authorized校验；assets映射/到web/index.html
+    H-->>C: 返回HTML正文
+    Note over C,P: Electron在页面脚本执行前运行preload；网络资源加载与预加载准备可能交错
+    P->>C: contextBridge暴露window.desktop.info
+    C->>H: HTML引用/app.mjs，带Cookie请求脚本
+    H-->>C: 返回app.mjs，页面模块依赖也逐一加载
+    C->>C: 执行页面脚本，更新SPA与建立业务连接
+    opt 页面调用桌面能力
+        C->>P: window.desktop.info()
+        P->>M: IPC invoke desktop:info
+        M-->>P: platform与version
+        P-->>C: Promise结果
+    end
+```
+
+这张图突出因果关系，不承诺“preload执行完才开始下载所有脚本”。需要保证的是preload在页面自己的脚本执行前加载；它不是HTTP认证步骤，也不会作为普通script标签出现在index.html里。
+
+| 接线位置 | 具体作用 |
+| --- | --- |
+| [Main的loadURL](../../harness-own/desktop/main.cjs) | 把Host生成的启动地址交给窗口加载 |
+| [http.mjs的token分支](../../harness-own/src/http.mjs) | 首次请求验证URL token，设置Cookie，302跳转到/ |
+| 同文件的authorized | 跳转后及后续资源请求检查Cookie与请求来源条件 |
+| 同文件的assets | 将URL根路径/映射到磁盘web/index.html，并返回文件正文 |
+| [web/index.html](../../harness-own/web/index.html) | script标签引用/app.mjs，触发浏览器后续资源请求 |
+| [preload.cjs](../../harness-own/desktop/preload.cjs) | Electron根据窗口选项加载，暴露桌面能力 |
+
+这里的 `HttpOnly` 表示普通页面JavaScript不能通过document.cookie读取这个Cookie，不表示浏览器不会发送它。同源资源请求会由浏览器携带Cookie，因此/app.mjs也能通过认证。地址栏跳回/，不会继续保留启动URL中的token参数；这不代表token从服务器或Cookie中消失。
+
+根路径返回哪份文件由服务端assets决定，并不是HTTP或Electron规定“/永远等于index.html”。本项目明确把/配置成web/index.html，所以你找不到显式的fetch('index.html')仍能看到页面。
+
+普通Chrome也能访问Host的启动URL、完成认证并加载同一SPA，但没有Electron窗口的preload，因此没有window.desktop。相反，Electron只是暴露了desktop接口，也不意味着app.mjs已实际调用它；聊天业务继续走WebSocket到Host。
+
+#### 在DevTools里核对一次真实加载
+
+1. 在Electron窗口打开开发者工具，进入Network，开启Preserve log以保留重定向记录。
+2. 复制本次Host生成的完整启动URL，在这个窗口的DevTools控制台执行 `location.assign('本次完整启动URL')`。不要把示例占位文字当作真实地址，也不要把包含token的记录对外分享。
+3. Network中核对 `/?token=... → 302 → / → 200`，再看/app.mjs等模块请求。只刷新已经跳转后的/通常不会重新出现首次token请求。
+4. 点开/的Response，应该看到index.html内容与script标签；控制台执行 `typeof window.desktop.info` 应为function。
+5. 在普通Chrome打开同一Host地址作对比：页面能加载，但不应期待window.desktop存在。
+
+未带正确token且没有有效Cookie时，服务端返回401，不会返回页面HTML。看见页面空白时先查Network状态，再区分是认证失败、资源404、页面脚本错误，还是preload未加载，不要把它们当成同一个问题。
+
 ## 7. 两个按钮，其实走两条不同的路
 
 ```mermaid

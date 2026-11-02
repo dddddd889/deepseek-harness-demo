@@ -907,7 +907,7 @@
   {
     "step": "047",
     "path": "src/http.mjs",
-    "sha256": "2d3271cdcac2617ef3872566a64d46d7b4c4d2fe45180456b122fb25bbb03209"
+    "sha256": "5b3bea440c1a2ec27b6e6a191451b84c436bd04170e53d9ecd9dd9a7b44c43a4"
   },
   {
     "step": "047",
@@ -1022,7 +1022,7 @@
   {
     "step": "052",
     "path": "desktop/main.cjs",
-    "sha256": "ec753053d61f6ca3b0bbdc638eb420aad2c5a0a3c3a3e1fdc7b9e3e39f1ffd1e"
+    "sha256": "37c507268be19052843846ef5059a0bc6428b0b6976e0fe6229b26fd7e0010ff"
   },
   {
     "step": "052",
@@ -1032,7 +1032,7 @@
   {
     "step": "052",
     "path": "desktop/preload.cjs",
-    "sha256": "30fc84ca0be93ee5ef0780a91a569ad77e63f09c634d1388033bfcc602cea16d"
+    "sha256": "15e496b72e6d79f38cc1a198822054a43078c0327938c23f5804a262698b2336"
   },
   {
     "step": "052",

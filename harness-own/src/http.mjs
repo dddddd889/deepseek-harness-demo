@@ -15,12 +15,16 @@ export async function startHTTP(host, { port = 0 } = {}) {
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, 'http://' + authority)
     if (request.headers.host !== authority) { response.writeHead(403); response.end(); return }
+    // loadURL首次携带token访问根路径：验证通过后写入HttpOnly Cookie，并跳到不含token的/。
     if (url.pathname === '/' && equal(url.searchParams.get('token'))) {
       response.writeHead(302, { location: '/', 'set-cookie': 'harness=' + token + '; HttpOnly; SameSite=Strict; Path=/', 'referrer-policy': 'no-referrer' }); response.end(); return
     }
+    // 跳转后的首页及后续脚本请求携带Cookie，在这里统一校验；失败返回401。
     if (!authorized(request)) { response.writeHead(401); response.end('Unauthorized'); return }
+    // URL不必出现index.html：根路径/映射到磁盘web/index.html；HTML再引用/app.mjs。
     const assets = { '/': ['../web/index.html', 'text/html; charset=utf-8'], '/app.mjs': ['../web/app.mjs', 'text/javascript; charset=utf-8'], '/view.mjs': ['./view.mjs', 'text/javascript; charset=utf-8'] }
     if (assets[url.pathname]) {
+      // 相对路径以当前http.mjs为基准解析，读取文件并把正文作为HTTP响应发给Chromium。
       try { response.setHeader('content-type', assets[url.pathname][1]); response.end(await readFile(fileURLToPath(new URL(assets[url.pathname][0], import.meta.url)))) }
       catch { response.writeHead(404); response.end('Web文件将在第049步创建') }
     } else { response.setHeader('content-type', 'application/json'); response.end(JSON.stringify({ service: 'harness-own', transport: 'websocket', model: 'explicitly-configured' })) }

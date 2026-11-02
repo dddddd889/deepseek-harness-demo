@@ -38,6 +38,9 @@ else {
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     window.webContents.on('will-navigate', (event, url) => { if (new URL(url).origin !== new URL(address).origin) event.preventDefault() })
     window.on('closed', () => { window = undefined })
+    // address来自Host本次输出：先请求/?token=...，服务端设置Cookie并302跳转到/。
+    // /对应web/index.html，Chromium继续请求/app.mjs；不是Main直接读取HTML文件。
+    // 上面的preload选项让Electron在页面脚本执行前加载桥接代码，暴露window.desktop。
     await window.loadURL(address)
     if (process.env.HARNESS_DESKTOP_DEBUG === '1') window.webContents.openDevTools()
   }
