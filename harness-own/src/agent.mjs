@@ -1,5 +1,5 @@
 import { Inbox } from './inbox.mjs'
-import { runTurn } from './loop_012.mjs'
+import { runTurn } from './loop.mjs'
 
 /** Agent 是活动的所有者；收到输入不等于开始执行。 */
 export class Agent {
@@ -7,6 +7,7 @@ export class Agent {
   controller = undefined
   closed = false
   failure = undefined
+  children = new Set()
   constructor(session, model, tools, settings) {
     this.session = session; this.model = model; this.tools = tools; this.settings = settings
     this.inbox = new Inbox(session)
@@ -33,9 +34,9 @@ export class Agent {
     this.active.catch(error => { this.failure = error; this.closed = true })
   }
   /** 取消当前活动，不取消未来排队的独立任务。 */
-  cancel() { this.controller?.abort(new Error('用户取消')) }
+  cancel() { this.controller?.abort(new Error('用户取消')); for (const child of this.children) child.cancel() }
   /** 等待事实与活动都收敛后再报告空闲。 */
-  async idle() { while (this.active) await this.active; if (this.failure) throw this.failure }
+  async idle() { do { if (this.active) await this.active; await Promise.all([...this.children].map(child => child.idle())) } while (this.active); if (this.failure) throw this.failure }
   /** 禁止新输入，取消当前活动并等待清理。 */
   async close() { this.closed = true; this.cancel(); await this.idle() }
 }

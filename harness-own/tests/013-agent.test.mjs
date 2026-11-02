@@ -4,7 +4,7 @@ import { Events } from '../src/events.mjs'
 import { Tools } from '../src/tools.mjs'
 import { Settings } from '../src/config.mjs'
 import { ScriptModel, answer } from '../src/model.mjs'
-import { Agent } from '../src/agent.mjs'
+import { Agent } from '../src/agent_013.mjs'
 
 test('首片取消、排队第二轮继续，配置快照不串轮', async () => {
   const session = new Events(), settings = new Settings({ model: 'first' }), model = new ScriptModel(['hang', answer('second')])
