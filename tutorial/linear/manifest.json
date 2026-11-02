@@ -1087,12 +1087,12 @@
   {
     "step": "054",
     "path": "src/runtime-assets.mjs",
-    "sha256": "78806362dbf97df41305abd6e2acdca9bbf5026540178819cc574ec836b2f718"
+    "sha256": "4ef448aa76ce158629b809c9a218c54a754e4a67ca2c87bd47d06d0d63bb7116"
   },
   {
     "step": "054",
     "path": "tests/054-runtime-assets.test.mjs",
-    "sha256": "5f54ccf81eb062e961578b69b2b7f11010349ee34c62a91a98bf2f719710cd2e"
+    "sha256": "ba475ec7d3e106bdbb1aa7048e2970b3cabef3f56184d010b98b4105b4943648"
   },
   {
     "step": "055",
