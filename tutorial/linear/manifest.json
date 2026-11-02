@@ -1176,18 +1176,23 @@
   },
   {
     "step": "059",
+    "path": "scripts/computer-smoke.mjs",
+    "sha256": "f8fea08041a2fc199346dd7a5400f8d8d89d5ed4299e5e71ea39ea1acfb37409"
+  },
+  {
+    "step": "059",
     "path": "src/browser.mjs",
     "sha256": "a05ef96677ccf62d112fb91b50cb0077585664df59c4cfbedd1ede2fdde90752"
   },
   {
     "step": "059",
     "path": "src/computer.mjs",
-    "sha256": "d8ff2d9121ca1ec5dc8859faa8d76147f38c9639634d707ed2287c59aff6ea05"
+    "sha256": "45451bf038e453609dc4f96d32a2e2ab4f3f9bf1a65e8bbd36e741d3eea772f8"
   },
   {
     "step": "059",
     "path": "tests/059-browser.test.mjs",
-    "sha256": "b5c8f9347100229d888b5aec86c82daaab815473136cf5e1a860113f96732502"
+    "sha256": "234ebc056fb6fdfed66b7af1b4a43785e0fbfe75bc29c237e2fb2cb8306dbf00"
   },
   {
     "step": "060",

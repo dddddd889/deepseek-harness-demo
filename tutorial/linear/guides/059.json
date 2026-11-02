@@ -1,24 +1,25 @@
 {
   "scenario": "Agent需要在网页表单填入中文并点击提交，再看真实页面是否改变。浏览器DOM操作与操作系统屏幕点击是两个领域：网页里能定位button，不代表已经能控制其他应用窗口。",
-  "flow": "browser(scope, Chrome路径) → Playwright启动隔离headless Chrome → page.fill/click/screenshot → DOM状态或真实PNG；network route复用Web.check。另一个computer(action)只把有限OS动作编译成固定命令，当前测试没有执行这些系统动作。",
+  "flow": "browser → Playwright隔离Chrome → DOM与PNG；computerSpec → 固定系统命令参数；computer → runner执行 → 检查退出码。自动测试使用系统执行替身；独立smoke脚本才执行macOS真实截屏。",
   "try": "先写完browser.mjs、computer.mjs并安装本章依赖，确认本机有Chrome；再运行bun test ./tests/059-browser.test.mjs。测试在隔离页面创建input和button，填中文、点击后检查data-done=yes，并验证PNG签名；它不访问公网、不接管个人登录浏览器。缺Chrome时应明确修复路径，不能把测试skip当通过。",
   "why": "Playwright管理浏览器和DOM，Scope保证关闭测试创建的浏览器。computerSpec只接受明确动作和参数，避免把模型提供的任意系统脚本当命令执行。两类动作的权限、取消和画面来源都不同。",
-  "accept": "测试确实启动Chrome并验证中文输入、按钮改变DOM、截图PNG及一个不支持的OS按键被拒绝。它没有测试navigate、外网/私网路由、真实系统截图/点击、OS授权或Agent工具接线。",
-  "debug": "在tests/059-browser.test.mjs用“059：本节测试”按F5，断在src/browser.mjs的chromium.launch、fill、click和screenshot；监视executablePath、await page.locator('#name').inputValue()及await page.locator('body').getAttribute('data-done')，后两者应为中文和yes。F10会等待外部Chrome动作，F11只能进入当前Bun的Playwright客户端，不能直接跳进Chrome页面JS。context.route断点本用例可能不命中，因为它使用setContent而非网络navigate。",
+  "accept": "本章8项测试覆盖真实Chrome输入、点击与网页PNG，以及系统命令生成、截图路径与坐标校验、按键白名单、不支持组合、执行结果、失败和预取消。系统执行测试使用固定runner，不证明真实系统权限或桌面动作生效；独立macOS截屏验收需要另行运行。",
+  "debug": "在tests/059-browser.test.mjs用“059：本节测试”按F5，断在src/browser.mjs的chromium.launch、fill、click和screenshot；监视executablePath、await page.locator('#name').inputValue()及await page.locator('body').getAttribute('data-done')，后两者应为中文和yes。F10会等待外部Chrome动作，F11只能进入当前Bun的Playwright客户端，不能直接跳进Chrome页面JS。context.route断点本用例可能不命中，因为它使用setContent而非网络navigate。 系统侧在src/computer.mjs的computerSpec、signal.throwIfAborted和runner调用处断点，查看固定argv与测试传入的platform。失败替身返回code=1时应抛出系统动作失败；非法参数和预取消时calls保持0。",
   "recall": "闭卷画Bun测试、Playwright协议、Chrome页面、操作系统桌面四块；给fill输入框、截图网页、点击另一个应用各放到正确领域。",
   "transfer": "练习：只在隔离测试页面把button选择器改为不存在的#missing，观察明确定位失败而不是返回模拟成功，随后恢复。该失败变体不在现有断言中；不要为了练习操作个人浏览器或系统桌面。",
   "wiring": "browser/computer是独立辅助模块，未注册进051 Agent工具表。068会复用browser来验收自己的Web页面，但不会因此获得完整Browser/CUA模型工具或OS控制产品。",
   "implemented": [
     "真实隔离headless Chrome，支持基本navigate、fill、click和PNG screenshot。",
     "浏览器网络请求可进入已有URL政策，scope关闭拥有的浏览器。",
-    "有限OS动作到固定命令的编译函数，不支持的组合明确报错。"
+    "有限OS动作到固定命令的编译函数，不支持的组合明确报错。",
+    "系统侧自动测试与可注入执行器；macOS截屏独立验收脚本。"
   ],
   "missing": [
     "原版有Browser提供方注册、Agent身份独占资源、激活/发现、操作队列和释放约定；这里直接创建Playwright页面。",
     "缺完整MCP/native浏览器提供方、模型schema、会话图像接纳及产品界面。",
-    "本章OS动作平台矩阵极小且未实测，不代表完整CUA；网络政策也未由本章测试验证。"
+    "OS动作平台矩阵极小，真实桌面截图/点击/按键及权限仍未实测；Windows与Wayland提供方未实现，网络政策也未由本章测试验证。"
   ],
-  "testEvidence": "tests/059-browser.test.mjs是实际Chrome测试，外部模型不参与，页面内容由测试内联固定。系统动作只测computerSpec拒绝任意脚本，没有调用computer执行系统命令。未完成的真实动作和平台资格仍保留缺口。",
+  "testEvidence": "tests/059-browser.test.mjs包含1项真实Chrome测试与7项系统侧测试。系统侧验证computerSpec和注入runner的computer，不执行桌面输入。scripts/computer-smoke.mjs提供可单独运行的macOS真实截屏验收，本轮未执行，不把命令替身通过说成桌面动作已实测。",
   "sources": [
     "packages/experimental/browser-use-runtime/src/index.ts",
     "packages/experimental/browser-use-runtime/src/mcp.ts",
@@ -26,5 +27,5 @@
     "packages/experimental/cua",
     "packages/experimental/cua-macos"
   ],
-  "sequence": "sequenceDiagram\n    participant T as Bun测试与Scope\n    participant B as browser辅助模块\n    participant C as 真实隔离Chrome页面\n    participant S as computerSpec纯函数\n    T->>B: browser并传Chrome路径\n    B->>C: Playwright启动headless进程\n    B-->>T: 返回页面与操作接口\n    T->>C: setContent固定表单\n    T->>B: fill中文\n    B->>C: locator.fill\n    C-->>B: 输入已完成\n    B-->>T: 返回\n    T->>B: click按钮\n    B->>C: locator.click并读body\n    C-->>B: data-done变yes\n    B-->>T: 页面文字\n    T->>B: screenshot\n    B->>C: 采集PNG\n    C-->>B: PNG字节\n    B-->>T: 返回真实截图\n    T->>S: 不支持的mac按键动作\n    S-->>T: 拒绝，不执行系统命令\n    T->>B: Scope关闭浏览器\n    B->>C: instance.close\n    Note over T,S: 没有Agent工具接线，也未实测系统截图或点击"
+  "sequence": "sequenceDiagram\n    participant T as Bun测试与Scope\n    participant B as browser辅助模块\n    participant C as 真实隔离Chrome页面\n    participant S as computerSpec纯函数\n    T->>B: browser并传Chrome路径\n    B->>C: Playwright启动headless进程\n    B-->>T: 返回页面与操作接口\n    T->>C: setContent固定表单\n    T->>B: fill中文\n    B->>C: locator.fill\n    C-->>B: 输入已完成\n    B-->>T: 返回\n    T->>B: click按钮\n    B->>C: locator.click并读body\n    C-->>B: data-done变yes\n    B-->>T: 页面文字\n    T->>B: screenshot\n    B->>C: 采集PNG\n    C-->>B: PNG字节\n    B-->>T: 返回真实截图\n    T->>S: 不支持的mac按键动作\n    S-->>T: 拒绝，不执行系统命令\n    T->>B: Scope关闭浏览器\n    B->>C: instance.close\n    Note over T,S: 系统侧另测固定命令与执行替身；未实测桌面动作"
 }
