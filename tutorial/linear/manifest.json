@@ -1217,17 +1217,32 @@
   {
     "step": "061",
     "path": ".vscode/launch.json",
-    "sha256": "b2ae51fb5a7309aa674a50d19d6be01130956bdf5fedd52f72288f8c13a4d3b6"
+    "sha256": "4e213886f397ad19c848a3c80149951b8f07f46e48234820803aa348b0c616e2"
+  },
+  {
+    "step": "061",
+    "path": "scripts/send-webhook.mjs",
+    "sha256": "6aa1a9cbead43f7fa269a27617061722842e9b7b2dd77fa75728e5d3e370901c"
+  },
+  {
+    "step": "061",
+    "path": "src/webhook-http.mjs",
+    "sha256": "c00ab3224ace41671e81bb635962e70b5bde04674fcbd0cf1e36884c42585f92"
+  },
+  {
+    "step": "061",
+    "path": "src/webhook-server.mjs",
+    "sha256": "13b80b1f88f8e758b674d475b3abea564211c626f9de1aae74a104d6168bce4e"
   },
   {
     "step": "061",
     "path": "src/webhook.mjs",
-    "sha256": "93883672810ec8044a099a666a4b62cb96875c5c296ec3c0b182313fac445ae4"
+    "sha256": "a08efc0d861e5f20dbffd168749fbbd1c932bdf60adbd3f74928d2bdf68c088b"
   },
   {
     "step": "061",
     "path": "tests/061-webhook.test.mjs",
-    "sha256": "64ef77b55e7a6dec886bcf2efb2594ed627513f48815acd2d93bdc7c895dfa34"
+    "sha256": "742ac8d2031e852e7274a2052704e0b0a55445318b5551d53b33c3d15c7be508"
   },
   {
     "step": "062",

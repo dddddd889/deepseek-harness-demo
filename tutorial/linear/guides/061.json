@@ -1,25 +1,26 @@
 {
-  "scenario": "外部系统把同一条review任务重复投递两次，教学实现希望它只进入既有会话Inbox一次。这里讲自定义接收身份和去重的思路，不是直接实现GitHub官方Webhook格式，也不是原版Webhook同语义复刻。",
-  "flow": "调用webhook返回的接收函数 → 检查时间/delivery与body签名 → 扫Session历史寻找webhook_delivery身份 → 首次追加inbox/add → agent.pump；重复身份直接返回duplicate。当前没有HTTP服务器路由。",
-  "try": "先写完src/webhook.mjs，再运行bun test ./tests/061-webhook.test.mjs。找到测试的body、delivery-1和pumps，第一次调用后pumps=1，重新构造webhook接收函数再调用仍为1；篡改body后签名应拒绝。不要向公网配置Webhook，本章无需真实GitHub secret或外部投递。",
-  "why": "把接收身份放在输入事件里，目的是让“接收过”和“已入队”共享事实来源，减少跨两个存储提交的空隙。不过这个目标必须由真实日志与重启测试验证；重新创建一个函数不等于重启进程。",
-  "accept": "现有测试只验证HMAC篡改拒绝，以及同一个内存Events对象被两个接收函数读取时不重复pump。它没有Journal、磁盘、进程重启、HTTP或真实Agent，因此不能声称已验证持久去重和重启恢复。",
-  "debug": "用“061：本节测试”启动tests/061-webhook.test.mjs，断在src/webhook.mjs的identity赋值、session.read().some(...)和session.append('inbox/add', ...)处。监视identity应为webhook_delivery-1、record.session.read().length与测试pumps；第一次F10会追加一条并pump，第二次在some判断直接返回duplicate。篡改body应在签名比较抛错。所有这些代码都在测试进程，当前没有外部HTTP进程可附加。",
-  "recall": "闭卷画“HTTP接收、验证投递、写Inbox、模型执行”四层，并在当前实现真正存在的层上打勾；再写出重建函数与重启后重读磁盘为什么不同。",
-  "transfer": "练习：用同一delivery和另一份合法签名body调用，观察当前实现会直接认duplicate，记录它与“相同身份不同正文应拒绝”的差距。只用固定secret和内存Events，不能把此观察写成已经实现拒绝。",
-  "wiring": "本章接收函数只由测试调用，没有挂047 HTTP路由，也没有为渠道创建真实Agent。原版Webhook走已验证投递→规则→创建新Session；本章走既有record的Inbox，属于不同设计，后续没有自动对齐。",
+  "scenario": "外部系统通过HTTP把review任务发送给已有会话。先启动本机Webhook服务，再发送签名请求，观察任务落入Journal并由真实Agent调用离线模型；重复投递只接收一次。这是自定义协议，不是GitHub官方Webhook格式。",
+  "flow": "签名发送脚本 → POST本机/webhooks → HTTP层读取原始字节和请求头 → webhook验签/去重 → Journal保存inbox/add → Agent.pump领取任务 → runTurn调用OfflineModel → Session记录回复与回合结束。HTTP回执只表示接收状态。",
+  "try": "创建本章所有文件后运行bun test ./tests/061-webhook.test.mjs。终端A设置HARNESS_WEBHOOK_SECRET=local-demo-only并启动bun src/webhook-server.mjs，终端B用同secret执行发送脚本并填入A打印的地址；具体命令见文末。观察HTTP 202和Agent回复，再重复投递验证HTTP 200。",
+  "why": "HTTP层负责传输与状态码，接收层负责验证与入队，Agent复用已有模型循环。接收身份和任务写在同一Journal事件，避免独立去重库与任务库之间的提交空隙；不等于外部副作用恰好执行一次。",
+  "accept": "6项测试验证签名与元数据绑定、真实HTTP触发真实Agent和离线回复、重开Host从Journal恢复后去重、同进程并发、正文冲突及各类接入失败。另提供服务与发送脚本，不声称已连接公网或真实外部模型。",
+  "debug": "用“061：本节测试”启动tests/061-webhook.test.mjs，给src/webhook-http.mjs的server.listen和receive(record, ...)断点。用“061：Webhook监听服务”启动手工示例，另开终端执行scripts/send-webhook.mjs；先确认监听成功，再发请求。在src/webhook.mjs的previous查询、session.append和pump观察身份：首次返回202，重复返回200，冲突返回409。在src/agent.mjs的inbox.claim与runTurn断点，进入src/loop.mjs的model.stream；终端A应打印离线回复与completed。HTTP不等待Agent结束。调试停顿超过请求超时或签名时间窗后需重新发送；退出时释放端口和Host。",
+  "recall": "画出发送脚本、HTTP监听、验签去重、Journal、Agent与模型六块，解释202与completed的区别；再区分重建接收函数、重开Host读盘与进程崩溃恢复的证据。",
+  "transfer": "练习：发送delivery-1，再用同身份与另一份合法签名正文投递，观察409且不新增任务；换delivery-2后应返回202。不配置公网投递，不使用真实账号密钥。",
+  "wiring": "src/webhook-server.mjs创建真实Host和会话，调用startWebhook独立监听本机/webhooks，不修改047既有HTTP入口。接收层写入既有Inbox并pump真实Agent，默认OfflineModel；与原版规则创建新Session仍属不同设计。",
   "implemented": [
-    "自定义HMAC-SHA256正文验签和基本时间/delivery格式检查。",
-    "按Session里inbox/add身份判断重复，并在首次接收后pump。",
-    "明确签名针对原始body，不对JSON重编码后验签。"
+    "HTTP监听、原始正文读取、大小限制、固定请求头及错误状态码。",
+    "HMAC绑定时间戳、投递身份和原始正文；正文摘要识别重复与身份冲突。",
+    "任务写入真实Journal并触发真实Agent，离线模型返回可观察回复。",
+    "启动服务、签名发送与正常退出示例；持久去重与同进程并发测试。"
   ],
   "missing": [
-    "原版GitHub provider实际读取HTTP事件/投递头验签并交给规则创建新Session；本章没有HTTP渠道或规则注册。",
-    "原版deliveryId只是来源信息，不是内建去重状态；本章持久Inbox去重是自定义语义，不能称原版功能已简化复刻。",
-    "本章timestamp和delivery未纳入body的HMAC覆盖；重复delivery但不同正文也未显式拒绝。",
-    "没有真实日志落盘/重启/并发接收测试，不能声称持久接收、执行去重或故障原子性已证明。"
+    "原版GitHub provider读取平台HTTP事件并交给规则创建新Session；本章是自定义协议和既有会话Inbox。",
+    "原版deliveryId不是本章内建去重状态，不能把自定义语义当作原版复刻。",
+    "没有公网、外部模型、进程崩溃注入、多进程接收、自动重放或死信处理。",
+    "HTTP接收去重不保证模型或外部工具恰好执行一次；未完成任务需要显式恢复策略。"
   ],
-  "testEvidence": "tests/061-webhook.test.mjs使用new Events()和仅递增计数的agent.pump替身，没有Journal或模型。签名计算是真实crypto；第二次调用只是重建接收函数，仍共享同一个内存日志。本次未新增真实Webhook接入。",
+  "testEvidence": "tests/061-webhook.test.mjs有6项测试，使用真实本机TCP、临时Journal和Host/Agent，模型为OfflineModel；处理函数小测试保留计数替身。重开Host测试重新读盘，不是进程崩溃注入；无公网或真实外部模型验证。",
   "sources": [
     "packages/experimental/webhook/src/index.ts",
     "packages/experimental/webhook/src/types.ts",
@@ -27,5 +28,5 @@
     "packages/experimental/webhook-github/src/handler.ts",
     "packages/experimental/webhook-github/src/body.ts"
   ],
-  "sequence": "sequenceDiagram\n    participant T as 纯内存测试调用方\n    participant W as webhook接收函数\n    participant E as 内存Events\n    participant P as agent.pump计数替身\n    Note over T,P: 没有HTTP路由、Journal、真实Agent或重启\n    T->>W: 第一次传body、签名与delivery\n    W->>W: 时间检查并验body的HMAC\n    W->>E: 查webhook_delivery身份\n    E-->>W: 尚不存在\n    W->>E: append inbox/add\n    W->>P: pump\n    P-->>W: pumps加一\n    W-->>T: duplicate=false\n    T->>W: 重建接收函数后重复同delivery\n    W->>E: 读取同一个内存Events\n    E-->>W: 身份已存在\n    W-->>T: duplicate=true，不再pump\n    T->>W: 篡改body沿用旧签名\n    W->>W: HMAC不匹配\n    W-->>T: 签名错误\n    Note over W,E: 重建函数不等于进程重启或持久恢复"
+  "sequence": "sequenceDiagram\n    participant S as 签名发送脚本或测试\n    participant H as 本机HTTP监听\n    participant W as webhook接收函数\n    participant J as Session与Journal\n    participant A as 真实Agent\n    participant M as OfflineModel\n    S->>H: POST /webhooks，原始body与签名头\n    H->>W: 原始字节与请求头\n    W->>W: 验签、检查时间与身份\n    W->>J: 查询接收身份和摘要\n    alt 首次接收\n        W->>J: append inbox/add并落盘\n        W->>A: pump\n        W-->>H: duplicate=false与inputId\n        H-->>S: HTTP 202接收凭据\n        A->>J: claim任务\n        A->>M: runTurn调用stream\n        M-->>A: 离线文本与finish\n        A->>J: 写回复与turn/end\n    else 相同身份和正文\n        W-->>H: duplicate=true\n        H-->>S: HTTP 200，不再pump\n    else 校验失败或身份冲突\n        W-->>H: 协议错误\n        H-->>S: 对应错误状态，不入队\n    end"
 }

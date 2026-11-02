@@ -98,6 +98,17 @@ def plan_for(lesson):
         if number != '044':
             primary = name
             reason = '先用本节演示看完整动作，再用固定测试检查断言；演示和它直接导入的模块在同一个 Bun 进程。'
+    if number == '061':
+        # 本机示例使用固定演示secret，发送端必须使用同值；不读取外部模型密钥。
+        add(bun_launch('061：Webhook监听服务', 'src/webhook-server.mjs',
+                       env={'HARNESS_WEBHOOK_SECRET': 'local-demo-only'}),
+            '本机HTTP到Agent联调', 'src/webhook-server.mjs', '监听成功后，另一个终端运行本节发送脚本；Ctrl+C或停止调试释放服务。')
+        reason = '测试使用真实本机HTTP、Host、Journal和Agent；手工演示启动独立监听服务，另一个终端才是HTTP发送方。模型默认为OfflineModel，无需API Key。'
+        actions = ['U->>D: 选择061的Webhook监听服务', 'D->>P: 启动Host与HTTP服务',
+                   'P-->>U: 打印动态端口与会话ID', 'U->>C: 另一终端启动send-webhook脚本',
+                   'C->>P: POST原始JSON与签名请求头', 'P->>P: 验签、写Journal、pump真实Agent',
+                   'P-->>C: 202接收凭据，不等待模型完成', 'P->>P: Agent调用OfflineModel并记录回复',
+                   'P-->>U: 打印Agent回复与回合结束', 'U->>P: Ctrl+C，关闭端口和Host']
     if number in ATTACH_DEMOS:
         name, program, route = ATTACH_DEMOS[number]
         add(attach(name, 'ws://127.0.0.1:6499/' + route), '本节演示', program, '终端先创建演示进程，再连接它的 Inspector。')

@@ -16,6 +16,22 @@
         "3600000"
       ],
       "stopOnEntry": false
+    },
+    {
+      "name": "061：Webhook监听服务",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/webhook-server.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "stopOnEntry": false,
+      "env": {
+        "HARNESS_WEBHOOK_SECRET": "local-demo-only"
+      }
     }
   ]
 }
