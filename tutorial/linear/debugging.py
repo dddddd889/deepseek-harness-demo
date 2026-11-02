@@ -1,6 +1,7 @@
 """逐课生成调试入口与启动说明；只列当步代码实际能够到达的目标。"""
 
 import json
+import re
 from pathlib import Path
 
 
@@ -230,6 +231,19 @@ def write_launch_files(lessons):
         destination.write_text(json.dumps(plan_for(lesson)['launch'], ensure_ascii=False, indent=2) + '\n')
 
 
+def render_debug_steps(description):
+    """把逐课调试原文按操作分成编号步骤，保留断点、变量与边界说明。"""
+    # 中文句号和分号是现有说明的操作边界；不按英文点号切开文件名和表达式。
+    parts = re.split(r'(?<=[。；])', description)
+    # 长句中的下一项操作也单独列出，不切开普通变量列表和函数参数。
+    parts = [step.strip() for part in parts
+             for step in re.split(r'(?<=[，：])(?=监视|在src/|给src/|在desktop/|在web/|继续后再附加)', part)
+             if step.strip()]
+    # 独立步骤以句号收尾，避免拆分后残留逗号、分号，看起来仍像未结束的长句。
+    return '\n\n'.join(f'{index}. {step.rstrip("，；") + "。" if step.endswith(("，", "；")) else step}'
+                        for index, step in enumerate(parts, start=1))
+
+
 def render_debugging(lesson):
     """渲染本节专属配置清单、为什么、启动步骤与必要的复杂启动图。"""
     plan = plan_for(lesson)
@@ -244,7 +258,7 @@ def render_debugging(lesson):
               '3. 在下方具体观察点停住；F10 跨过当前语句，F11 只进入当前调试目标。异步等待涉及另一进程时，切换调试会话并继续对端。',
               '4. 变量要在所属调用帧查看；看测试局部变量时选测试帧，看 this 和参数时选实现方法帧。', '',
               '<details class="debug-details">', '<summary>展开本节具体断点和预期</summary>', '',
-              lesson['debug'], '', '</details>', '']
+              render_debug_steps(lesson['debug']), '', '</details>', '']
     if lesson['id'] == '000':
         lines += ['先安装 Bun 扩展 `oven.bun-vscode`。若找不到 Bun，在 PROJECT 终端执行 `which bun`，将 runtime 换成实际绝对路径。', '']
     if plan['requirements']:

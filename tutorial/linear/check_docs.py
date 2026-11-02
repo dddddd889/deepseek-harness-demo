@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from debugging import plan_for
+from debugging import plan_for, render_debug_steps
 from chapter_map import CALLS, render_map, map_files
 
 ROOT = Path(__file__).resolve().parent
@@ -65,7 +65,9 @@ def main():
                 raise ValueError(number + '缺少复杂调试启动时序')
             debug_sequences += 1
         for field in ('scenario', 'flow', 'sequence', 'wiring', 'try', 'why', 'accept', 'debug', 'recall', 'transfer', 'testEvidence'):
-            if guide[field] not in text:
+            # 调试说明按步骤排版；其余说明仍按原文逐段核对。
+            expected = render_debug_steps(guide[field]) if field == 'debug' else guide[field]
+            if expected not in text:
                 raise ValueError(number + '未展示说明字段：' + field)
         # 保留原文本调用链，并要求时序图紧跟其后、位于接线说明之前。
         flow_block = '```text\n' + guide['flow'] + '\n```'
