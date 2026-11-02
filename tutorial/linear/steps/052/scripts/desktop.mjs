@@ -4,7 +4,10 @@ import { resolve } from 'node:path'
 
 // 开发入口由 Bun 启动，再将其绝对路径传给 Electron，Host 不从 PATH 猜运行时。
 const require = createRequire(import.meta.url) // 这里只加载 Electron 包提供的二进制路径。
-const executable = require('electron') // Electron 主进程仍使用其内置运行时。
+// 当前是Bun启动器：按普通依赖查找加载node_modules/electron/index.js。
+// 该入口导出getElectronPath()的结果，因此这里得到可执行程序路径字符串，不是app等API。
+// createRequire只提供模块加载接口；后面的spawn才启动真正的Electron运行时。
+const executable = require('electron')
 const environment = { ...process.env, HARNESS_BUN: process.execPath }
 delete environment.ELECTRON_RUN_AS_NODE
 // 只在显式调试时开放本机端口；先连接 Main，再继续启动 Host 和窗口。

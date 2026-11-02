@@ -1,3 +1,6 @@
+// 本文件由Electron程序执行：它启动时已注册electron内置模块并设置特殊模块加载规则。
+// 因此同样的require('electron')在这里取得app、BrowserWindow等API，不走npm包的路径导出入口。
+// 与Bun启动器中的区别来自运行时的模块加载机制，不是createRequire或本文件判断后切换返回值。
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron')
 const { spawn } = require('node:child_process')
 const path = require('node:path')
