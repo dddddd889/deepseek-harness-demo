@@ -398,6 +398,41 @@ HARNESS_VSCODE_DEBUG=1 env -u DEEPSEEK_API_KEY bun run desktop
 
 按 [052本节启动图](lessons/052.md) 先附加 Main（9229）并继续，之后才能出现 Host（6499）和页面（9222）。只启动“052：本节测试”不会开窗口，Bun 的 F11 也不会直接进入 Electron Renderer。
 
+
+### Main停在spawn，为什么还附加不到Host？
+
+断点通常停在语句执行之前。Main停在 `host = spawn(runtime, hostArgs, ...)` 这一行，不等于子进程已经创建。Main的F11也不能跨进程进入web-server.mjs。
+
+```mermaid
+sequenceDiagram
+    actor U as 学习者
+    participant M as Main调试会话
+    participant H as Bun Host调试目标
+    U->>M: 在spawn行停住
+    Note over M,H: spawn尚未执行，此时没有新Host可附加
+    U->>M: F10执行spawn这一行
+    M->>H: 创建Host子进程
+    alt 使用默认inspect
+        H->>H: 立即运行web-server.mjs
+        Note over U,H: 稍后附加可能已错过启动断点
+    else 临时使用inspect-brk
+        H->>H: 启动暂停，等待调试器
+        U->>H: 选择Electron：Bun Host附加
+        U->>H: 在Host会话F5继续，进入启动断点
+    end
+```
+
+本项目默认Host参数是 `--inspect=127.0.0.1:6499/harness-host`：开放调试端口，但不等你附加。要观察Host启动代码，请临时把Main的hostArgs中这一项改成 `--inspect-brk=127.0.0.1:6499/harness-host`，保留后面的paths.host参数。
+
+1. 退出旧桌面应用，重新用调试模式启动，并先附加 **Electron：Main**。
+2. 在Main的spawn行停住，按F10执行这一行；停到下一行后，Host才已经创建。此时可以暂时保持Main暂停。
+3. 在PROJECT的 `src/web-server.mjs` 首条可执行语句设断点，再启动 **Electron：Bun Host** 附加会话。配置地址应与6499/harness-host一致，不选9222的Renderer。
+4. 从“调用堆栈”选中Host调试会话，按F5继续Host；启动代码这时才开始执行。按需要继续Main，让它读取Host输出的URL并创建窗口。
+5. Main中的Host启动保护计时为20秒。尚停在spawn之后、计时器创建之前时可以先完成附加；如果已经让Main进入等待URL的代码，就要及时连接并继续Host。仅让Host一直暂停会使Main报启动超时。
+6. 调完恢复默认inspect。普通运行无需暂停等待第二个调试器；要观察运行中的任务，附加Host后在remote、Host或Agent的处理函数下断点，再从页面发送任务即可。
+
+`--inspect-brk`让Host成为可连接、尚未执行完启动逻辑的目标；它不会把Host并入Main调用栈。若6499已被旧实例占用，先退出旧实例，不要误连旧Host并等待新进程断点命中。
+
 ## 11. 窗口关了，应用为什么还在？
 
 ### 为什么要监听这四个事件？
@@ -483,7 +518,7 @@ sequenceDiagram
 | 直接用 bun desktop/main.cjs，Electron API不可用 | Main需要由Electron程序执行；使用 bun run desktop 的启动器 |
 | 打开的是普通Chrome页面，window.desktop不存在 | 页面没有加载Electron preload；回到桌面窗口观察 |
 | 只运行052测试却没有窗口 | 那是策略测试，实际窗口用 desktop 命令启动 |
-| Main已暂停，Host附加连接失败 | 先继续Main，让startHost真正执行 |
+| Main停在spawn行，Host附加失败 | 先F10执行spawn；若调启动断点，用inspect-brk，再连接Host |
 | 窗口空白或报Host超时 | 检查Host stderr和本次URL；不能只看Main是否创建成功 |
 
 读完后能画出 `启动器 → Main → Host / Renderer`，并分清 `页面 → IPC → Main` 与 `页面 → Web → Host` 两条路，就可以回到 [第052节](lessons/052.md) 继续逐文件阅读。
