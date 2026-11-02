@@ -216,6 +216,49 @@
       "pathMapping": {
         "/view.mjs": "${workspaceFolder}/src/view.mjs"
       }
+    },
+    {
+      "name": "052：本节测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/052-desktop-policy.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Electron：Main",
+      "type": "node",
+      "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9229,
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Electron：Bun Host",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6499/harness-host"
+    },
+    {
+      "name": "Electron：Renderer",
+      "type": "chrome",
+      "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/web",
+      "pathMapping": {
+        "/view.mjs": "${workspaceFolder}/src/view.mjs"
+      }
     }
   ],
   "inputs": [

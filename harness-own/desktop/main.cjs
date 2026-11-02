@@ -20,7 +20,7 @@ else {
     const environment = { ...process.env, HARNESS_HOME: paths.home }
     delete environment.NODE_OPTIONS; delete environment.NODE_PATH; delete environment.ELECTRON_RUN_AS_NODE
     // Bun 与 Electron Main 使用不同调试协议，必须连接不同端口。
-    const hostArgs = environment.HARNESS_VSCODE_DEBUG === '1' ? ['--inspect=127.0.0.1:6499/harness-host', paths.host] : [paths.host]
+    const hostArgs = environment.HARNESS_VSCODE_DEBUG === '1' ? ['--inspect-brk=127.0.0.1:6499/harness-host', paths.host] : [paths.host]
     host = spawn(runtime, hostArgs, { cwd: applicationRoot, env: environment, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = '', errors = ''
     address = await new Promise((resolve, reject) => {

@@ -1,4 +1,5 @@
 import { View } from '/view.mjs'
+debugger;
 
 // UI只管理连接和视图，不在浏览器里运行Agent Loop或保存模型Key。
 const element = id => document.getElementById(id)
