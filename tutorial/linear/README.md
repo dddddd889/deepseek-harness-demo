@@ -116,3 +116,7 @@ flowchart LR
 调试统一使用 **VS Code Debug**：每节代码前都有“本节调试”清单和本节专用 `.vscode/launch.json`，只列该节可用入口。`NNN：本节测试` 固定运行该节测试文件，不依赖编辑器当前打开的文件；跨进程、跨语言、页面与 Electron 另给启动时序和原因。配置标题不再跳到 `harness-own` 的累计配置。首次安装 `oven.bun-vscode`，之后按每节说明更新配置并设断点。详细操作见 [VS Code 调试说明](DEBUGGING.md)。
 
 涉及多文件接线的章节，在逐文件代码前提供 PROJECT 目录树与调用关系图。目录标明本节新增/替换和沿用的前置文件；图中箭头写明具体函数调用、进程启动或尚未接入的路径，再单独用启动时序图说明调试器如何连接。
+
+## Electron 前置阅读
+
+第052节看不懂时，先读 [Electron 入门](ELECTRON-BEGINNER.md)：窗口、Main、Renderer、preload、IPC与本项目的Bun Host，通过目录树和调用图逐步展开。
