@@ -111,6 +111,60 @@ flowchart TD
 
 本项目 Main 和 preload 用 `.cjs` 是为了明确采用 CommonJS 的 require 写法；Bun 侧 `.mjs` 用 import。扩展名描述模块格式，不能代替进程关系。
 
+### 为什么启动器要写 createRequire(import.meta.url)？
+
+看 [scripts/desktop.mjs](../../harness-own/scripts/desktop.mjs) 时，把下面三步连起来读：先取得依赖包提供的程序路径，再用这个程序执行真正的 Main。
+
+```javascript
+import { createRequire } from 'node:module'
+import { spawn } from 'node:child_process'
+import { resolve } from 'node:path'
+
+// 当前文件使用ESM；创建以该文件位置为依赖查找起点的require。
+const require = createRequire(import.meta.url)
+
+// 此时运行在Bun启动器里，普通electron依赖包导出的是程序路径字符串。
+const executable = require('electron')
+
+// 教学接线片段：用Electron执行Main；完整启动器还传递环境并处理退出。
+const child = spawn(executable, [resolve('desktop/main.cjs')], { stdio: 'inherit' })
+```
+
+| 代码 | 为什么这样写 |
+| --- | --- |
+| `import.meta.url` | 指明当前desktop.mjs的位置；依赖查找以该模块位置为起点，不是随便猜一个node_modules目录 |
+| `createRequire(...)` | 当前文件采用ESM模块格式，显式创建CommonJS的require接口；Bun可能有额外兼容能力，这种写法明确使用Node兼容接口 |
+| `require('electron')` | 在这个启动器中取得Electron可执行文件路径，不是在Bun里创建BrowserWindow |
+| `spawn(executable, ...)` | 真正启动Electron程序，再由Electron加载desktop/main.cjs |
+
+可对照 [Node createRequire 文档](https://nodejs.org/api/module.html#modulecreaterequirefilename)。这段采用require接口读取Electron包的CommonJS导出；并不表示ESM永远不能通过import读取CommonJS包。
+
+### 为什么 Main 里的 require('electron') 又变成 API？
+
+不是同一个index.js根据运行时切换返回值，而是两种运行时把同一个模块名解析到了不同实现。
+
+```mermaid
+flowchart TD
+    Q["require('electron')"] --> B["在Bun启动器里"]
+    Q --> E["在Electron Main里"]
+    B --> N["普通依赖查找：node_modules/electron/index.js"]
+    N --> P["module.exports = getElectronPath()：程序路径"]
+    E --> R["Electron启动时设置自己的模块加载规则"]
+    R --> A["内置electron模块：app、BrowserWindow等API"]
+    P --> S["spawn这个程序，再执行main.cjs"]
+```
+
+本项目当前安装的Electron包版本为44.7.0，package.json的main指向index.js。该入口最后执行 `module.exports = getElectronPath()`；这是本地安装包的导出行为。Electron运行时本身则在初始化时注册electron模块缓存与别名，并调整模块解析规则，不沿普通包查找去执行这个npm入口。实现可对照 [Electron v44.7.0 初始化源码](https://github.com/electron/electron/blob/v44.7.0/lib/common/init.ts#L70-L113)。模块缓存、解析规则共同参与，不能把上图理解成只修改一个函数就实现了全部Electron API。
+
+因此 [desktop/main.cjs](../../harness-own/desktop/main.cjs) 里使用：
+
+```javascript
+// 由Electron程序执行Main时，加载其API模块。
+const { app, BrowserWindow } = require('electron')
+```
+
+`createRequire`本身不负责检测Electron，也不负责把路径变成API。决定结果的是当前运行时的模块加载机制。这就是本项目要先运行启动器、再由Electron执行Main的原因：直接执行 `bun desktop/main.cjs` 不会让Bun自动拥有Electron的主进程API。
+
 ## 5. 再看本项目目录
 
 ```text
