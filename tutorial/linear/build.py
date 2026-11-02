@@ -30,7 +30,7 @@ def main():
                  '### 这次数据怎么走', '', '```text', guide['flow'], '```', '',
                  '### 对应时序图', '', '从上往下读；实线箭头表示调用或发送，虚线箭头表示返回或事件通知。`opt`表示可选操作，`alt`表示不同结果，`loop`表示重复，`par`及其`and`分支表示并行；“未接入”及fixture说明按图中标注理解。', '',
                  '```mermaid', guide['sequence'], '```', '',
-                 '**当前接线位置：**' + guide['wiring'], '',
+                 '**当前接线位置：** ' + guide['wiring'], '',
                  '## 这一步具体做什么', '', lesson['try'], '',
                  '需要本章新文件的操作，先按下面代码创建文件，再执行；不要在上一步尚不存在的接口上试错。', '',
                  '## 代码为什么放在这一层', '', lesson['why'], '',
@@ -72,10 +72,10 @@ def main():
         if (ROOT / 'locks' / f'{number}.bun.lock').exists():
             command = command.replace('bun install --ignore-scripts', f'cp "$COURSE/locks/{number}.bun.lock" bun.lock\nbun install --frozen-lockfile --ignore-scripts')
         lines += ['', '## 运行命令与通过标准', '', '```sh', 'cd "$PROJECT"', command, 'bun test', '```', '', lesson['accept'], '',
-                  '**本步证据的范围：**' + guide['testEvidence'], '',
+                  '**本步证据的范围：** ' + guide['testEvidence'], '',
                   '## 不看答案，确认自己能解释', '', lesson['recall'], '',
                   '完成后在 LEARNING.md 写一句实际结果和一个卡点。明天只重做这个卡点；第 3 天、第 7 天再做一次，能独立完成就继续下一页，不另开学习路线。', '',
-                  '**再改一个条件验证：**' + lesson['transfer'], '',
+                  '**再改一个条件验证：** ' + lesson['transfer'], '',
                   '## 与当前原版还差哪些', '',
                   '对照本仓库固定原版 `687f282e8625c6b8d11ff58211a90524be2e4317`；这里的“当前”指该本地基线，不是未经检查的上游最新版。', '',
                   '**这一页已经实现：**', '']

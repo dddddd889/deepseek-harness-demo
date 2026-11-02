@@ -237,13 +237,13 @@ def render_debugging(lesson):
              f'**建议先选：{plan["primary"]}。** 每节的测试入口都固定到本节文件，不依赖编辑器当前打开的 `${{file}}`。', '',
              '| 配置名称 | 什么时候选 | 实际入口或目标 | 能观察什么 |', '| --- | --- | --- | --- |']
     lines += ['| ' + ' | '.join(row) + ' |' for row in plan['rows']]
-    lines += ['', '**为什么这样启动：**' + plan['reason'], '',
+    lines += ['', '**为什么这样启动：** ' + plan['reason'], '',
               '使用下方的[本节专用调试配置](#lesson-debug-config)。它只列本节可用目标；要保留个人配置，请先备份并按名称合并。页面上 `harness-own` 的累计文件链接供看当前工程，不是本节调试配置的答案。', '',
               '1. VS Code 打开自己的 PROJECT；按本节创建源码与配置，断点设在 PROJECT 文件中。',
               f'2. 先用终端运行 `bun test ./{lesson["test"]}` 确认普通验收，再选表中的配置按 F5。',
               '3. 在下方具体观察点停住；F10 跨过当前语句，F11 只进入当前调试目标。异步等待涉及另一进程时，切换调试会话并继续对端。',
               '4. 变量要在所属调用帧查看；看测试局部变量时选测试帧，看 this 和参数时选实现方法帧。', '',
-              '**本节具体断点和预期：**' + lesson['debug'], '']
+              '**本节具体断点和预期：** ' + lesson['debug'], '']
     if lesson['id'] == '000':
         lines += ['先安装 Bun 扩展 `oven.bun-vscode`。若找不到 Bun，在 PROJECT 终端执行 `which bun`，将 runtime 换成实际绝对路径。', '']
     if plan['requirements']:
