@@ -62,10 +62,12 @@ function readRoute() {
 
 // 标题锚点保留中文，兼容教材已有的 GitHub 风格页内链接。
 function headingSlug(text, used) {
-  const base = text.trim().toLowerCase().replace(/[^\p{L}\p{N}_\-\s]/gu, '').replace(/\s/g, '-');
-  const count = used.get(base) || 0;
-  used.set(base, count + 1);
-  return count ? `${base}-${count}` : base;
+  const base = text.trim().toLowerCase().replace(/[^\p{L}\p{N}_\-\s]/gu, '').replace(/\s/g, '-') || 'section';
+  // 重复标题和自带数字后缀的标题也必须得到不同ID，不能跳到另一节。
+  let slug = base, suffix = 0;
+  while (used.has(slug)) slug = `${base}-${++suffix}`;
+  used.add(slug);
+  return slug;
 }
 
 // 目录按既有 R00～R09 阶段分组，目录编号沿用教材的 000～069。
@@ -240,15 +242,39 @@ function createDiagram(pre, source, sequence) {
   else render();
 }
 
+// 标题链接复制完整地址；剪贴板不可用时仍可通过地址栏或右键复制。
+async function copyHeadingUrl(link) {
+  try {
+    await navigator.clipboard.writeText(link.href);
+    link.textContent = '已复制';
+    setTimeout(() => { if (link.isConnected) link.textContent = '链接'; }, 1600);
+  } catch {
+    link.title = '已定位到标题，可复制地址栏或右键复制链接地址';
+  }
+}
+
 // 右侧目录直接取自渲染后的标题，保证显示文字和跳转目标一致。
 function renderToc() {
-  const used = new Map();
-  currentHeadings = [...$('markdown-content').querySelectorAll('h1,h2,h3,h4')];
+  // 保留正文已有的显式锚点，并为全部六级标题生成不冲突的地址。
+  const used = new Set([...$('markdown-content').querySelectorAll('[id]')].filter((node) => !/^H[1-6]$/.test(node.tagName)).map((node) => node.id));
+  currentHeadings = [...$('markdown-content').querySelectorAll('h1,h2,h3,h4,h5,h6')];
   const fragment = document.createDocumentFragment();
   for (const heading of currentHeadings) {
-    heading.id = headingSlug(heading.textContent, used);
+    // 先取原标题再加控件，链接文字不会混入标题ID或右侧目录。
+    const title = heading.textContent;
+    heading.id = headingSlug(title, used);
+    const permalink = element('a', 'heading-permalink', '链接');
+    permalink.href = routeUrl(currentPath, heading.id);
+    permalink.title = '点击复制标题直达链接，也可右键复制链接地址';
+    permalink.setAttribute('aria-label', `复制“${title}”的直达链接`);
+    permalink.addEventListener('click', (event) => {
+      // 保留新标签页、右键菜单等原生链接操作，普通点击同时复制完整URL。
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      copyHeadingUrl(permalink);
+    });
+    heading.append(permalink);
     if (heading.tagName === 'H1') continue;
-    const link = element('a', `toc-link toc-${heading.tagName.toLowerCase()}`, heading.textContent);
+    const link = element('a', `toc-link toc-${heading.tagName.toLowerCase()}`, title);
     link.href = routeUrl(currentPath, heading.id);
     link.dataset.heading = heading.id;
     fragment.append(link);
@@ -365,6 +391,8 @@ function setRawMode(enabled) {
 
 // 以当前路由的标题锚点为目标；浏览器后退能回到上一课和上一段。
 function scrollToHeading(id) {
+  // 从原文视图打开标题链接时，先恢复可定位的阅读视图。
+  if (id && rawMode) setRawMode(false);
   if (!id) { window.scrollTo({ top: 0, behavior: 'instant' }); return; }
   // 补充问答还使用 <a id="q1"> 这样的显式锚点，查找范围限制在已渲染正文。
   const target = [...$('markdown-content').querySelectorAll('[id]')].find((node) => node.id === id);
