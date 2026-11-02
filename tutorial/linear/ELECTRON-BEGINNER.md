@@ -165,6 +165,55 @@ const { app, BrowserWindow } = require('electron')
 
 `createRequire`本身不负责检测Electron，也不负责把路径变成API。决定结果的是当前运行时的模块加载机制。这就是本项目要先运行启动器、再由Electron执行Main的原因：直接执行 `bun desktop/main.cjs` 不会让Bun自动拥有Electron的主进程API。
 
+### 直接验证：让 Electron 自己打印 API
+
+在 `harness-own` 目录复制执行下面整段命令。它会创建一个专用验证脚本，启动真实 Electron Main、打印结果后退出，不创建窗口。前提是已按本章准备好 Electron 运行程序；不要为了验证而直接用 Bun 或 Node 执行这个 cjs 文件。
+
+```sh
+mkdir -p tmp
+
+cat > tmp/electron-api-check.cjs <<'EOF'
+// 本文件由Electron执行，加载的是其内置API模块。
+const electron = require('electron')
+const { app, BrowserWindow } = electron
+
+console.log('进程类型：', process.type)
+console.log('Electron版本：', process.versions.electron)
+console.log('模块返回类型：', typeof electron)
+console.log('app.whenReady类型：', typeof app.whenReady)
+console.log('BrowserWindow类型：', typeof BrowserWindow)
+
+// 等待Electron完成初始化后退出，不留下后台应用进程。
+app.whenReady().then(() => {
+  console.log('验证成功：取得了Electron API，准备退出')
+  app.quit()
+})
+EOF
+
+# Node只负责取得Electron程序路径，不负责执行验证脚本。
+electron_binary="$(node -p "require('electron')")"
+
+# 移除可能让Electron进入普通Node模式的变量，再用Electron执行脚本。
+env -u ELECTRON_RUN_AS_NODE "$electron_binary" "$PWD/tmp/electron-api-check.cjs"
+```
+
+上面是 macOS / Linux shell 写法，与本仓库当前开发环境一致，需要可用的桌面会话。若 Electron 尚未安装完整，先运行本项目的 `bun scripts/install-electron.mjs`；不要把缺少运行程序或桌面环境导致的失败误认为模块返回值不同。
+
+预期关键输出如下，版本号取决于实际安装版本：
+
+```text
+进程类型： browser
+Electron版本： <当前版本>
+模块返回类型： object
+app.whenReady类型： function
+BrowserWindow类型： function
+验证成功：取得了Electron API，准备退出
+```
+
+`browser` 是 Electron Main 的内部进程类型名，不表示这里启动了普通 Chrome 网页。示例只读取 BrowserWindow 类的类型，没有 new BrowserWindow，因此不打开窗口。
+
+再对比 `node -e "console.log(require('electron'))"`：Node 输出程序路径；使用该路径启动 Electron 执行 cjs 后，输出的是 API 的类型。两次加载发生在不同运行时，这份例子验证的是模块加载差异，不是完整桌面窗口或 Harness 任务链路。
+
 ## 5. 再看本项目目录
 
 ```text
