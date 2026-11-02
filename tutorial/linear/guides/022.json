@@ -4,7 +4,7 @@
   "try": "完成本章代码后运行 bun src/edit-demo.mjs，再运行 bun test ./tests/022-edit.test.mjs。依次应看到默认多匹配拒绝、显式全量得到y y、旧版本拒绝、重新读取后唯一替换得到z y；demo只操作临时目录，退出自动清理。不要用自己的源文件验证删除和替换边界。",
   "why": "fileTools把021的文件能力变成模型可见Schema。replaceAll是可选布尔值，省略或false仍要唯一匹配；只在本次调用传true才允许全部。pieces.join(after)按普通字符串替换，after里的$&不会触发JS替换模板。",
   "accept": "6项真实文件测试覆盖默认/false、多处与唯一匹配、true全量、字面$&、空after删除、错误flag类型、空/无匹配、旧版本。read仍只有path，全量读取；replaceAll既不提供分片读，也不解决并发编辑。",
-  "debug": "在VS Code选tests/022-edit.test.mjs，选择“Bun：当前测试”按F5。在src/file-tools.mjs的current.version比较、matches赋值和return fs.write打断点；监视args.replaceAll、matches、pieces与current.version。F10默认遇matches=2应拒绝，true应进入write；F11进LocalFS.write再看expected=current及observed。要调CLI按下方attach配置运行bun --inspect-brk=127.0.0.1:6499/edit-022 src/edit-demo.mjs。",
+  "debug": "在VS Code选tests/022-edit.test.mjs，选择“022：本节测试”按F5。在src/file-tools.mjs的current.version比较、matches赋值和return fs.write打断点；监视args.replaceAll、matches、pieces与current.version。F10默认遇matches=2应拒绝，true应进入write；F11进LocalFS.write再看expected=current及observed。要调CLI按下方attach配置运行bun --inspect-brk=127.0.0.1:6499/edit-022 src/edit-demo.mjs。",
   "recall": "闭卷写出省略、false、true、字符串\"true\"四种flag的结果，再说明before空串、零匹配、after空串分别如何处理。",
   "transfer": "在临时测试副本用“a.b a.b”验证before按普通字符串处理而非正则；再用after=\"$&\"验证按字面保留。需自己补case再运行，不能用全量模式当成“不检查版本”的开关。",
   "wiring": "本章edit-demo通过真实Tools与LocalFS执行；041 Host会注册fileTools并由Agent Loop使用。后续教程没有自动补齐原版read分片、图片读取和文件搜索全集，不能把Host接线等同文件能力全量实现。",

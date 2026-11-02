@@ -4,7 +4,7 @@
   "try": "先写完src/webhook.mjs，再运行bun test ./tests/061-webhook.test.mjs。找到测试的body、delivery-1和pumps，第一次调用后pumps=1，重新构造webhook接收函数再调用仍为1；篡改body后签名应拒绝。不要向公网配置Webhook，本章无需真实GitHub secret或外部投递。",
   "why": "把接收身份放在输入事件里，目的是让“接收过”和“已入队”共享事实来源，减少跨两个存储提交的空隙。不过这个目标必须由真实日志与重启测试验证；重新创建一个函数不等于重启进程。",
   "accept": "现有测试只验证HMAC篡改拒绝，以及同一个内存Events对象被两个接收函数读取时不重复pump。它没有Journal、磁盘、进程重启、HTTP或真实Agent，因此不能声称已验证持久去重和重启恢复。",
-  "debug": "用“Bun：当前测试”启动tests/061-webhook.test.mjs，断在src/webhook.mjs的identity赋值、session.read().some(...)和session.append('inbox/add', ...)处。监视identity应为webhook_delivery-1、record.session.read().length与测试pumps；第一次F10会追加一条并pump，第二次在some判断直接返回duplicate。篡改body应在签名比较抛错。所有这些代码都在测试进程，当前没有外部HTTP进程可附加。",
+  "debug": "用“061：本节测试”启动tests/061-webhook.test.mjs，断在src/webhook.mjs的identity赋值、session.read().some(...)和session.append('inbox/add', ...)处。监视identity应为webhook_delivery-1、record.session.read().length与测试pumps；第一次F10会追加一条并pump，第二次在some判断直接返回duplicate。篡改body应在签名比较抛错。所有这些代码都在测试进程，当前没有外部HTTP进程可附加。",
   "recall": "闭卷画“HTTP接收、验证投递、写Inbox、模型执行”四层，并在当前实现真正存在的层上打勾；再写出重建函数与重启后重读磁盘为什么不同。",
   "transfer": "练习：用同一delivery和另一份合法签名body调用，观察当前实现会直接认duplicate，记录它与“相同身份不同正文应拒绝”的差距。只用固定secret和内存Events，不能把此观察写成已经实现拒绝。",
   "wiring": "本章接收函数只由测试调用，没有挂047 HTTP路由，也没有为渠道创建真实Agent。原版Webhook走已验证投递→规则→创建新Session；本章走既有record的Inbox，属于不同设计，后续没有自动对齐。",

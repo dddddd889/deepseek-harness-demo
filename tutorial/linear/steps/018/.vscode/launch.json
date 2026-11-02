@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "018：本节测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/018-routes.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：018路由演示（附加）",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6499/routes-018"
+    }
+  ]
+}

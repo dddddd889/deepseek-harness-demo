@@ -4,7 +4,7 @@
   "try": "先写完worktree.mjs，再运行bun test ./tests/062-worktree.test.mjs。该测试只尝试归档不拥有的名字、../escape名称和以-开头的ref，应该在运行git/tar之前拒绝。不要对当前仓库调用archive来试验：它包含真实删除，现有用例没有建立安全的真实归档测试环境。",
   "why": "owned表示这份管理器允许删除哪些checkout，先归档再移除是避免误删的教学顺序。它只在内存里保存所有权，不等于Git自身的worktree清单，也不等于原版Session工作目录服务。",
   "accept": "测试只证明未拥有路径与恶意名字/ref在外部命令之前被拒绝，没有运行一次真实git worktree或tar。不能依据这项测试宣布创建、归档、删除、恢复或中文文件保留通过。",
-  "debug": "用“Bun：当前测试”启动tests/062-worktree.test.mjs，在src/worktree.mjs的if (!target)和名称/ref校验条件断点；监视name、reference、this.owned.size应为0。F10应直接进入抛错，src/process.mjs的execute断点不应到达。不要为命中tar断点而跳过owned检查或指向日常仓库。",
+  "debug": "用“062：本节测试”启动tests/062-worktree.test.mjs，在src/worktree.mjs的if (!target)和名称/ref校验条件断点；监视name、reference、this.owned.size应为0。F10应直接进入抛错，src/process.mjs的execute断点不应到达。不要为命中tar断点而跳过owned检查或指向日常仓库。",
   "recall": "闭卷写出教学实现的detach checkout和原版新建branch的区别，再写出当前owned在进程退出后会发生什么，以及tar文件为什么不自动等于完整Git上下文。",
   "transfer": "练习：只给纯输入测试增加一个以-开头的name，验证它仍在任何git命令前拒绝。真实创建/归档练习需要另建完全隔离Git仓库和恢复核对，当前没有这份自动验收，不在本章冒进执行。",
   "wiring": "Worktrees只在062测试使用，未注册Agent工具、未更新Session cwd。后续没有恢复实现。它额外提供的tar归档删除不能冒充原版worktree服务的同语义简化。",

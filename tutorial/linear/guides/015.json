@@ -4,7 +4,7 @@
   "try": "写完sse.mjs及测试后运行 bun test ./tests/015-sse.test.mjs。测试把含“你好”的原始字节逐字节切开，预期仍输出[\"你好\",\"a\\nb\"]；不带空行的data: partial尾帧必须报错。这里没有网络请求，直接喂字节数组。",
   "why": "SSE解析器只恢复“事件的data字符串”，不负责thinking、工具调用和请求完成；那些由模型适配器解释。LF与CRLF都可形成行结束，两个行结束形成空行；[DONE]是本教程兼容接口正文约定，不是SSE标准的通用终止符。",
   "accept": "覆盖单字节中文、CRLF、多行data和未完成尾帧。当前正则只支持LF/CRLF，不支持单独CR；不保存event/id/retry、会忽略空data，也没有完整EventSource重连和无限buffer防护。",
-  "debug": "在VS Code打开练习工程并选中tests/015-sse.test.mjs，选择“Bun：当前测试”按F5启动。在src/sse.mjs的decoder.decode(chunk,{stream:true})、正则exec与yield data打断点。F10喂“你”的前两个字节时观察buffer尚无完整字符，第三字节才出现“你”；监视match.index和buffer，只有空行完整后才yield。F11看上层next收到的是数据正文，不是网络块。",
+  "debug": "在VS Code打开练习工程并选中tests/015-sse.test.mjs，选择“015：本节测试”按F5启动。在src/sse.mjs的decoder.decode(chunk,{stream:true})、正则exec与yield data打断点。F10喂“你”的前两个字节时观察buffer尚无完整字符，第三字节才出现“你”；监视match.index和buffer，只有空行完整后才yield。F11看上层next收到的是数据正文，不是网络块。",
   "recall": "闭卷写出一条data: 中文加空行的SSE字节文本，圈出网络块可任意切的位置与不可据此判断事件的位置。",
   "transfer": "在测试副本把分块改成一块含两个完整事件，结果应与逐字节分块相同；再让CRLF分隔恰好跨块。这是改已有输入数组，不访问远端服务。",
   "wiring": "016的DeepSeekModel直接调用sse(response.body)，018固定HTTP demo也经016复用；020换pi-ai后由SDK解析SSE，不再使用本章解析器处理该路径。",

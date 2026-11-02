@@ -4,7 +4,7 @@
   "try": "在自己的工程创建本页给出的src/ptc.mjs和tests/038-ptc.test.mjs，再运行 bun test ./tests/038-ptc.test.mjs。先预测：第一个echo收到ok并返回ok；第二个echo的text会从{$ref:\"a\"}变成什么？执行前的检查会进入几次？运行后用result.b=\"ok\"和checks=2核对。最后看maxCalls=0那次调用，确认任何工具都没有开始执行。",
   "why": "runProgram按数组顺序做事：调用工具，把返回值按id存进values，再把下一步参数里的$ref换成已经保存的值。每次都经过Tools.execute，保留原有参数校验和权限检查。这里只会替换参数第一层的引用，不会往嵌套对象里继续查找，也不会运行一段JavaScript源码。",
   "accept": "本章测试应1项通过：result等于{a:\"ok\",b:\"ok\"}；原测试实际断言b为ok、检查次数为2，并确认maxCalls=0时拒绝执行。checks只记录进入检查入口的次数，不证明已经测试了权限拒绝或用户审批。没有调用模型、启动子进程或运行模型生成的源码。",
-  "debug": "在VS Code打开tests/038-ptc.test.mjs，用“Bun：当前测试”启动。先在src/ptc.mjs的values.set打断点，F10执行第一步保存后，values.get(\"a\")应为\"ok\"。再在argumentsValue[key] = structuredClone(...)打断点：第二步替换前argumentsValue.text是{$ref:\"a\"}，F10后变成字符串\"ok\"。在await tools.execute处F11进入src/tools.mjs，再进入this.guard，看测试里的checks由0变1、再变2。maxCalls=0那次停在program.length > maxCalls，观察它直接抛错，不进入任何tool.run。",
+  "debug": "在VS Code打开tests/038-ptc.test.mjs，用“038：本节测试”启动。先在src/ptc.mjs的values.set打断点，F10执行第一步保存后，values.get(\"a\")应为\"ok\"。再在argumentsValue[key] = structuredClone(...)打断点：第二步替换前argumentsValue.text是{$ref:\"a\"}，F10后变成字符串\"ok\"。在await tools.execute处F11进入src/tools.mjs，再进入this.guard，看测试里的checks由0变1、再变2。maxCalls=0那次停在program.length > maxCalls，观察它直接抛错，不进入任何tool.run。",
   "recall": "合上文档，自己写出两步echo调用，讲清a的值存在哪里、$ref由谁替换、第二次echo真正收到什么参数。再解释为什么checks=2只说明检查入口被调用两次，不能证明用户已经批准了操作。",
   "transfer": "把第二步的$ref改为missing，确认报“引用尚未定义”，第二个echo没有执行；第一步已经执行，不会自动回滚。再把引用放到options.text里，观察当前代码不会替换这个更深一层的值。恢复原测试，明天闭卷重写查值和替换这几行，第3天再用自己的话讲清结果传递和逐次检查。",
   "wiring": "038由测试函数直接调用runProgram，没有父Agent或模型参与。051才把它包装为run_program工具供Agent调用。两种入口最后都经过Tools.execute；本章没有实现原版执行源码的脚本运行环境。",

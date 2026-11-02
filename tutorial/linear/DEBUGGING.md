@@ -1,74 +1,47 @@
-# 在 VS Code 里调试自己的 Harness
+# 按当前课次选择调试目标
 
-先按 [README](README.md) 初始化REPO、COURSE和PROJECT，默认练习工程是本仓库的 `$REPO/harness-own`。在 VS Code 打开仓库根目录的 `harness-course.code-workspace`，运行和调试选择 `harness-own` 文件夹；也可以用“文件 → 打开文件夹”单独打开 `$PROJECT`。断点与 `.vscode` 配置仍放在练习工程，`${workspaceFolder}` 指向这份练习目录。
+每节的“本节调试：选什么、为什么、怎么启动”是该节入口清单。用本节下方的完整 `.vscode/launch.json`，不要从前后课的配置猜测；`harness-own/.vscode/launch.json` 是学习者当前累计版本，不一定对应你正在读的课次。
 
-现有 `harness-own` 保留当前进度，不要按第000步清空或覆盖它。只有显式选择并自行创建了新的同仓空目录，才从第000步独立重做；这时在 VS Code 单独打开这个PROJECT。当前只做第000步时，只读下面第一段操作。
+## 一节一份配置
 
-## 第000步：亲手停在 input
-
-1. 打开扩展面板，搜索 **Bun**，确认扩展 ID 为 `oven.bun-vscode`，安装。它和内置的 Node 调试器不同。
-2. 按第000步创建 `.vscode/extensions.json` 和 `.vscode/launch.json`，以及该步源码、测试。
-3. 打开 `src/main.mjs`，单击 `const prompt = argv.join(...)` 行号左侧，出现红点。
-4. 打开左侧“运行和调试”，选择 **Bun：CLI 入口**，按 F5。停住时当前执行行高亮；此时变量 `argv` 应包含 `读取 README`。
-5. 在“调试控制台”输入 `argv.join(" ")`，检查任务文字。按 F10 执行赋值，再在“变量”查看 `prompt`；按 F5 继续，应输出 `收到任务：读取 README`。
-6. 打开 `tests/000-entry.test.mjs`，选择 **Bun：当前测试**，按 F5。测试调用 input 时也应停住，观察不同输入，再继续到测试结束。
-
-**本步调试验收：**断点实际命中，能观察输入、单步后结果，继续后退出正确。仅看到绿色启动按钮或终端输出不算完成。随后在集成终端运行 `bun test`；不要为了通过而删断言。
-
-## 单进程模块：先调当前测试
-
-保持本章列出的测试为当前编辑器文件，选择 **Bun：当前测试**。配置中的 `${file}` 就是这个文件；工作目录固定为 PROJECT。Bun 扩展负责启动与连接调试器，不再手工打开网页 Inspector。
-
-配置中的 `--preload` 加载 `scripts/vscode-debug.mjs`，只清除供子进程继承的 Inspector 环境变量，当前调试器保持连接。创建子进程时还需显式传当前环境快照 `env: { ...process.env }`，不使用 Bun 默认缓存的启动环境。否则父地址仍可能被子 Bun 抢占，产生 EADDRINUSE。第000步的真实 VS Code 回归验证了两者一起修复冲突；普通运行不加载此脚本。
-
-第000步配置给测试增加一小时默认超时，避免刚开始观察变量就触发默认5秒限制。033、035的调试补充配置改用`--timeout 0`关闭Bun单测时限；各章的业务计时器仍需分别设置。测试自己设置的显式超时和业务中的真实计时器仍然生效；取消、审批和网络故障需检查时序。调试结束要用正常 `bun test` 再验收。
-
-| 操作 | 按键 / 位置 | 看到什么 |
+| 本节情况 | 怎么启动 | 为什么 |
 | --- | --- | --- |
-| 设断点 | 单击行号左侧 | 红点 |
-| 启动或继续 | F5 | 启动程序，或从暂停处继续 |
-| 执行当前行 | F10 | 留在当前函数观察状态变化 |
-| 进入调用 | F11 | 进入当前行调用的函数 |
-| 返回调用方 | Shift+F11 | 运行到当前函数返回 |
-| 停止 | Shift+F5 | 结束本次调试；附加模式还要检查被附加进程是否仍在运行 |
-| 看变量与调用链 | 左侧“变量 / 监视 / 调用堆栈” | 当前输入、局部状态与调用方 |
-| 求表达式的值 | 下方“调试控制台” | 表达式在当前暂停帧中的结果 |
+| 普通 Bun 模块与测试 | 选择 `NNN：本节测试`，F5 | program 固定为该节测试；不依赖当前编辑器文件 |
+| 本节另有可运行 demo | 选择本节表中列出的演示入口 | demo 驱动完整流程，测试驱动指定断言，两者入口不同 |
+| 终端启动、VS Code 附加 | 先执行本节命令，再选对应 Attach | Attach 不创建进程，只连接已监听的 Inspector |
+| 父测试启动子服务 | 先调父侧，需要时再附加子侧 | 两份调用栈，F11 不跨进程 |
+| Python 客户端 | 使用该节 debugpy 配置 | Bun 的测试包装器不能进入 Python 线程 |
+| 手工 Web 调试 | 先 Host，后页面，使用本次完整 URL | 端口和 token 来自本次 Host；页面与服务端各有调试会话 |
+| Electron 052 | 终端启动，再依次附加 Main、Host、Renderer | 三个执行目标使用不同调试协议，策略单测不创建窗口 |
 
-Mac 若系统拦截功能键，配合 Fn 使用；也可以直接点调试工具栏按钮。
+每节都保留本节测试配置。只有该节实际用到的 demo、语言运行时、浏览器或附加目标才会出现；比如 053 的登录数据测试不会继续列出 052 的三个 Electron 目标。
 
-## 从032开始：父进程与子进程分开连接
+## 配置放在哪里
 
-032已有可直接运行的跨进程demo。只调worker时，在终端运行`bun src/rpc-demo.mjs --debug-worker`，选择“Bun：032 RPC worker子进程”附加6500端口；仍由父进程在终端接收y/n审批输入。父子一起调试时运行带主进程6499 Inspector和`--debug-worker`的命令，先附加主进程并继续，让其启动worker，再附加6500。完整配置和断点见[032](lessons/032.md)。不要在内存echo测试里等待worker断点命中。
+打开自己的 PROJECT，例如仓库中已有进度的 `harness-own/`，或从 000 独立重做时选定的目录。将本节配置放进 PROJECT 的 `.vscode/launch.json`。若用 `harness-course.code-workspace`，配置属于 `harness-own` 这个文件夹；不要误选教材仓库根的旧实验室配置。
 
-**Bun：当前测试**只保证调试当前测试进程。SDK、Python SDK、ACP 或 Worker 启动的 Host 是另一个进程，Host 中的断点不会自动随父进程命中。
+本节给出的完整文件只含本节目标。若要保留自己的旧配置，先保存副本，按名称合并；旧配置不应成为当前课次的默认入口。不要直接在教材的 `steps` 目录运行，那里只保留单步增量，缺少前置文件。
 
-第033步的MCP服务也由SDK另起子进程。按[033文档末尾的完整调试实操](lessons/033.md#033调试实操父测试mcp子进程和日志文件)操作：父测试附加6499/mcp-parent-033，fixture附加6501/mcp-033，先连接父进程并继续，再连接子进程。启动测试时加`--timeout 0`可关闭Bun单测时限；`MCP_DEBUG=1`同时把SDK每次请求时限调到1小时，SDK的`timeout: 0`会立即超时，不能拿来关闭计时。日志追加到PROJECT/tmp/mcp-server.log，stdout继续专门承载MCP协议。完整文件、运行顺序和通过标准均在该页。
+## 复杂启动先看图
 
-第035步的固定LSP服务同样是独立Bun子进程。按[035文档末尾的完整调试实操](lessons/035.md#035调试实操lsp父子进程与超时)操作：父测试附加6499/lsp-parent-035，子服务附加6502/lsp-035，先父后子。本章使用自有Peer，普通请求默认10秒、shutdown为1秒；`LSP_DEBUG=1`通过统一包装把这几处请求的调试预算设为一小时，CLI另加`--timeout 0`关闭Bun单测时限。完整代码会清除子环境中的父Inspector地址，调试时将子stderr转发到父终端，stdout仍专门传Content-Length帧。该页给出5份完整文件、断点、运行命令和验收标准；另在“传递前、传递中、传递后的结构”中沿同一请求ID观察业务params、RPC信封、bytes/packet、接收buffer/raw和最终result。该页后面还提供2份完整日志扩展文件与父子接线：RPC_TRACE=1单独开启，把父/子Peer与framing分别追加到4份JSONL，运行时用mktemp创建本次专用目录，按同一请求id对照各阶段；chunk只记字节，完整解帧后才有id。固定fixture依然不做TypeScript语义分析。
+涉及多个进程或多个运行时时，本节另外给“本节调试启动时序”。它回答谁启动谁、什么时候连接 Inspector、什么时候继续父进程、子进程何时出现。业务时序图说明请求如何执行，启动图说明调试器如何连接，二者用途不同。
 
-需要追子进程时，按第044步说明临时给子进程加 Inspector 参数并把 stderr 显示出来，然后选择 **Bun：附加子进程**，粘贴它输出的完整 `ws://` 地址。不要粘贴页面地址，也不要把调试日志写入协议 stdout。调试结束恢复临时改动，再正常验收。
+033 的 MCP 和 035 的 LSP 双进程调试需要先应用本节文末的调试扩展文件：基础增量不会因为添加了 Attach 配置就自动开启子 Inspector。按本节图和命令先父后子；不要把 032 的 worker 端口拿来调其他服务。
 
-从044起，SDK启动的Host需要按本章末尾给出的独立地址附加，不使用032固定的worker端口代替。第045步的 Python 客户端使用本章新增的 **Python：SDK 客户端** 与 `ms-python.debugpy` 扩展，Bun Host 仍是另一个调试目标。
+044 的普通测试与“等待附加Host”模式分别设置开关。只有选择等待模式时才需要第二个调试会话；普通验收不应停在子 Inspector。045 的 Python 客户端另用 debugpy，046 ACP 的服务端仍是独立 Bun 进程。
 
-## 第049步起：Host 与页面各一个调试会话
+## 暂停与超时
 
-本章加入 **Web：Bun Host** 与 **Web：页面** 两个配置。先启动 Host，复制它输出的本次完整启动 URL；再启动页面配置，把这个 URL 粘入提示框。端口与 token 由 Host 本次启动产生，不填写示例地址。
+`--timeout 3600000` 只放宽 Bun 测试框架的等待。应用自己的 RPC、进程执行、Shell、审批和 shutdown 仍各有计时，不能因为父调试器暂停就认为它们也暂停。各节会说明实际预算和可选调试扩展。
 
-`web/app.mjs` 的断点属于浏览器，`src/remote.mjs`、`src/host.mjs` 的断点属于 Bun Host。不要用 `file://` 打开页面。两个调试会话可以同时存在，从“调用堆栈”选择当前要观察的会话。
+F10 等待异步结果时，如果结果由另一个暂停中的调试目标负责产生，切换过去并继续。不要在两个进程都暂停时不断等父侧返回。观察完停止本节启动的进程，先重跑本节测试；修改无关模块或最终验收时才扩大范围。
 
-## 第052步起：Electron 的三个调试目标
+## 断点没停住时检查
 
-按该章末尾顺序，先在集成终端执行 `HARNESS_VSCODE_DEBUG=1 bun run desktop`，依次连接 **Electron：Main**、**Electron：Bun Host**、**Electron：Renderer**。
+1. 文件是否来自自己的 PROJECT，而非教材参考目录？
+2. 选择的是本节表中目标，还是前章的配置？
+3. 断点属于测试、子服务、Python、页面还是 Electron Main？
+4. 这条测试实际会不会执行该函数？本节注明未覆盖的入口不会命中。
+5. 扩展是否已安装？Bun 入口需要 `oven.bun-vscode`，Python 需要 `ms-python.debugpy`。找不到 Bun 时，执行 `which bun`，把 runtime 改为本机绝对路径。
 
-Main 用 Electron 的内置运行时，因此配置类型为 `node`；它不会把领域 Host 改成 Node。Host 仍使用 `type: bun`；Renderer 使用 VS Code 内置浏览器调试器。preload 运行在 Renderer 进程中，不能把它当成单独的 Bun 进程。
-
-调试开关关闭时不开放这些端口。调试后停止附加会话并退出测试窗口，检查终端启动器也已退出。
-
-## 断点没停住时，先核对这四件事
-
-1. 打开的是 PROJECT 的文件，还是教材的参考文件？
-2. 当前配置启动的是入口、测试、子 Host，还是页面？
-3. 设置断点的行这次会不会执行？先在函数入口放断点。
-4. 断点是否空心、Bun 是否找不到？在 VS Code 集成终端执行 `which bun`，将 launch.json 的 `runtime` 换成实际绝对路径。扩展未激活时先检查是否安装了 `oven.bun-vscode` 并重新加载窗口。
-
-配置依据：[Bun 官方扩展说明](https://github.com/oven-sh/bun/tree/main/packages/bun-vscode)、[VS Code 浏览器调试](https://code.visualstudio.com/docs/nodejs/browser-debugging)、[Electron 的 VS Code 调试说明](https://www.electronjs.org/docs/latest/tutorial/debugging-vscode)。这些资料只用于核对配置，当前章节仍是唯一主材料。
+断点属于哪一个目标，变量也属于哪一个调用帧。要看测试里的 result，选择测试帧；看实现里的 this 和参数，选择方法帧。能启动调试器不等于已经验证外部模型、浏览器、桌面窗口或安装包。

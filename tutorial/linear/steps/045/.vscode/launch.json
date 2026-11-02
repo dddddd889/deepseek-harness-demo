@@ -2,26 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Bun：CLI 入口",
+      "name": "045：本节测试",
       "type": "bun",
       "request": "launch",
-      "program": "${workspaceFolder}/src/main.mjs",
-      "cwd": "${workspaceFolder}",
-      "runtime": "bun",
-      "runtimeArgs": [
-        "--preload",
-        "${workspaceFolder}/scripts/vscode-debug.mjs"
-      ],
-      "args": [
-        "读取 README"
-      ],
-      "stopOnEntry": false
-    },
-    {
-      "name": "Bun：当前测试",
-      "type": "bun",
-      "request": "launch",
-      "program": "${file}",
+      "program": "${workspaceFolder}/tests/045-python.test.mjs",
       "cwd": "${workspaceFolder}",
       "runtime": "bun",
       "runtimeArgs": [
@@ -34,12 +18,6 @@
       "stopOnEntry": false
     },
     {
-      "name": "Bun：附加子进程",
-      "type": "bun",
-      "request": "attach",
-      "url": "${input:bunInspectorUrl}"
-    },
-    {
       "name": "Python：SDK 客户端",
       "type": "debugpy",
       "request": "launch",
@@ -47,6 +25,7 @@
       "cwd": "${workspaceFolder}",
       "python": "/usr/bin/python3",
       "console": "integratedTerminal",
+      "justMyCode": true,
       "env": {
         "PYTHONPATH": "${workspaceFolder}/python"
       },
@@ -54,15 +33,7 @@
         "bun",
         "${workspaceFolder}/src/sdk-server.mjs",
         "${workspaceFolder}/.data-python-debug"
-      ],
-      "justMyCode": true
-    }
-  ],
-  "inputs": [
-    {
-      "id": "bunInspectorUrl",
-      "type": "promptString",
-      "description": "粘贴子进程 Bun Inspector 打印的完整 ws:// 地址"
+      ]
     }
   ]
 }

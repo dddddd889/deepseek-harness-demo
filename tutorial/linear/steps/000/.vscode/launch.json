@@ -2,26 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Bun：CLI 入口",
+      "name": "000：本节测试",
       "type": "bun",
       "request": "launch",
-      "program": "${workspaceFolder}/src/main.mjs",
-      "cwd": "${workspaceFolder}",
-      "runtime": "bun",
-      "runtimeArgs": [
-        "--preload",
-        "${workspaceFolder}/scripts/vscode-debug.mjs"
-      ],
-      "args": [
-        "读取 README"
-      ],
-      "stopOnEntry": false
-    },
-    {
-      "name": "Bun：当前测试",
-      "type": "bun",
-      "request": "launch",
-      "program": "${file}",
+      "program": "${workspaceFolder}/tests/000-entry.test.mjs",
       "cwd": "${workspaceFolder}",
       "runtime": "bun",
       "runtimeArgs": [
@@ -32,6 +16,22 @@
         "3600000"
       ],
       "stopOnEntry": false
+    },
+    {
+      "name": "Bun：CLI 入口",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/main.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "stopOnEntry": false,
+      "args": [
+        "读取 README"
+      ]
     }
   ]
 }

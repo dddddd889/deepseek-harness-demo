@@ -4,7 +4,7 @@
   "try": "先写完本章的acp.mjs、acp-server.mjs和测试，并安装本章依赖，再在练习工程根目录运行env -u DEEPSEEK_API_KEY bun test ./tests/046-acp.test.mjs。对照测试找到三次prompt：hello、写proof.txt、/slow。记录每次的sessionId和stopReason；写入用自动允许回调完成，不会连接收费模型。",
   "why": "acpApp负责把标准ACP方法翻译成已有Host操作，再把会话事实翻译回标准更新。它不重新实现模型循环、权限或文件系统。pending表示某会话已有尚未结算的prompt；delivery链让本会话输出按顺序发送完后再返回结果。",
   "accept": "当前测试确实启动另一个Bun进程，用真实ACP SDK完成initialize/new、文字prompt、自动允许后的真实文件写入、取消、list、close和resume。它没有验证所有ACP方法、并发双会话、图片、资源链接、推理更新或请求级取消；取消测试里的20ms等待也不是首片到达的确定性屏障。",
-  "debug": "在VS Code打开练习工程的tests/046-acp.test.mjs，选“Bun：当前测试”按F5。在const result = await client.request(...)、写文件prompt和assert.equal((await slow).stopReason, 'cancelled')处停下，监视created.sessionId、updates和result.stopReason；hello结束应为end_turn，取消应为cancelled。F10看SDK调用前后，F11只会进入主进程中的SDK。acp.mjs运行在子进程，本配置不会自动命中它；不要把主进程断点当成已调试服务端，也不要向服务端stdout打印日志。",
+  "debug": "在VS Code打开练习工程的tests/046-acp.test.mjs，选“046：本节测试”按F5。在const result = await client.request(...)、写文件prompt和assert.equal((await slow).stopReason, 'cancelled')处停下，监视created.sessionId、updates和result.stopReason；hello结束应为end_turn，取消应为cancelled。F10看SDK调用前后，F11只会进入主进程中的SDK。acp.mjs运行在子进程，本配置不会自动命中它；不要把主进程断点当成已调试服务端，也不要向服务端stdout打印日志。",
   "recall": "合上本章，画出一次write调用的五个节点：ACP客户端、ACP粘合层、Host/Agent、Tools、磁盘；在另一条反向箭头写request_permission，并写明真正决定允许的是谁。",
   "transfer": "练习：只在这份临时目录测试里，把客户端权限回调的optionId从allow改成deny，再补断言proof.txt不存在。完成后恢复示例。这个拒绝变体目前没有自动测试，不算已有验收，也不需要连接外部模型。",
   "wiring": "本章创建了可运行的ACP stdio服务，真正使用041的Host与既有Agent、工具和持久日志；不是内存echo。后续067复用acpApp做三个差分样本，但没有把以下缺口自动补齐。ACP入口也没有像051的Web入口那样装配capabilities。",

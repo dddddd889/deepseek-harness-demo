@@ -113,4 +113,4 @@ flowchart LR
 
 维护者重验命令：`python3 tutorial/linear/verify.py --install`（在本仓库根目录运行），从新的临时空目录叠加 70 步；历史 Node 记录保存在 `evidence/node24-history/`，不能作为 Bun 的通过证据。
 
-调试统一使用 **VS Code Debug**：第 000 步安装 `oven.bun-vscode` 并创建 `.vscode/launch.json`，随后设断点、选配置、按 F5。每章标出当前测试、观察点和调试验收；Web 与 Electron 配置到对应章节才加入。详细操作见 [VS Code 调试说明](DEBUGGING.md)。
+调试统一使用 **VS Code Debug**：每节代码前都有“本节调试”清单和本节专用 `.vscode/launch.json`，只列该节可用入口。`NNN：本节测试` 固定运行该节测试文件，不依赖编辑器当前打开的文件；跨进程、跨语言、页面与 Electron 另给启动时序和原因。配置标题不再跳到 `harness-own` 的累计配置。首次安装 `oven.bun-vscode`，之后按每节说明更新配置并设断点。详细操作见 [VS Code 调试说明](DEBUGGING.md)。

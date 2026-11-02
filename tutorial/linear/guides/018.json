@@ -4,7 +4,7 @@
   "try": "完成本章所有源文件与测试后运行 bun src/routes-demo.mjs，再运行 bun test ./tests/018-routes.test.mjs ./tests/018-routes-demo.test.mjs。按六场景日志看首片前重试、切路由、半句后不重试、未知模型、两次失败耗尽、双请求单刷新；最后摘要中refreshes=1、modelHTTP=2、两个usedNewToken=true。此demo固定外部HTTP，不读真实模型Key。",
   "why": "Routes负责模型路由与有限重试；RefreshToken负责共享正在刷新的Promise。published不是“是否有正文”，任意Part（包括usage）交给Loop后即为true。三个gate只是demo确认两个请求都已到达再放行刷新，不是生产token锁；生产合并来自RefreshToken.pending。",
   "accept": "两项测试分别覆盖路由/刷新原语和真实CLI全链路，demo有6个场景；其中3～5的error是预期结果。没有真实OAuth登录服务器、跨进程token事务或按HTTP错误种类分类，usage-only失败目前同样不重试。",
-  "debug": "在VS Code先选tests/018-routes.test.mjs，选择“Bun：当前测试”按F5；在src/routes.mjs的published=true、catch和this.pending ??=打断点，F10监视attempt、published、pending与测试调用者的attempts/refreshes。要调实际六场景，按下方现有attach配置运行 bun --inspect-brk=127.0.0.1:6499/routes-018 src/routes-demo.mjs 并附加；在refreshScene放行finishRefresh前查看beforeRelease应为getCalls=2、refreshes=1、modelHTTP=0。CLI测试spawn的子进程不会自动跟随F11调试。",
+  "debug": "在VS Code先选tests/018-routes.test.mjs，选择“018：本节测试”按F5；在src/routes.mjs的published=true、catch和this.pending ??=打断点，F10监视attempt、published、pending与测试调用者的attempts/refreshes。要调实际六场景，按下方现有attach配置运行 bun --inspect-brk=127.0.0.1:6499/routes-018 src/routes-demo.mjs 并附加；在refreshScene放行finishRefresh前查看beforeRelease应为getCalls=2、refreshes=1、modelHTTP=0。CLI测试spawn的子进程不会自动跟随F11调试。",
   "recall": "闭卷给“HTTP之前失败、只收到usage、已输出半句、用户取消”四种情况写当前实现是否重试，再画token.get等待者与pending的关系。",
   "transfer": "在routes.test的副本把第一Part改成usage后抛错，断言attempts不再增加；这是需新增的策略边界测试。若要让usage-only重试，需另外设计计费归属，当前教程未实现，不能只删published判断。",
   "wiring": "018的routes-demo确实把Routes、RefreshToken、DeepSeekModel、Agent和Tools串起来；020的pi-demo也使用Routes。041 Host未统一改成此Routes装配，故独立demo通过不代表所有Web/ACP请求都自动采用这套重试与刷新。",

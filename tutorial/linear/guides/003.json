@@ -4,7 +4,7 @@
   "try": "按本章写完plugins.mjs及测试，运行 bun test ./tests/003-plugins.test.mjs。在测试的broken插件处观察“安装失败”后，plugins.services.get(\"x\")必须再报缺少，不能留下a的服务。此处不启动模型和网络。005再运行真实读文件组合。",
   "why": "Plugins负责“安装谁、用哪份配置、卸载谁”；兄弟插件借同一个services交流，各自scope只管理自己的贡献。installed只记录本次profile装配成功的插件，因此失败时不直接close根Scope；根关闭会连本来就运行的插件也退出。",
   "accept": "本次Profile中途失败后，前面安装的服务消失。当前测试只覆盖一个正常清理项和一个安装失败项；不证明依赖自动排序、热重载及清理失败时整个回滚链都可靠。",
-  "debug": "在VS Code打开练习工程并选中tests/003-plugins.test.mjs，选择“Bun：当前测试”按F5启动。在src/plugins.mjs的 const scope = this.scope.child()、this.active.set(name,scope)、installed.push和installed.reverse打断点。F11进入install(a)，监视active和services.entries；再F10到broken抛错，回到catch应移除a。观察共享services相同而两个插件scope不同。",
+  "debug": "在VS Code打开练习工程并选中tests/003-plugins.test.mjs，选择“003：本节测试”按F5启动。在src/plugins.mjs的 const scope = this.scope.child()、this.active.set(name,scope)、installed.push和installed.reverse打断点。F11进入install(a)，监视active和services.entries；再F10到broken抛错，回到catch应移除a。观察共享services相同而两个插件scope不同。",
   "recall": "不看代码写出install、profile、close的区别，并解释为什么profile的installed列表不能用根scope.close替换。",
   "transfer": "在测试副本中先install一个existing服务，再运行失败profile，增加断言existing仍可get、a已消失；这是需要自己新增的测试练习，写完再运行，勿直接假定原测试已经覆盖。",
   "wiring": "005的createReaderApp首次真正调用profile(compose(...),catalog)；其他很多后续入口手动new对象，并非全部经过此Plugins。003的单测只是最小回滚验证。",

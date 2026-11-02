@@ -4,7 +4,7 @@
   "try": "先写完src/view.mjs和本章测试，再运行bun test ./tests/048-view.test.mjs。按测试顺序记录每次apply后的seq和waiting.size：先seq1会等待，补seq0后连续接纳到1，重复seq0不追加；reconnect后旧generation的seq2被忽略，新generation的seq2才移除审批。这里没有浏览器或网络请求。",
   "why": "View是页面的读模型：只整理已经发生的事实，不负责执行工具。seq解决同一会话事件的顺序与重复，generation解决消息属于哪一次连接；这两个数字不能相互替代。",
   "accept": "纯内存测试验证乱序暂存、重复文字不追加、旧generation不结算新视图审批以及新generation结算审批。它不证明真正断网重连、快照下载、流控、有界历史或完整原版会话投影。",
-  "debug": "在VS Code打开tests/048-view.test.mjs，选“Bun：当前测试”按F5。给src/view.mjs的this.waiting.set、while (this.waiting.has(this.seq + 1))及generation比较设断点；监视event.seq、generation、this.generation、this.seq和this.waiting.size。用F10逐次apply，第一条seq1后this.seq应为-1，补seq0后应为1。F11进入state观察approval/settled怎样删除id=p。",
+  "debug": "在VS Code打开tests/048-view.test.mjs，选“048：本节测试”按F5。给src/view.mjs的this.waiting.set、while (this.waiting.has(this.seq + 1))及generation比较设断点；监视event.seq、generation、this.generation、this.seq和this.waiting.size。用F10逐次apply，第一条seq1后this.seq应为-1，补seq0后应为1。F11进入state观察approval/settled怎样删除id=p。",
   "recall": "闭卷写一个四行事件表：seq1、seq0、重复seq0、seq2，并在旁边标出哪些等待、哪些接纳、哪些忽略；再写出generation不匹配时为什么不能修改状态。",
   "transfer": "练习：在这份纯内存测试里把seq2安排在快照seq0/seq1之前，预测waiting的变化，再补断言最终三条各出现一次。它是新增练习，当前测试没有这个排列；不需要添加另一套网络实现。",
   "wiring": "本章仅完成View类及单测；049的真实页面会调用它。View本身既不建立连接也不请求快照；后续页面重连仍不是原版ConnectionController的完整实现。",

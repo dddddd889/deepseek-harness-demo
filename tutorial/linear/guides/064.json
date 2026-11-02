@@ -4,7 +4,7 @@
   "try": "先写完telemetry.mjs，再运行bun test ./tests/064-telemetry.test.mjs。测试会把prompt/private text与apiKey/secret-value一起传给record，用固定fetcher截获body并返回503；检查敏感值不在body里、flush返回false。不会连接真实Collector或发送用户数据。",
   "why": "字段白名单限制允许出站的数据，队列和超时限制资源占用。遥测失败不向业务抛网络异常；但调用方仍须明确决定何时record/flush，单独存在一个发送器不会自动观察Agent。",
   "accept": "测试验证OTLP JSON结构、两项敏感字段被过滤和固定503返回false。它没有真实HTTP、Collector、业务任务、队列满/超时/退出flush测试，也不证明所有可能字段都完成隐私审查。",
-  "debug": "用“Bun：当前测试”启动tests/064-telemetry.test.mjs，断在src/telemetry.mjs的allowed过滤、const batch = this.queue.splice(0, 100)和return response.ok；方法帧监视this.queue.length与batch.length。切到测试回调或调用者帧观察sent：JSON.parse(sent)中attributes应有key为reason、value.stringValue为completed的一项，且原字符串不含private text/secret-value。F10后batch应有一条，flush结果为false。F11进入的是测试固定fetcher，不是外部Collector进程。",
+  "debug": "用“064：本节测试”启动tests/064-telemetry.test.mjs，断在src/telemetry.mjs的allowed过滤、const batch = this.queue.splice(0, 100)和return response.ok；方法帧监视this.queue.length与batch.length。切到测试回调或调用者帧观察sent：JSON.parse(sent)中attributes应有key为reason、value.stringValue为completed的一项，且原字符串不含private text/secret-value。F10后batch应有一条，flush结果为false。F11进入的是测试固定fetcher，不是外部Collector进程。",
   "recall": "闭卷给prompt、apiKey、toolName、durationMs四个字段标出当前是否允许出站，再写出网络失败时业务是否应抛错及谁负责flush。",
   "transfer": "练习：让固定fetcher直接抛错，补断言flush仍返回false；仍不访问真实网络。这个异常变体当前没有测试，不等价于真实Collector超时验收。",
   "wiring": "Telemetry只在064测试手动调用；Host/Agent、Web和Electron没有订阅并上报事件。后续也未接产品统计开关或全链Trace，不能把它当已开启的遥测系统。",

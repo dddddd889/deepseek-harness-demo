@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from debugging import plan_for
 
 ROOT = Path(__file__).resolve().parent
 ORIGINAL = ROOT.parents[1] / 'deepseek-harness'
@@ -18,13 +19,41 @@ def main():
         raise ValueError('要求覆盖000～069，不得缺页')
     references = set()
     available = set()
+    debug_sequences = 0
     for lesson in lessons:
         number = lesson['id']
         available.update(path.relative_to(ROOT / 'steps' / number).as_posix() for path in (ROOT / 'steps' / number).rglob('*') if path.is_file())
+        # 调试入口必须属于本节且已具备源码；固定测试不能再次退回依赖当前文件。
+        plan = plan_for(lesson)
+        launch = json.loads((ROOT / 'steps' / number / '.vscode/launch.json').read_text())
+        if launch != plan['launch']:
+            raise ValueError(number + '本节调试计划与配置不同步')
+        names = [row['name'] for row in launch['configurations']]
+        if len(names) != len(set(names)) or plan['primary'] not in names:
+            raise ValueError(number + '调试配置重名或建议入口不存在')
+        for config in launch['configurations']:
+            program = config.get('program', '')
+            if program == '${file}':
+                raise ValueError(number + '本节配置仍依赖当前编辑器文件')
+            if program.startswith('${workspaceFolder}/') and program[len('${workspaceFolder}/'):] not in available:
+                raise ValueError(number + '调试入口尚未在本节实现：' + program)
+        current_test = next(row for row in launch['configurations'] if row['name'] == number + '：本节测试')
+        if current_test.get('program') != '${workspaceFolder}/' + lesson['test'] or current_test.get('runtimeArgs', [None])[0] != 'test':
+            raise ValueError(number + '固定测试没有指向本节测试文件')
         guide = json.loads((ROOT / 'guides' / (number + '.json')).read_text())
         if guide != lesson['guide']:
             raise ValueError(number + '说明与lessons.json不同步')
         text = (ROOT / 'lessons' / (number + '.md')).read_text()
+        if '## 本节调试：选什么、为什么、怎么启动' not in text or 'id="lesson-debug-config"' not in text:
+            raise ValueError(number + '缺少本节调试入口或配置锚点')
+        if any('| ' + row[0] + ' |' not in text for row in plan['rows']):
+            raise ValueError(number + '正文调试清单未展示配置')
+        if re.search(r'^### (?:创建|替换) \[`.vscode/launch.json`\]', text, re.M):
+            raise ValueError(number + '本节调试标题仍误链接到累计工程配置')
+        if plan['sequence']:
+            if '```mermaid\n' + plan['sequence'] + '\n```' not in text:
+                raise ValueError(number + '缺少复杂调试启动时序')
+            debug_sequences += 1
         for field in ('scenario', 'flow', 'sequence', 'wiring', 'try', 'why', 'accept', 'debug', 'recall', 'transfer', 'testEvidence'):
             if guide[field] not in text:
                 raise ValueError(number + '未展示说明字段：' + field)
@@ -71,7 +100,7 @@ def main():
         article = (ROOT / 'lessons' / (row['step'] + '.md')).read_text()
         if '\n' + source + '\n' + fence not in article:
             raise ValueError('教程缺少完整代码：' + str(path))
-    print(json.dumps({'lessons': len(lessons), 'sequenceDiagrams': len(lessons), 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'flowThenSequence': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
+    print(json.dumps({'lessons': len(lessons), 'sequenceDiagrams': len(lessons), 'debugLaunchFiles': len(lessons), 'debugStartupSequences': debug_sequences, 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'flowThenSequence': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

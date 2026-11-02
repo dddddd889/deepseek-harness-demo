@@ -4,7 +4,7 @@
   "try": "先写完本章测试，保持此前页面和Host代码，运行env -u DEEPSEEK_API_KEY bun test ./tests/068-web-e2e.test.mjs。测试会开隔离headless Chrome：创建会话、发送write、点允许一次、验证proof.txt；再等partial出现点cancel，发送after-cancel并reload。不要在个人浏览器或日常数据目录运行替代步骤。",
   "why": "这次验证不直接调用按钮后面的函数，而是经过真实DOM操作和WebSocket。外部模型固定只消除不确定性，权限、文件和持久化仍实际执行；因此能定位产品接线错误，但不能证明真实模型回答质量。",
   "accept": "测试验证真实浏览器写文件、首片后取消、下一轮、刷新恢复、不复活旧审批及无pageerror。没有拒绝审批、多窗口文件冲突、真实网络断线、所有面板、真实DeepSeek或原版UI差分；page.reload也不是完整断网故障矩阵。",
-  "debug": "手工观察用049的“Web：Bun Host”与“Web：页面”两个VS Code会话，断页面web/app.mjs的rpc/render、Host的src/permissions.mjs审批分支和src/loop.mjs的工具执行；沿sessionId、toolCallId与approvalId核对同一次write。F10页面发送后切到Host，F11进入Tools/LocalFS，磁盘应出现from-browser；/slow后等stream=partial再取消。若调自动测试，打开tests/068-web-e2e.test.mjs用“Bun：当前测试”，可停Host与Playwright客户端，但它另开Chrome，不会自动命中“Web：页面”会话。",
+  "debug": "手工观察用049的“Web：Bun Host”与“Web：页面”两个VS Code会话，断页面web/app.mjs的rpc/render、Host的src/permissions.mjs审批分支和src/loop.mjs的工具执行；沿sessionId、toolCallId与approvalId核对同一次write。F10页面发送后切到Host，F11进入Tools/LocalFS，磁盘应出现from-browser；/slow后等stream=partial再取消。若调自动测试，打开tests/068-web-e2e.test.mjs用“068：本节测试”，可停Host与Playwright客户端，但它另开Chrome，不会自动命中“Web：页面”会话。",
   "recall": "闭卷从点击允许开始画到proof.txt写入再回页面completed的链路；给每个箭头标请求、事件或磁盘操作，最后说明刷新为什么不应重新执行write。",
   "transfer": "练习：在隔离浏览器测试中把允许按钮换为拒绝，补断言proof.txt不存在且还能发下一轮。这个拒绝变体目前没有测试；只修改本章临时工作区测试，不授权真实外部动作。",
   "wiring": "本章真实贯通049/050页面、047传输和051装配，没有换用假的按钮函数。浏览器辅助模块用于测试自己的网页，不等于给Agent注册了059 Browser/CUA工具。",

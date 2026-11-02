@@ -145,7 +145,8 @@ def link_harness_files(markdown, lesson_id, repository_root=None):
             paths.append(path)
         target = aliases.get(path, path)
         label = "`" + path + "`"
-        if target in committed:
+        # 调试配置逐课生成，不能把本节文件标题链接到学习者的累计配置。
+        if path != '.vscode/launch.json' and target in committed:
             label = "[" + label + "](" + _harness_href(target) + ")"
         linked.append(match.group("prefix") + label + match.group("suffix") + line[len(content):])
 
@@ -170,6 +171,8 @@ def link_harness_files(markdown, lesson_id, repository_root=None):
             "[`harness-own/" + target + "`](" + _harness_href(target) + ")"
             if target in committed else "尚未合入 harness-own"
         )
+        if path == '.vscode/launch.json':
+            destination = '使用本页下方的本节专用配置，不复制累计版本'
         section.append("| `" + path + "` | " + destination + " |")
     if not paths:
         section.append("| — | 本课未单独列出创建或替换文件 |")

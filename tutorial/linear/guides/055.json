@@ -4,7 +4,7 @@
   "try": "先写完src/update.mjs和测试，再运行bun test ./tests/055-update.test.mjs。观察本地临时密钥签名的raw清单：末尾加空格后必须验签失败；原raw准入后，固定installer抛错，最终状态必须为failed-keep-old。本章不连接更新服务器，也不安装或重启应用。",
   "why": "签名证明清单来自信任的签发方，hash证明载荷符合清单，版本和平台判断决定它是否适合当前安装。awaiting-new-version-smoke只是等待新版启动验证，不能把它当更新完成。",
   "accept": "单测验证真实Ed25519签名的篡改拒绝、载荷hash校验通过后固定安装器失败，以及失败状态落盘。它没有测试成功安装、降级/跨平台分支、真实平台安装器、旧应用保留或新版启动；failed-keep-old是状态名，不是磁盘恢复证据。",
-  "debug": "打开tests/055-update.test.mjs，用“Bun：当前测试”启动。断在src/update.mjs的verify(...)、state.status !== 'admitted'条件和catch里的store.update。入口看state.manifest.target、state.previous；state是入口快照，后续监视this.store.read().status才会依次看到admitted、installing、failed-keep-old。F10查看篡改raw被拒绝，再F11进入apply，installer抛错后进入catch。installer是测试回调，不是系统安装程序。",
+  "debug": "打开tests/055-update.test.mjs，用“055：本节测试”启动。断在src/update.mjs的verify(...)、state.status !== 'admitted'条件和catch里的store.update。入口看state.manifest.target、state.previous；state是入口快照，后续监视this.store.read().status才会依次看到admitted、installing、failed-keep-old。F10查看篡改raw被拒绝，再F11进入apply，installer抛错后进入catch。installer是测试回调，不是系统安装程序。",
   "recall": "闭卷分别写一句“签名通过”“hash通过”“installer返回”“新版smoke通过”各能证明什么，再指出哪一步才有资格宣告新版可运行。",
   "transfer": "练习：用本地临时密钥给版本0.9.0的清单重新签名，调用admit时currentVersion=1.0.0，断言即使签名有效也被拒绝。不用真实证书或发布服务；该降级变体目前没有测试。",
   "wiring": "Updates仍是独立类，052 Main没有调用它，056打包也没有因此获得真实自动升级。后续没有平台installer和新版smoke确认接线，不能把本章状态机当作已完成桌面更新。",

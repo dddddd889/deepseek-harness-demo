@@ -4,7 +4,7 @@
   "try": "写完filesystem.mjs和测试后运行 bun test ./tests/021-filesystem.test.mjs。测试会在系统临时目录建workspace、outside和link；首次新建允许，读取后写two允许，再用旧version写stale拒绝，读取越界链接拒绝。别在自己的工作区造真实机密链接。",
   "why": "LocalFS是实际读写磁盘的提供方，022才把它包装成模型工具。expected核对调用者依据的版本，observed核对本实例确实读过它；临时文件再rename避免半份内容暴露，但不是原子“检查版本并替换”。",
   "accept": "1项真实文件测试验证先读后改、旧版本拒绝和链接越界。pending只在同一个实例生效，注释“同进程”范围偏宽；两个实例、外部进程不共用锁，版本检查与rename之间仍可能被外部修改插入。",
-  "debug": "在VS Code选tests/021-filesystem.test.mjs，选择“Bun：当前测试”按F5。在src/filesystem.mjs的inside(await realpath(...))、observed.set、版本条件及rename打断点。F11进入read，监视path/version；写入时看this.observed.get(path)与current/expected，F10后observed应清空。链接场景realpath指向outside，应在inside抛错而不进入readFile。",
+  "debug": "在VS Code选tests/021-filesystem.test.mjs，选择“021：本节测试”按F5。在src/filesystem.mjs的inside(await realpath(...))、observed.set、版本条件及rename打断点。F11进入read，监视path/version；写入时看this.observed.get(path)与current/expected，F10后observed应清空。链接场景realpath指向outside，应在inside抛错而不进入readFile。",
   "recall": "闭卷给“只拿到别人传来的hash”“本实例读过但外部已改”“本实例刚新建”三种情况写出当前write结果，说明原子替换与原子版本检查为何不同。",
   "transfer": "在测试副本读取后用writeFile把临时目标改成external，再带旧版本调用fs.write，断言external被保留；这是需新增的检查前冲突练习，不证明检查之后的竞态已解决。",
   "wiring": "021只在文件提供方单测使用；022 fileTools与edit-demo接入统一Tools.execute，041 Host为每个会话创建LocalFS(header.cwd)。不同会话实例的pending不会互相串行。",

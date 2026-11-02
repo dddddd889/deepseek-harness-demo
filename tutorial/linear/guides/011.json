@@ -4,7 +4,7 @@
   "try": "完成tools.mjs与测试后运行 bun test ./tests/011-tools.test.mjs。观察错误参数后runs仍0、正确调用后返回ok；关闭scope后再次execute应报未知工具。当前测试直接调用工具运行时，不需要模型发起请求。",
   "why": "Tools是统一工具注册和执行门。插件、文件工具和后来的MCP工具都可登记到同一张平面Map，来源不需要构成树；Scope只决定登记何时撤销，模型目录不包含run函数或秘密。",
   "accept": "参数类型和撤销路径有效。validate只支持源码列出的Schema子集，不是完整JSON Schema；当前只有一个可覆盖guard属性，不包含多个guard、父子权限继承或restrict。",
-  "debug": "在VS Code打开练习工程并选中tests/011-tools.test.mjs，选择“Bun：当前测试”按F5启动。在src/tools.mjs的validate(tool.schema,call.arguments)、await this.guard和tool.run打断点。F11进入validate，监视schema.type、value、path和runs；错误text=3不能到guard/run。正确调用F10到run后runs=1；关闭Scope后entries.size应为0。",
+  "debug": "在VS Code打开练习工程并选中tests/011-tools.test.mjs，选择“011：本节测试”按F5启动。在src/tools.mjs的validate(tool.schema,call.arguments)、await this.guard和tool.run打断点。F11进入validate，监视schema.type、value、path和runs；错误text=3不能到guard/run。正确调用F10到run后runs=1；关闭Scope后entries.size应为0。",
   "recall": "合上资料写出从execute到run的执行顺序，再说明为什么catalog里不应该包含函数、API Key；说清工具注册平面表与资源Scope树的区别。",
   "transfer": "在测试副本给echo参数加additionalProperties:false后传一个多余字段，确认run不执行；该字段规则已有实现。不要把补上Schema里未实现的minimum/integer后当成自动生效。",
   "wiring": "012的Loop实际通过Tools.execute执行sum，022的文件工具及033的MCP包装器复用同一入口。当前guard要由调用方赋值，024后才装粗粒度审批策略；并未获得原版多守卫。",

@@ -4,7 +4,7 @@
   "try": "完成model.mjs和测试后运行 bun test ./tests/010-model.test.mjs。第一段收集结果应为text、finish；第二段收到partial后abort，再stream.next应拒绝。不要等60秒，测试主动取消会结束等待。",
   "why": "ScriptModel是可控的模型替身，接口仍是async generator，后续Loop无需判断真假模型。Part表达正文、工具、结束等语义；它不是HTTP字节，也不是SSE帧，finish只结束一次模型请求。",
   "accept": "证明异步事件接口和signal中止正在等待的流。测试请求只有signal，没有验收完整请求历史、工具schema或usage；更没有访问真实模型服务。",
-  "debug": "在VS Code打开练习工程并选中tests/010-model.test.mjs，选择“Bun：当前测试”按F5启动。在src/model.mjs的this.requests.push(request)、this.script.shift()、yield和await delay打断点。F11进入stream，监视requests.length与response；F10返回partial后在测试controller.abort处继续，下一次next应走取消拒绝。",
+  "debug": "在VS Code打开练习工程并选中tests/010-model.test.mjs，选择“010：本节测试”按F5启动。在src/model.mjs的this.requests.push(request)、this.script.shift()、yield和await delay打断点。F11进入stream，监视requests.length与response；F10返回partial后在测试controller.abort处继续，下一次next应走取消拒绝。",
   "recall": "闭卷写一份answer(\"你好\")的Part序列，再写call(\"sum\",...)为什么以tools结束；解释“模型一次请求结束”和“整个任务结束”的区别。",
   "transfer": "把answer文字改成中文多句，再在测试副本加第三次stream验证“脚本耗尽”报错；写完新增断言再运行，不填API Key。",
   "wiring": "012以此驱动模型→工具→模型，013 demo首次展示Agent。016的DeepSeekModel和020的PiModel也遵守stream接口，但它们才负责模型协议；固定脚本不会自动变成智能模型。",

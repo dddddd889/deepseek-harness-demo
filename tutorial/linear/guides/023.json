@@ -4,7 +4,7 @@
   "try": "先写完本章src/approval.mjs和tests/023-approval.test.mjs，再在练习工程根目录运行 bun test ./tests/023-approval.test.mjs。观察测试先让s2回答s1的问题并被拒绝，再取消s1；随后另建审批器，在publish回调中立即回答true，确认同步回答也不会丢失。此章没有真人审批界面，不要等待终端出现y/n。",
   "why": "Approvals是一次性等待与唤醒的登记簿，不决定哪些工具要审批。owner回答“谁的问题”，id回答“哪一次问题”，pending.delete保证同一请求只能结算一次。权限策略在024决定要不要问；自由文本问答属于另一种交互。",
   "accept": "测试应1项通过，跨owner回答报错、取消后pending.size为0、旧id迟答报错、同步允许返回true。测试没有验证超时路径、持久化故障或真实UI，不能把通过理解为完整审批产品。",
-  "debug": "用VS Code附加本章Bun测试进程。在src/approval.mjs的this.pending.set(requestId, ...)与if (!this.pending.delete(requestId)) return打断点；F10登记后看pending.size从0到1。在answer的owner检查处看错误调用owner=\"s2\"、记录owner=\"s1\"。继续到abort路径，F11进finish，看删除后size=0；同步回答场景在publish内F11进入answer，确认计时器和监听先于发布已准备好。",
+  "debug": "选择“023：本节测试”按F5直接启动测试，不需要手动附加。在src/approval.mjs的this.pending.set(requestId, ...)与if (!this.pending.delete(requestId)) return打断点；F10登记后看pending.size从0到1。在answer的owner检查处看错误调用owner=\"s2\"、记录owner=\"s1\"。继续到abort路径，F11进finish，看删除后size=0；同步回答场景在publish内F11进入answer，确认计时器和监听先于发布已准备好。",
   "recall": "合上approval.mjs，在纸上画出request→answer与request→abort两条路径，指出两条路径共用哪一个删除操作；再说明为什么必须先登记pending、再publish。",
   "transfer": "安全练习：只在临时测试中把相同id回答两次，断言第二次报“审批不存在”；另用很短timeout验证超时后pending为空。自由文本和“选项＋自填”目前未实现，不能把allowed改成字符串冒充问答。",
   "wiring": "023本章只有独立测试。024将它接到工具守卫，041 Host把审批发布为会话事件；032跨进程demo复用它处理真人/自动答复。后续接线没有把其boolean结果补成原版完整审批词汇。",

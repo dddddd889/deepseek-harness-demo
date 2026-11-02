@@ -4,7 +4,7 @@
   "try": "先写完本章文件和更新后的页面，再运行env -u DEEPSEEK_API_KEY bun test ./tests/050-product.test.mjs。查看测试中permission=read-only被保存后closeSession/open的结果；再看backend=missing产生turn/end.reason=error。人工Web验收保持backend=offline，读取练习文件后修改并保存，观察它仍请求审批；不要为了本章验证而填写真实Key。",
   "why": "product把已有领域装到产品接口上：设置通过Store落盘，凭据由Host解析，文件操作仍调用同一Tools守卫。请求拿到的是本轮配置快照，保存设置不是直接修改正在进行中的HTTP请求。",
   "accept": "现有单测证明设置在同一个Host关闭/重新打开会话后保留，以及未知backend确实导致Agent错误结束。测试没有重启整个进程，没有验证真实DeepSeek请求、凭据隐藏、文件面板保存或两个窗口的版本冲突。",
-  "debug": "在tests/050-product.test.mjs用“Bun：当前测试”启动。断在src/product.mjs的set(store.read())、record.settings.set及if (route === 'offline')；监视store.read()、request.config.backend和request.config.permission。F10执行closeSession后，F11进入host.open，恢复的permission应为read-only。最后backend=missing时确认throw发生在模型factory，最终turn/end.reason应为error。UI文件调试另用Web两个会话，在file.write到Tools.execute处观察version。",
+  "debug": "在tests/050-product.test.mjs用“050：本节测试”启动。断在src/product.mjs的set(store.read())、record.settings.set及if (route === 'offline')；监视store.read()、request.config.backend和request.config.permission。F10执行closeSession后，F11进入host.open，恢复的permission应为read-only。最后backend=missing时确认throw发生在模型factory，最终turn/end.reason应为error。UI文件调试另用Web两个会话，在file.write到Tools.execute处观察version。",
   "recall": "闭卷写出“保存设置→写Store→新轮次取snapshot→选择模型”的四步；再写一个例子说明文件面板为什么不能直接调用fs.write绕过Tools。",
   "transfer": "练习：在本章临时测试里将permission先设ask，再close/open并断言ask；随后保留现有missing-backend错误用例。这个变体只验证设置持久化，不需要真实模型或额外路线。",
   "wiring": "product已接Web入口，069也会接CLI入口；它增加Remote方法并替换Host模型factory。当前factory只支持offline和直接DeepSeekModel，没有把018 Routes或020 PiModel自动装成最终产品路由。ACP和SDK入口也没有因此获得同一套product装配。",

@@ -4,7 +4,7 @@
   "try": "先写完runtime-assets.mjs，再运行bun test ./tests/054-runtime-assets.test.mjs。测试先用固定字节trusted-archive生成hash并写真实缓存，再将下载响应改为tampered，预期校验失败。这里的响应不是可解包tar，也没有真实运行时，不要直接调用installRuntime期待得到Python或Bun。",
   "why": "下载URL说明去哪里取，可信hash说明预期取到什么；staging避免把半成品直接暴露为安装目录。workspaceDependencies应该指向随载荷带来的明确路径，不能缺文件后偷偷退回PATH找到另一版本。",
   "accept": "当前测试只调用asset，证明固定响应内容能写入真实缓存、错误hash被拒绝。它没有调用installRuntime或workspaceDependencies，没有验证tar解包、发布原子性、清理、可执行性、真实运行时冒烟或没有PATH的机器。",
-  "debug": "用“Bun：当前测试”启动tests/054-runtime-assets.test.mjs，在src/runtime-assets.mjs的hash比较和await writeFile(path, bytes, ...)设断点。监视spec.sha256、bytes.toString()和path：第一次是trusted-archive并到达写入，第二次是tampered且在writeFile之前抛错。F10到测试readFile断言缓存内容；installRuntime/rename断点不会命中，因为当前测试没调用安装函数。",
+  "debug": "用“054：本节测试”启动tests/054-runtime-assets.test.mjs，在src/runtime-assets.mjs的hash比较和await writeFile(path, bytes, ...)设断点。监视spec.sha256、bytes.toString()和path：第一次是trusted-archive并到达写入，第二次是tampered且在writeFile之前抛错。F10到测试readFile断言缓存内容；installRuntime/rename断点不会命中，因为当前测试没调用安装函数。",
   "recall": "闭卷画“下载→hash校验→暂存解包→冒烟→发布”五个格子，圈出当前测试真正经过哪两个，再写出冒烟为什么不能被“文件存在”代替。",
   "transfer": "练习：固定fetcher返回HTTP 500，补断言asset在写缓存前失败。仍使用临时目录与内存Response，不下载真实运行时；本变体未在现有测试实现。",
   "wiring": "本章提供独立下载/安装/依赖路径辅助函数；052 Main没有调用它们，051也没有注册workspace_dependencies工具。056只携带当前Bun二进制，不等于复用了本章并完成原版全部primary-runtime。",

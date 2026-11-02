@@ -4,7 +4,7 @@
   "try": "写完config.mjs和测试后运行 bun test ./tests/004-config.test.mjs。对照断言确认first.route.model仍为a、直接改first抛TypeError、新snapshot为b；compose同id的enabled:false应保留。005的真实读取示例会在任务开始后更新prefix，再验证旧任务快照不变。",
   "why": "Settings保存当前设置，snapshot保存“一次任务选定的设置”。compose只合并插件行，不负责安装插件，也不是任意嵌套JSON深合并：同一行的config对象会被后层整个替换，需要明确写全该对象的值。",
   "accept": "本章测试证明冻结副本与后续更新分离，以及同id行覆盖；不包含设置表单、写磁盘或配置schema校验。禁止把revision当成已实现跨客户端并发保护，它只是本实例计数。",
-  "debug": "在VS Code打开练习工程并选中tests/004-config.test.mjs，选择“Bun：当前测试”按F5启动。在src/config.mjs的this.revision++、freeze返回处和rows.set打断点。F10经过set后，在config.mjs的方法帧监视this.value.route.model与this.revision，应为b、1；切换到测试调用者帧再看first.route.model，应仍为a。F11进入compose，查看相同row.id覆盖前后config是否整对象替换。",
+  "debug": "在VS Code打开练习工程并选中tests/004-config.test.mjs，选择“004：本节测试”按F5启动。在src/config.mjs的this.revision++、freeze返回处和rows.set打断点。F10经过set后，在config.mjs的方法帧监视this.value.route.model与this.revision，应为b、1；切换到测试调用者帧再看first.route.model，应仍为a。F11进入compose，查看相同row.id覆盖前后config是否整对象替换。",
   "recall": "合上资料，写出“当前设置”和“已启动任务快照”两份对象；说明set后哪些变化、哪些不变，再说明compose不是安装动作。",
   "transfer": "在测试副本给初始route添加temperature，再用set({route:{model:\"b\"}})更新，观察temperature被替换掉；这是理解浅合并的练习。不要把预期写成自动保留嵌套字段。",
   "wiring": "005把compose结果真的交给Plugins.profile；013的Agent在每个新turn调用settings.snapshot，018/020按这份快照路由。当前每turn固定快照与原版每次操作捕获配置并非相同接口。",

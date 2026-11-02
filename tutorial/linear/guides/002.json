@@ -4,7 +4,7 @@
   "try": "按本章写完services.mjs和测试，运行 bun test ./tests/002-services.test.mjs。逐个对应四个结果：子读remote、父读local、关闭local后子读local、关闭owner后get抛“缺少服务”。这里remote是测试对象返回值，不是真正SSH访问。",
   "why": "Services是按名字查能力实现的注册表，Scope是撤销这些注册项的所有者。provide(scope,...)把移除Map项的函数交给scope；没有另一个destroy接口，是因为生命周期从登记时就交给Scope了。调用方仍持有value变量时，关闭Scope也不会神奇删除那个外部引用。",
   "accept": "父子覆盖与回退成立，关闭后不再留注册项。测试没有打开文件或连接，只验证查找和撤销；服务对象自己的文件句柄或连接若需要关闭，还必须另行scope.own。",
-  "debug": "在VS Code打开练习工程并选中tests/002-services.test.mjs，选择“Bun：当前测试”按F5启动。在src/services.mjs的if(this.entries.has(name))、this.parent.get(name)以及this.entries.delete(name)打断点。F11进入child.get，监视this.entries、this.parent.entries和entry.value；关闭local后再查，F10应走父层。注意看Map大小而不是把“变量仍可见”误认为没有撤销。",
+  "debug": "在VS Code打开练习工程并选中tests/002-services.test.mjs，选择“002：本节测试”按F5启动。在src/services.mjs的if(this.entries.has(name))、this.parent.get(name)以及this.entries.delete(name)打断点。F11进入child.get，监视this.entries、this.parent.entries和entry.value；关闭local后再查，F10应走父层。注意看Map大小而不是把“变量仍可见”误认为没有撤销。",
   "recall": "合上资料写出Services和Scope各负责的一句话；再画出子Map缺项时get沿父链查找的顺序。",
   "transfer": "把测试服务名改为model，父返回模型A、子返回模型B，重复覆盖与回退断言；这是替换测试数据，不代表已经实现模型网络请求。",
   "wiring": "003的Plugins只创建一个共享Services供兄弟插件协作，不会自动为每个插件生成Services.child；005的reader从共享注册表取settings与session。子覆盖机制本章只在单测直接使用。",

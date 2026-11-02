@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "046：本节测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/046-acp.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：附加子进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "${input:bunInspectorUrl}"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "bunInspectorUrl",
+      "type": "promptString",
+      "description": "粘贴本节子进程输出的完整 ws:// 地址"
+    }
+  ]
+}

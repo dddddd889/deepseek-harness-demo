@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "063：本节测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/063-workers.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false,
+      "env": {
+        "SDK_DEBUG_HOST": "0"
+      }
+    }
+  ]
+}

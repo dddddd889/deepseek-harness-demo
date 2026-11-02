@@ -4,7 +4,7 @@
   "try": "写完projection.mjs及测试后运行 bun test ./tests/008-projection.test.mjs。观察parent中有用户消息和stream/text两条事件，child投影只有用户消息；search找到“取消”的seq应为0。不要把stream/text临时拼成assistant后再叫投影，那会改变本章验证的问题。",
   "why": "messages回答“哪些已提交内容给模型看”，fork回答“新会话从哪里继承”，search回答“只读查到哪些事实”。三者读取同一日志，但不是把所有事件不加区分塞给模型。",
   "accept": "测试确认流分片排除、父记录不变、搜索能命中。代码注释中的“保留完整事实前缀”偏宽：fork实际只复制message/*并另写lineage，未复制request、工具开始和其他事实。",
-  "debug": "在VS Code打开练习工程并选中tests/008-projection.test.mjs，选择“Bun：当前测试”按F5启动。在src/projection.mjs的filter、child.append(\"lineage\",...)和if(event.type.startsWith(\"message/\"))打断点。F11进入fork，监视event.type、through与child.records；stream/text应被跳过。F10进入messages后查看结果长度1，同时父records仍2。",
+  "debug": "在VS Code打开练习工程并选中tests/008-projection.test.mjs，选择“008：本节测试”按F5启动。在src/projection.mjs的filter、child.append(\"lineage\",...)和if(event.type.startsWith(\"message/\"))打断点。F11进入fork，监视event.type、through与child.records；stream/text应被跳过。F10进入messages后查看结果长度1，同时父records仍2。",
   "recall": "闭卷列出模型历史应保留的三种message类型，并说明为什么stream/text不是另一条assistant消息；再指出本章fork复制的是哪些事件。",
   "transfer": "在测试副本加入message/assistant和message/tool，确认messages顺序与调用id保持一致；这只是投影练习。不要把没有工具结果的切点当作已实现完整安全分叉。",
   "wiring": "messages在012/014/016的Loop生成请求历史时真实使用；fork与search只在008单测直接调用。041 Host虽导入messages但该文件没有调用，不能把一个import当成分叉或搜索已接线；066另有SessionQuery实现，与008的内存search不是同一条调用链。",

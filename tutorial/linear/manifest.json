@@ -12,7 +12,7 @@
   {
     "step": "000",
     "path": ".vscode/launch.json",
-    "sha256": "fb2dff828ef1b474b7e7cb9001e71fb4de182e422a17763032f93c8f4c99bdce"
+    "sha256": "c86c37058dd8e3a5f7be713cba0c5e32c89d910af573b7d957a4c5decef542dd"
   },
   {
     "step": "000",
@@ -41,6 +41,11 @@
   },
   {
     "step": "001",
+    "path": ".vscode/launch.json",
+    "sha256": "fc45e470a720b4605b964474069b516cbf8e3e8c3a5dd803445f595a94e4e710"
+  },
+  {
+    "step": "001",
     "path": "src/scope.mjs",
     "sha256": "eeef4eb2f8a88f31818ae27d08696df7e9e90b8a106d56b82f360ee367a61123"
   },
@@ -48,6 +53,11 @@
     "step": "001",
     "path": "tests/001-scope.test.mjs",
     "sha256": "d5a1b997e7552a4784fa5e6d3498b4b3f264139fcc3d91a6e3ecd6e6f9f0f943"
+  },
+  {
+    "step": "002",
+    "path": ".vscode/launch.json",
+    "sha256": "ee5dd825f5656c34b08a602cfe9083cb7ec6b5de4b8085a5aacd8c17315ac14b"
   },
   {
     "step": "002",
@@ -61,6 +71,11 @@
   },
   {
     "step": "003",
+    "path": ".vscode/launch.json",
+    "sha256": "97d76cf2c7f68bc6605515db4d467c0d8153bd09cab7064f22632f3832b70d71"
+  },
+  {
+    "step": "003",
     "path": "src/plugins.mjs",
     "sha256": "1a7b646f650a15a2218d71ec11d58f1c71b040c4a6fd972be3b0bf26d3bb625b"
   },
@@ -71,6 +86,11 @@
   },
   {
     "step": "004",
+    "path": ".vscode/launch.json",
+    "sha256": "effc5c73c768960f7bf0d37a7d950a1eb928f784b0b2e59d0c3eed7036763cfc"
+  },
+  {
+    "step": "004",
     "path": "src/config.mjs",
     "sha256": "f4a1401c8fb1e0b5eeacff601147c129532674f925f2cf3824c2a3789848e208"
   },
@@ -78,6 +98,11 @@
     "step": "004",
     "path": "tests/004-config.test.mjs",
     "sha256": "8676e36b4529bbbf15387afbf4dbad664fa791e1725919adfab8ac91b9f3b92d"
+  },
+  {
+    "step": "005",
+    "path": ".vscode/launch.json",
+    "sha256": "8d0d8b10c7ecbc430048f863548e6ba2b177440b151e1be5cea7d965971ec543"
   },
   {
     "step": "005",
@@ -106,6 +131,11 @@
   },
   {
     "step": "006",
+    "path": ".vscode/launch.json",
+    "sha256": "7bf17a877f6f7c9524520000e2eace8bef08cbe49894d065770af68d9eb0dedb"
+  },
+  {
+    "step": "006",
     "path": "src/journal.mjs",
     "sha256": "7cadd197401a5b4d0d4ef38c670aa60cf917fcefa3fbc8c0ca05b1adb2575ea2"
   },
@@ -113,6 +143,11 @@
     "step": "006",
     "path": "tests/006-journal.test.mjs",
     "sha256": "69d1bd73bca8152ddedc20a2bab3346c38a5b3dd7ff7cc6530dd25166b905875"
+  },
+  {
+    "step": "007",
+    "path": ".vscode/launch.json",
+    "sha256": "f18bb3d43444f08deda2ee7db5ceb6925438d8f55f436bee59d0854a807a7985"
   },
   {
     "step": "007",
@@ -126,6 +161,11 @@
   },
   {
     "step": "008",
+    "path": ".vscode/launch.json",
+    "sha256": "0ba4b8e7b7e23ad25729d4f7411c5fd1f2acb84cc4f8d2dfe6dec9ee46dc70a2"
+  },
+  {
+    "step": "008",
     "path": "src/projection.mjs",
     "sha256": "491d860dac80d8e06fe0d482c5a822b0dccb91b21649a39d66b447bcf8e41d43"
   },
@@ -133,6 +173,11 @@
     "step": "008",
     "path": "tests/008-projection.test.mjs",
     "sha256": "99806c1e5b75ce147f7081377b1d60f06601abe6f891bc237925634b1b76f8ae"
+  },
+  {
+    "step": "009",
+    "path": ".vscode/launch.json",
+    "sha256": "308035173aa0d3596902584688819b52e65b559086f2e510f36abfc38767e7c5"
   },
   {
     "step": "009",
@@ -146,6 +191,11 @@
   },
   {
     "step": "010",
+    "path": ".vscode/launch.json",
+    "sha256": "7349c80275bea8d33ee79b572e6a0c7dc3119c470c09a4805e6cef09b6435a29"
+  },
+  {
+    "step": "010",
     "path": "src/model.mjs",
     "sha256": "bffca74cec28ac31af458971dbed8d4d748ced1f848c734d22118ba50b1a6f04"
   },
@@ -153,6 +203,11 @@
     "step": "010",
     "path": "tests/010-model.test.mjs",
     "sha256": "0f478d55d6405f9473857ef07a628b7a8751493cb9cb7179cef21585c726925e"
+  },
+  {
+    "step": "011",
+    "path": ".vscode/launch.json",
+    "sha256": "820fd3bd80bd5b2bfdc8761817a887fc8e6809e338553edd7df20fed996e4dae"
   },
   {
     "step": "011",
@@ -166,6 +221,11 @@
   },
   {
     "step": "012",
+    "path": ".vscode/launch.json",
+    "sha256": "2be495e031465c0754b7e9860ffc18dc400d4cd4efce8d6eed768d1eef8dc66f"
+  },
+  {
+    "step": "012",
     "path": "src/loop.mjs",
     "sha256": "d87a2be1d60a545909ee6d788e74d84241230e185799ab22d1d5afbdb724ca6a"
   },
@@ -173,6 +233,11 @@
     "step": "012",
     "path": "tests/012-loop.test.mjs",
     "sha256": "44e0517496916a856fa31cc12c4f949308265ad2c49bd19404d2af8a5c0de8b5"
+  },
+  {
+    "step": "013",
+    "path": ".vscode/launch.json",
+    "sha256": "5d1da4bc9b37b055aa222c9d1212de8bcabfd80b00713ca6306c2b8767ede4f0"
   },
   {
     "step": "013",
@@ -191,6 +256,11 @@
   },
   {
     "step": "014",
+    "path": ".vscode/launch.json",
+    "sha256": "f9709f8cbf93f948c691878b85217b57e8dc1cf9ce231ccf205b7bc213f38d3d"
+  },
+  {
+    "step": "014",
     "path": "src/batch.mjs",
     "sha256": "679f3ee090c75f215f446b5646571f0c568a030d095cfd0d04c55ef581c2c327"
   },
@@ -206,6 +276,11 @@
   },
   {
     "step": "015",
+    "path": ".vscode/launch.json",
+    "sha256": "5cca86458f8265c88eae3f7ecb612d54d7d410c277e7f3e29c2f6f130c2ab232"
+  },
+  {
+    "step": "015",
     "path": "src/sse.mjs",
     "sha256": "d94d27000d33e7d2d10963da7a9afc4f30c238fc036d04cc131f8e74e7135c54"
   },
@@ -218,6 +293,11 @@
     "step": "016",
     "path": ".env.example",
     "sha256": "abad5ff6aef51a898f598724bf392fb30042f2e6ac614da2b89d2c21908db98b"
+  },
+  {
+    "step": "016",
+    "path": ".vscode/launch.json",
+    "sha256": "9d194aa6b482805352f24d156e0534b698ba6400123b2376fa4bb1e9ce3a0e00"
   },
   {
     "step": "016",
@@ -246,6 +326,11 @@
   },
   {
     "step": "017",
+    "path": ".vscode/launch.json",
+    "sha256": "2e5f932c5ea5c66b9e2a55832d7a9267bd79e11731683f732ed7e378904a26c4"
+  },
+  {
+    "step": "017",
     "path": "src/files.mjs",
     "sha256": "746a0895343edb4dfba5ab42fb0f71b79c3201b7664b228644ea3032bba8237d"
   },
@@ -253,6 +338,11 @@
     "step": "017",
     "path": "tests/017-files.test.mjs",
     "sha256": "e69f0c21a320c9e72e764e5a2cac4d3933ad52374316aeadca65f51a6f8b7091"
+  },
+  {
+    "step": "018",
+    "path": ".vscode/launch.json",
+    "sha256": "1865116b804483cc615258de57f9809cb56068873cbda4763d360d4c85a353eb"
   },
   {
     "step": "018",
@@ -276,6 +366,11 @@
   },
   {
     "step": "019",
+    "path": ".vscode/launch.json",
+    "sha256": "85aac17abf5a823237a5ffbc1fcb76498fbc9b5d46f9c0b2036a5cb5d4e0fe2e"
+  },
+  {
+    "step": "019",
     "path": "src/context.mjs",
     "sha256": "700a82b59b02f039d306a71e4116890ec6cd0a0a4c713a158bb611cdd722eba4"
   },
@@ -283,6 +378,11 @@
     "step": "019",
     "path": "tests/019-context.test.mjs",
     "sha256": "c2ae2d2c296c449e23555b09ced1caff2b1d75f29105460f105106aa7a5e935d"
+  },
+  {
+    "step": "020",
+    "path": ".vscode/launch.json",
+    "sha256": "83a2343904d2f33579426302a0f10bdb85f275064f7be3ba3c4244478ea70f49"
   },
   {
     "step": "020",
@@ -311,6 +411,11 @@
   },
   {
     "step": "021",
+    "path": ".vscode/launch.json",
+    "sha256": "7e34e1bc15fed7174b200b740d593142415df4ac381ac9704f44a7ff6885449b"
+  },
+  {
+    "step": "021",
     "path": "src/filesystem.mjs",
     "sha256": "9f29c35ef79017df89dfb5eeded9052672b0cb9b28b7152de474ade48a2e28ae"
   },
@@ -318,6 +423,11 @@
     "step": "021",
     "path": "tests/021-filesystem.test.mjs",
     "sha256": "55f743181d013fc94c8ac6f2a0da816a1ffac2c55125eab709cd19b7af78fd17"
+  },
+  {
+    "step": "022",
+    "path": ".vscode/launch.json",
+    "sha256": "12a42e02f9c625194b2deb9cb97c72d5eb9346eb99def1f9d60926ea49149c57"
   },
   {
     "step": "022",
@@ -336,6 +446,11 @@
   },
   {
     "step": "023",
+    "path": ".vscode/launch.json",
+    "sha256": "f54712936898c694790f7dd620ad5a3275da730cc0e06f0abc9d931aa18d2d82"
+  },
+  {
+    "step": "023",
     "path": "src/approval.mjs",
     "sha256": "727c12222d28fdd263d03f6ac9a58a6ec4744ee892a65a75a55ac24d71a0d9ae"
   },
@@ -343,6 +458,11 @@
     "step": "023",
     "path": "tests/023-approval.test.mjs",
     "sha256": "7bcaa036231d8ca1d33049124e5c76f9b4562c4fecf9de225433d3cc1872e3ee"
+  },
+  {
+    "step": "024",
+    "path": ".vscode/launch.json",
+    "sha256": "37a0ea22db21dc478d92d6ec499778b48d7e52503a1260adde3e154ba30fc19e"
   },
   {
     "step": "024",
@@ -356,6 +476,11 @@
   },
   {
     "step": "025",
+    "path": ".vscode/launch.json",
+    "sha256": "ea1099ad3c56dcb84bcc6f7e4296f3b66e0961970047b16bc4e8bdc57972957c"
+  },
+  {
+    "step": "025",
     "path": "src/process.mjs",
     "sha256": "bf6a457a272470eea7c7973e1a0cfefe772be52513f96bd1edc7e7960526dc0f"
   },
@@ -366,6 +491,11 @@
   },
   {
     "step": "026",
+    "path": ".vscode/launch.json",
+    "sha256": "d56845b707edd2b82fd283ccfc0e426ef3acba324d6652a3061282f37b9b0356"
+  },
+  {
+    "step": "026",
     "path": "src/shell.mjs",
     "sha256": "f168f5237e456be01ec398435e3bd781deac99d78b0584feb4601cefa20111d7"
   },
@@ -373,6 +503,11 @@
     "step": "026",
     "path": "tests/026-shell.test.mjs",
     "sha256": "2d56c28b513275710eb60ec500aba1e46ee7613879fcfa7a088054b8b1c2d559"
+  },
+  {
+    "step": "027",
+    "path": ".vscode/launch.json",
+    "sha256": "12403c3c392f9b19d121859324c47a8c5f4e2e0b505fa579ff02d0ff28945442"
   },
   {
     "step": "027",
@@ -391,6 +526,11 @@
   },
   {
     "step": "028",
+    "path": ".vscode/launch.json",
+    "sha256": "48a408692b380636da6e2106e5f5c12aa043b35cb49936fa4e43050b8edd7283"
+  },
+  {
+    "step": "028",
     "path": "src/sandbox.mjs",
     "sha256": "5dda6dcd7d42146123b9422758d688969dd25150ab94f07b3a0f6abef59e5634"
   },
@@ -398,6 +538,11 @@
     "step": "028",
     "path": "tests/028-sandbox.test.mjs",
     "sha256": "bfa4510c495051d507b4ccf36187313e2a08d4f4287b36cf03341f98f50c1c0b"
+  },
+  {
+    "step": "029",
+    "path": ".vscode/launch.json",
+    "sha256": "d36c8612ecc0aca5699cefb82e111af9b2c0395a3a3fafce34e46484b2914f98"
   },
   {
     "step": "029",
@@ -411,6 +556,11 @@
   },
   {
     "step": "030",
+    "path": ".vscode/launch.json",
+    "sha256": "a908b4cfde0c2787ed2fbaebf69d49adcb4812638c760ec9654c1e667b9a8d13"
+  },
+  {
+    "step": "030",
     "path": "src/jobs.mjs",
     "sha256": "b73a286ccd22ceedf2a27286c77ed0162714d5eb63f88b69706f2fe87733fb9b"
   },
@@ -421,6 +571,11 @@
   },
   {
     "step": "031",
+    "path": ".vscode/launch.json",
+    "sha256": "a85d40806e89d4a47f88dec8c9fd651991488d89f22ccc2c8a0284ebf4197c9c"
+  },
+  {
+    "step": "031",
     "path": "src/skills.mjs",
     "sha256": "84c9d8931f7ef61dfe247137c43e9a12fb94c69056152444d317b310094496ec"
   },
@@ -428,6 +583,11 @@
     "step": "031",
     "path": "tests/031-skills.test.mjs",
     "sha256": "65ab6bc93018f3b0c980bca9a9c4507420ad630ae45837e200df473d0aa29aa1"
+  },
+  {
+    "step": "032",
+    "path": ".vscode/launch.json",
+    "sha256": "2a47c135f7b2b46a23afe6d978d70481ded3e6e62d501610dd1262710b817dfa"
   },
   {
     "step": "032",
@@ -456,6 +616,11 @@
   },
   {
     "step": "033",
+    "path": ".vscode/launch.json",
+    "sha256": "89a7b740e6346c66fa0c2268e0d967e0c237e16b7423e35b5cc33c19458e038d"
+  },
+  {
+    "step": "033",
     "path": "package.json",
     "sha256": "475f0e305213283fdd95dc9fe252d70a51e5ea7543a1cadb9b04e6584f5e2637"
   },
@@ -476,6 +641,11 @@
   },
   {
     "step": "034",
+    "path": ".vscode/launch.json",
+    "sha256": "ed0b8d74b0605003eb412573f58a7d264933684fd32b49c456749a87def6e5c2"
+  },
+  {
+    "step": "034",
     "path": "src/web-tools.mjs",
     "sha256": "539ab4b816d49679b2482cc86dfe1e95432af7c08813eaec5e242310a7b4fbd7"
   },
@@ -483,6 +653,11 @@
     "step": "034",
     "path": "tests/034-web.test.mjs",
     "sha256": "866a7f0e158310ec7e3e8f73d202551f36612e45bb2e10e7e4129de5f49a2748"
+  },
+  {
+    "step": "035",
+    "path": ".vscode/launch.json",
+    "sha256": "1a60b97afc45fc877b61456f6ae74a09b4b4fbed72f93cb779666b128c743b81"
   },
   {
     "step": "035",
@@ -498,6 +673,11 @@
     "step": "035",
     "path": "tests/fixtures/lsp.mjs",
     "sha256": "f37664b7d6c28f71c146a803f5d662e7bd2231273f6886dcd2605d46b2509229"
+  },
+  {
+    "step": "036",
+    "path": ".vscode/launch.json",
+    "sha256": "7f435967c619af87a60e58da91f3c14369aaded22cba20c747a477f78017e062"
   },
   {
     "step": "036",
@@ -526,6 +706,11 @@
   },
   {
     "step": "037",
+    "path": ".vscode/launch.json",
+    "sha256": "71d8d9d6178fab6ac25e458f5963224b9d0759cc65054fec341a5a3ee0d623f1"
+  },
+  {
+    "step": "037",
     "path": "src/workflow.mjs",
     "sha256": "6bee7f449aba38fcb70265d88b6dd882605d35d8a15369005f60597c22e8a92c"
   },
@@ -536,6 +721,11 @@
   },
   {
     "step": "038",
+    "path": ".vscode/launch.json",
+    "sha256": "f0b01b4ca60febd049936a5952103a2b24d2d932d19b7d3254886d1f7b92bb11"
+  },
+  {
+    "step": "038",
     "path": "src/ptc.mjs",
     "sha256": "5ebcc2d65e36cd228b1d1e119ce0a019d53f2474b14f070ed6cc99998d234d09"
   },
@@ -543,6 +733,11 @@
     "step": "038",
     "path": "tests/038-ptc.test.mjs",
     "sha256": "9f180bc0a52cbab12cd64da47657a6d3a81549e1ff531479cb4e5a2885038f6b"
+  },
+  {
+    "step": "039",
+    "path": ".vscode/launch.json",
+    "sha256": "2b5a071fa477a5d86a48a4971e4022d96fbfffbd52ea1ff1a04d2e36ed583944"
   },
   {
     "step": "039",
@@ -561,6 +756,11 @@
   },
   {
     "step": "040",
+    "path": ".vscode/launch.json",
+    "sha256": "aa099c49955a8cd4f8f5edb33f45e37457da789ab7094a9b491c87d8e3116fff"
+  },
+  {
+    "step": "040",
     "path": "src/attachments.mjs",
     "sha256": "21e0377466a2c517bd6b123b671f1c8dc7a88683e1e3a38e59466b8b8fb337e5"
   },
@@ -568,6 +768,11 @@
     "step": "040",
     "path": "tests/040-attachments.test.mjs",
     "sha256": "91085f1ebaf3e9bb29997e8e7bd70233bc5c90ce234409bb262b4d240f9958aa"
+  },
+  {
+    "step": "041",
+    "path": ".vscode/launch.json",
+    "sha256": "337f382aaefbb24d3f3192eb2467b45d8488d8ae9f7afa07c7bb6cc7e66bc120"
   },
   {
     "step": "041",
@@ -586,6 +791,11 @@
   },
   {
     "step": "042",
+    "path": ".vscode/launch.json",
+    "sha256": "0278060ed14c884906c1c53b54e060ff1ba7fea273ca81e2122f9c49af5f7812"
+  },
+  {
+    "step": "042",
     "path": "src/storage.mjs",
     "sha256": "167d1ff01ef80b75f9029312318b6ad19ff0b2410270a4b1b022bba3cb8cb06c"
   },
@@ -593,6 +803,11 @@
     "step": "042",
     "path": "tests/042-storage.test.mjs",
     "sha256": "b09df26112b7f8977b50ffebccec054015981d92b9d97e9a7513347530ac0491"
+  },
+  {
+    "step": "043",
+    "path": ".vscode/launch.json",
+    "sha256": "ceddcaa90c05570e87ba51ef95294c2dd670673922fdeb0d0c8205eb7aee3263"
   },
   {
     "step": "043",
@@ -607,7 +822,7 @@
   {
     "step": "044",
     "path": ".vscode/launch.json",
-    "sha256": "2bba6e63398dc11f784feca60d08c69f107d3b1ee5170e39e35045b6bc44473e"
+    "sha256": "cffe63853ef2962dafae48a74e88cb038696a5b58a5946acd83c1fb9ed917f37"
   },
   {
     "step": "044",
@@ -637,7 +852,7 @@
   {
     "step": "045",
     "path": ".vscode/launch.json",
-    "sha256": "cab42d110a3dec89603d4f79f7e78bd7deabed52856b0dda2b7fa42719316ac2"
+    "sha256": "cd9051fb820796987c3725a8f6d4c57b0bba620363e4da63a83080317214f453"
   },
   {
     "step": "045",
@@ -653,6 +868,11 @@
     "step": "045",
     "path": "tests/fixtures/python-sdk.py",
     "sha256": "6f7c23269dde2b579b7f8818fcf5bf51c3d4a20eccd6ebeddcae64a73dac0ff7"
+  },
+  {
+    "step": "046",
+    "path": ".vscode/launch.json",
+    "sha256": "b7b76d35317b687f1b46c2a60302ca6f95f86c54cda25c13c9a81b45b73a8de9"
   },
   {
     "step": "046",
@@ -676,6 +896,11 @@
   },
   {
     "step": "047",
+    "path": ".vscode/launch.json",
+    "sha256": "8662d1f02741902ddd1aa80fcd2247ad4bfe50b561e558db1f4b231d5338501d"
+  },
+  {
+    "step": "047",
     "path": "package.json",
     "sha256": "3ca6fe5828c9b4fecd184798b8a8c313ec9218993528c4b42354a26486b1521f"
   },
@@ -696,6 +921,11 @@
   },
   {
     "step": "048",
+    "path": ".vscode/launch.json",
+    "sha256": "1fc1047d3f0789a9b54ac7334b67c3e538a942e00f02d23372c130bad840fac7"
+  },
+  {
+    "step": "048",
     "path": "src/view.mjs",
     "sha256": "c73cb008bec1f95271f594ccde2d165635bebefac00abdbbf9d22786c062cba1"
   },
@@ -707,7 +937,7 @@
   {
     "step": "049",
     "path": ".vscode/launch.json",
-    "sha256": "62c0a82a33a66a33c011eb2fabf1d5719302c0a8cf0faaec285f2331ff79803e"
+    "sha256": "838af767ca157930cd1d0caec765138a7382bf2e78452faa05157abd7ee5be7d"
   },
   {
     "step": "049",
@@ -723,6 +953,11 @@
     "step": "049",
     "path": "web/index.html",
     "sha256": "bd5a63ed807338f6c0c2277cb39311c9716d2aa15c7d9995077c7cfb956cfc43"
+  },
+  {
+    "step": "050",
+    "path": ".vscode/launch.json",
+    "sha256": "2d6a4cc91b3b719b36f22c458362d8ad6c00048977c9077dd15e7b93a946440e"
   },
   {
     "step": "050",
@@ -756,6 +991,11 @@
   },
   {
     "step": "051",
+    "path": ".vscode/launch.json",
+    "sha256": "30bc18a49695a911217577d1ff9bd4f1e7169e7732b02ea7b32abf12a4c8fa30"
+  },
+  {
+    "step": "051",
     "path": "src/agent.mjs",
     "sha256": "413a1810296644aa3cb963863edfc21fed010a627148df5349339e3b49c24301"
   },
@@ -777,7 +1017,7 @@
   {
     "step": "052",
     "path": ".vscode/launch.json",
-    "sha256": "9a0f0fe1a9956ca6932e6160211367f46a8e4bee282aa58c1f05d6e607d617e0"
+    "sha256": "3028151c1aef93b0fce50745271aa297d514ef50cbef18327ca3fb7ae0e84458"
   },
   {
     "step": "052",
@@ -821,6 +1061,11 @@
   },
   {
     "step": "053",
+    "path": ".vscode/launch.json",
+    "sha256": "20d0e05887e49fa89cf72f6f0eb368e1972c038bba9a28f42698dd0e9715ba54"
+  },
+  {
+    "step": "053",
     "path": "desktop/shortcuts.mjs",
     "sha256": "8d45c0d0adc0f0c81a9e414095404b290068d028783b9181e7e37cb5ef968ae2"
   },
@@ -836,6 +1081,11 @@
   },
   {
     "step": "054",
+    "path": ".vscode/launch.json",
+    "sha256": "8211ab52745df2c7e804b4c48843eeb13408e0c4a96034410645b3230d7faf8d"
+  },
+  {
+    "step": "054",
     "path": "src/runtime-assets.mjs",
     "sha256": "78806362dbf97df41305abd6e2acdca9bbf5026540178819cc574ec836b2f718"
   },
@@ -846,6 +1096,11 @@
   },
   {
     "step": "055",
+    "path": ".vscode/launch.json",
+    "sha256": "c69b1870326e5039123f6d901ae840e70b8f11464e8bed70087ec311d67118ca"
+  },
+  {
+    "step": "055",
     "path": "src/update.mjs",
     "sha256": "da03b618e5cd68667c7f0b5b5aa8f7d59e7dd6a8dce29d22d84f19805f03fd6a"
   },
@@ -853,6 +1108,11 @@
     "step": "055",
     "path": "tests/055-update.test.mjs",
     "sha256": "c1c0fec310d5c8a3c6d4353352e6e15814b311e5505356278aaecd9ac13fb11f"
+  },
+  {
+    "step": "056",
+    "path": ".vscode/launch.json",
+    "sha256": "c88ee6202126e9a60026d42312f1ee2e15fdc69e0b73e3335460a55f15cb22fa"
   },
   {
     "step": "056",
@@ -876,6 +1136,11 @@
   },
   {
     "step": "057",
+    "path": ".vscode/launch.json",
+    "sha256": "a229e43e559c8c27100630e99d52e38dd40dd972201525ea128acbcc6f486be4"
+  },
+  {
+    "step": "057",
     "path": "src/teams.mjs",
     "sha256": "7ce2221f6a9656cb89e41fc9589042ad45bef03fcb835a137cde3f9e3d6fa354"
   },
@@ -886,6 +1151,11 @@
   },
   {
     "step": "058",
+    "path": ".vscode/launch.json",
+    "sha256": "dfaa883e9f74b90679718edb087b3c7c0efb42130a95788aaecf8d0fa7d85396"
+  },
+  {
+    "step": "058",
     "path": "src/hooks.mjs",
     "sha256": "35aee35502d0d8ac50c3e7e573e6d1c98ca02a4a363ae2ce0ec54cc9a7f00db6"
   },
@@ -893,6 +1163,11 @@
     "step": "058",
     "path": "tests/058-hooks.test.mjs",
     "sha256": "3d5882b90e7968790b1eea2131b3c31efe64173ff4584c15dc7b2c7944eb5325"
+  },
+  {
+    "step": "059",
+    "path": ".vscode/launch.json",
+    "sha256": "82be61f42a451f740d93d6b289245e1fd62dd8c1db604fb6c00a322a5ccaecdd"
   },
   {
     "step": "059",
@@ -916,6 +1191,11 @@
   },
   {
     "step": "060",
+    "path": ".vscode/launch.json",
+    "sha256": "f0c4d8f7bd46173fe9b80192248747856748a621a830fb323830ceda19fa6280"
+  },
+  {
+    "step": "060",
     "path": "src/audio.mjs",
     "sha256": "4f45a8e96bd9e23108359c3b9724f453ce7b071b0b5a7399d8baf87b7b667f2b"
   },
@@ -931,6 +1211,11 @@
   },
   {
     "step": "061",
+    "path": ".vscode/launch.json",
+    "sha256": "b2ae51fb5a7309aa674a50d19d6be01130956bdf5fedd52f72288f8c13a4d3b6"
+  },
+  {
+    "step": "061",
     "path": "src/webhook.mjs",
     "sha256": "93883672810ec8044a099a666a4b62cb96875c5c296ec3c0b182313fac445ae4"
   },
@@ -938,6 +1223,11 @@
     "step": "061",
     "path": "tests/061-webhook.test.mjs",
     "sha256": "64ef77b55e7a6dec886bcf2efb2594ed627513f48815acd2d93bdc7c895dfa34"
+  },
+  {
+    "step": "062",
+    "path": ".vscode/launch.json",
+    "sha256": "28109224798a6517cd4bede3b809780e03f0afcd930644acaabaebb2cab31876"
   },
   {
     "step": "062",
@@ -951,6 +1241,11 @@
   },
   {
     "step": "063",
+    "path": ".vscode/launch.json",
+    "sha256": "9b1dff6206bfbfa5389366da83c36b419ddab4b2a8e9a5e70e52200fc2b4ca78"
+  },
+  {
+    "step": "063",
     "path": "src/workers.mjs",
     "sha256": "ff0e33fd7ba502d01a109e2e2628a7d139a1669c5acf40b9459b84ad6e8c1a5d"
   },
@@ -958,6 +1253,11 @@
     "step": "063",
     "path": "tests/063-workers.test.mjs",
     "sha256": "08576d988fae72bfbe72030af471a5c08c104f24b40a420b9f138ec74c2b5ad4"
+  },
+  {
+    "step": "064",
+    "path": ".vscode/launch.json",
+    "sha256": "b182d120ae59dcd9334ecfeaac45c4e63366b279325573cf982f18e83768ebb8"
   },
   {
     "step": "064",
@@ -971,6 +1271,11 @@
   },
   {
     "step": "065",
+    "path": ".vscode/launch.json",
+    "sha256": "9d915b263caf8fdf318f34d21f95b0d4289902e87d2e767ec2a98def5d50e206"
+  },
+  {
+    "step": "065",
     "path": "src/market.mjs",
     "sha256": "c52abdd6b373a4af0f7e86a596f77f651db32eb3563ead5e4f60bcb0537cfff4"
   },
@@ -978,6 +1283,11 @@
     "step": "065",
     "path": "tests/065-market.test.mjs",
     "sha256": "2a9e22c81686e394532e6784c967bd1236e36fbe0c887e3b844362a18c4e0e74"
+  },
+  {
+    "step": "066",
+    "path": ".vscode/launch.json",
+    "sha256": "b3f5e47d5bd26757d0e42de5a70831042271b6a93be2b29e1ace6db96f58e039"
   },
   {
     "step": "066",
@@ -1006,6 +1316,11 @@
   },
   {
     "step": "067",
+    "path": ".vscode/launch.json",
+    "sha256": "5a0e25f32efced05430e905a34f71e14a9f563258c84748d084daca8ba6dfa40"
+  },
+  {
+    "step": "067",
     "path": "scripts/compare-acp.mjs",
     "sha256": "14cf30f7efb517e674a318e884abad5260268bae9140d1f0666c50aa14ee8d2d"
   },
@@ -1026,13 +1341,18 @@
   },
   {
     "step": "068",
+    "path": ".vscode/launch.json",
+    "sha256": "fa3566e0f0ee77f68bd77555c07d279f5e06c74b7a4f841e269b666172785a7d"
+  },
+  {
+    "step": "068",
     "path": "tests/068-web-e2e.test.mjs",
     "sha256": "f674029049ed2946e1bc275b615bbb2e90f7a6e275a3ad66766a9b04e5eb3d64"
   },
   {
     "step": "069",
     "path": ".vscode/launch.json",
-    "sha256": "ca591c6a7a1c3018ba24506095f85d86ef292fe1762d15d00d16d84a7f5a841d"
+    "sha256": "6d88f4c74785ad1b35713e3582689db406ebd5c393d74b6993a4b146a61e8a5c"
   },
   {
     "step": "069",

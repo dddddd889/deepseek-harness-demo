@@ -4,7 +4,7 @@
   "try": "完成context.mjs和测试后运行 bun test ./tests/019-context.test.mjs。预期长500字符的旧history不被修改，压缩副本最后仍是next；Spill先取回“完整原文”，再被测试改坏文件后get报完整性错误。当前测试直接调用两个helper，没有模型HTTP。",
   "why": "compact控制模型请求副本，不删除事实日志；Spill控制长结果的原文存放，不等于自动压缩模型上下文。两个函数需接在真实请求/工具结果路径上才会起作用，本章只建立并测试基础算法。",
   "accept": "1项测试证明旧数组不被改、短摘要可放回预算、原文hash可检测篡改。measure实际用JSON字符串长度，不是token；测试没有当前轮工具组，也没有证明流式大文件、自动触发压缩或模型摘要质量。",
-  "debug": "在VS Code选tests/019-context.test.mjs，选择“Bun：当前测试”按F5。在src/context.mjs的const recent、await summarize、measure(result)和完整性比较打断点。F10监视split、copy.length、recent、result；回到测试帧确认history[0].content.length仍500。F11进入Spill.get，在测试篡改后预期hash与id不相等而抛错。",
+  "debug": "在VS Code选tests/019-context.test.mjs，选择“019：本节测试”按F5。在src/context.mjs的const recent、await summarize、measure(result)和完整性比较打断点。F10监视split、copy.length、recent、result；回到测试帧确认history[0].content.length仍500。F11进入Spill.get，在测试篡改后预期hash与id不相等而抛错。",
   "recall": "闭卷分别说明“摘要副本”和“落盘原文”解决哪件事，再画出旧轮次被摘要、当前轮次完整保留的历史。指出JSON长度为什么不能叫真实token数。",
   "transfer": "在测试副本把recent内容也扩成超过limit，断言“当前轮次本身超限”；这是需新增的已有分支练习。想用工具组验证需自己补assistant calls与tool消息，不要说原测试已覆盖。",
   "wiring": "compact与new Spill目前只见019测试，未接Loop、Tools或041 Host；后续模型请求不会自动调用本章压缩。即使前面sum和后面Web能跑，也不能据此判断长上下文已处理。",

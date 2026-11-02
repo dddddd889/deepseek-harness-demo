@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "032：本节测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/032-rpc-demo.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Bun：032跨进程RPC主进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6499/rpc-032"
+    },
+    {
+      "name": "Bun：032 RPC worker子进程",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6500/rpc-worker-032"
+    }
+  ]
+}

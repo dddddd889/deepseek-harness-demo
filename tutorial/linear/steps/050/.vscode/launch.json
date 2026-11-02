@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "050：本节测试",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/050-product.test.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "test",
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs",
+        "--timeout",
+        "3600000"
+      ],
+      "stopOnEntry": false
+    },
+    {
+      "name": "Web：Bun Host",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/web-server.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "stopOnEntry": false,
+      "env": {
+        "HARNESS_HOME": "${workspaceFolder}/.data-web",
+        "HARNESS_PORT": "0"
+      }
+    },
+    {
+      "name": "Web：页面",
+      "type": "chrome",
+      "request": "launch",
+      "url": "${input:webBootstrapUrl}",
+      "webRoot": "${workspaceFolder}/web",
+      "pathMapping": {
+        "/view.mjs": "${workspaceFolder}/src/view.mjs"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "webBootstrapUrl",
+      "type": "promptString",
+      "description": "粘贴本次 Host 输出的完整 http://127.0.0.1:端口/?token=... 地址"
+    }
+  ]
+}
