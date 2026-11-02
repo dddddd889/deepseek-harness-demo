@@ -32,6 +32,47 @@
       "env": {
         "HARNESS_WEBHOOK_SECRET": "local-demo-only"
       }
+    },
+    {
+      "name": "061：Webhook发送请求",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/send-webhook.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtime": "bun",
+      "runtimeArgs": [
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
+      ],
+      "stopOnEntry": false,
+      "env": {
+        "HARNESS_WEBHOOK_SECRET": "local-demo-only",
+        "HARNESS_WEBHOOK_TIMEOUT_MS": "600000"
+      },
+      "args": [
+        "${input:webhookUrl}",
+        "${input:webhookPrompt}",
+        "${input:webhookDelivery}"
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "webhookUrl",
+      "type": "promptString",
+      "description": "粘贴本次服务打印的完整http://127.0.0.1:端口/webhooks地址"
+    },
+    {
+      "id": "webhookPrompt",
+      "type": "promptString",
+      "description": "本次Webhook任务",
+      "default": "帮我处理这条通知"
+    },
+    {
+      "id": "webhookDelivery",
+      "type": "promptString",
+      "description": "投递ID；相同ID与正文用于验证重复，新任务请换ID",
+      "default": "debug-delivery-1"
     }
   ]
 }

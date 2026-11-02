@@ -3,6 +3,7 @@
 import json
 import re
 from pathlib import Path
+from debug_routes import render_routes
 
 
 ROOT = Path(__file__).resolve().parent
@@ -103,7 +104,17 @@ def plan_for(lesson):
         add(bun_launch('061：Webhook监听服务', 'src/webhook-server.mjs',
                        env={'HARNESS_WEBHOOK_SECRET': 'local-demo-only'}),
             '本机HTTP到Agent联调', 'src/webhook-server.mjs', '监听成功后，另一个终端运行本节发送脚本；Ctrl+C或停止调试释放服务。')
-        reason = '测试使用真实本机HTTP、Host、Journal和Agent；手工演示启动独立监听服务，另一个终端才是HTTP发送方。模型默认为OfflineModel，无需API Key。'
+        # 发送端是独立Bun进程，不能从服务端F11跨HTTP进入。
+        add(bun_launch('061：Webhook发送请求', 'scripts/send-webhook.mjs',
+                       env={'HARNESS_WEBHOOK_SECRET': 'local-demo-only', 'HARNESS_WEBHOOK_TIMEOUT_MS': '600000'},
+                       args=['${input:webhookUrl}', '${input:webhookPrompt}', '${input:webhookDelivery}']),
+            '需要发送端断点时，先启动监听服务', 'scripts/send-webhook.mjs', '粘贴已启动服务的URL，调试签名与fetch；服务端需保留另一调试会话。')
+        inputs.extend([
+            dict(id='webhookUrl', type='promptString', description='粘贴本次服务打印的完整http://127.0.0.1:端口/webhooks地址'),
+            dict(id='webhookPrompt', type='promptString', description='本次Webhook任务', default='帮我处理这条通知'),
+            dict(id='webhookDelivery', type='promptString', description='投递ID；相同ID与正文用于验证重复，新任务请换ID', default='debug-delivery-1'),
+        ])
+        reason = '三条路线按目的选择：A仅启动本节测试；B先启动监听服务，再从终端发请求；C先启动监听服务，再用发送请求配置建立第二个调试会话。无需另起Host、CLI、网页或Electron。默认OfflineModel无需API Key。'
         actions = ['U->>D: 选择061的Webhook监听服务', 'D->>P: 启动Host与HTTP服务',
                    'P-->>U: 打印动态端口与会话ID', 'U->>C: 另一终端启动send-webhook脚本',
                    'C->>P: POST原始JSON与签名请求头', 'P->>P: 验签、写Journal、pump真实Agent',
@@ -262,6 +273,7 @@ def render_debugging(lesson):
              f'**建议先选：{plan["primary"]}。** 每节的测试入口都固定到本节文件，不依赖编辑器当前打开的 `${{file}}`。', '',
              '| 配置名称 | 什么时候选 | 实际入口或目标 | 能观察什么 |', '| --- | --- | --- | --- |']
     lines += ['| ' + ' | '.join(row) + ' |' for row in plan['rows']]
+    lines += ['', render_routes(lesson, plan), '']
     lines += ['', '**为什么这样启动：** ' + plan['reason'], '',
               '使用下方的[本节专用调试配置](#lesson-debug-config)。它只列本节可用目标；要保留个人配置，请先备份并按名称合并。页面上 `harness-own` 的累计文件链接供看当前工程，不是本节调试配置的答案。', '',
               '1. VS Code 打开自己的 PROJECT；按本节创建源码与配置，断点设在 PROJECT 文件中。',

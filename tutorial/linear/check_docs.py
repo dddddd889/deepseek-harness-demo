@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from debugging import plan_for, render_debug_steps
 from chapter_map import CALLS, render_map, map_files
+from debug_routes import routes_for, render_routes
 
 ROOT = Path(__file__).resolve().parent
 ORIGINAL = ROOT.parents[1] / 'deepseek-harness'
@@ -22,6 +23,8 @@ def main():
     available = set()
     debug_sequences = 0
     chapter_maps = 0
+    route_count = 0
+    multi_route_lessons = 0
     for lesson in lessons:
         number = lesson['id']
         available.update(path.relative_to(ROOT / 'steps' / number).as_posix() for path in (ROOT / 'steps' / number).rglob('*') if path.is_file())
@@ -58,6 +61,25 @@ def main():
             raise ValueError(number + '缺少本节调试入口或配置锚点')
         if any('| ' + row[0] + ' |' not in text for row in plan['rows']):
             raise ValueError(number + '正文调试清单未展示配置')
+        # 路线必须只引用本章配置，并覆盖每个按钮，防止新增入口后文档漏写启动顺序。
+        routes = routes_for(lesson, plan)
+        used_names = {name for route in routes for name in route['configs']}
+        if used_names != set(names):
+            raise ValueError(number + '路线与调试配置不一一覆盖')
+        for route in routes:
+            if not route['steps'] or not route['targets'] or not route['finish']:
+                raise ValueError(number + '路线缺少启动、断点或结束说明')
+            # 路线中明确写出的源码文件也必须已经存在于本节累计工程。
+            route_text = '\n'.join(route['steps'] + [route['targets'], route['note']])
+            for path in re.findall(r'(?:src|tests|python|web|desktop|scripts)/[A-Za-z0-9_./-]+\.(?:mjs|cjs|py)', route_text):
+                if path not in available:
+                    raise ValueError(number + '路线引用尚未实现的文件：' + path)
+        # 路线正文不包含创建/替换文件标题，应保留完整原始步骤。
+        expected_routes = render_routes(lesson, plan)
+        if expected_routes not in text:
+            raise ValueError(number + '缺少完整调试路线说明')
+        route_count += len(routes)
+        multi_route_lessons += len(routes) > 1
         if re.search(r'^### (?:创建|替换) \[`.vscode/launch.json`\]', text, re.M):
             raise ValueError(number + '本节调试标题仍误链接到累计工程配置')
         if plan['sequence']:
@@ -112,7 +134,7 @@ def main():
         article = (ROOT / 'lessons' / (row['step'] + '.md')).read_text()
         if '\n' + source + '\n' + fence not in article:
             raise ValueError('教程缺少完整代码：' + str(path))
-    print(json.dumps({'lessons': len(lessons), 'sequenceDiagrams': len(lessons), 'debugLaunchFiles': len(lessons), 'debugStartupSequences': debug_sequences, 'chapterDirectoryMaps': chapter_maps, 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'flowThenSequence': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
+    print(json.dumps({'lessons': len(lessons), 'sequenceDiagrams': len(lessons), 'debugLaunchFiles': len(lessons), 'debugStartupSequences': debug_sequences, 'chapterDirectoryMaps': chapter_maps, 'debugRoutes': route_count, 'multiRouteLessons': multi_route_lessons, 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'flowThenSequence': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

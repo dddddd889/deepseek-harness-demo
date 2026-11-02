@@ -1217,12 +1217,12 @@
   {
     "step": "061",
     "path": ".vscode/launch.json",
-    "sha256": "4e213886f397ad19c848a3c80149951b8f07f46e48234820803aa348b0c616e2"
+    "sha256": "6b2819aee4507e656a9df60e1eea90edc1c0376dc71a8e42c510ec788683fc30"
   },
   {
     "step": "061",
     "path": "scripts/send-webhook.mjs",
-    "sha256": "6aa1a9cbead43f7fa269a27617061722842e9b7b2dd77fa75728e5d3e370901c"
+    "sha256": "a2777b1166d0ea879b39c397c8da9d4e109cc728e1f9f27661b1c586086dfec8"
   },
   {
     "step": "061",
