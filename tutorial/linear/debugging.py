@@ -243,7 +243,8 @@ def render_debugging(lesson):
               f'2. 先用终端运行 `bun test ./{lesson["test"]}` 确认普通验收，再选表中的配置按 F5。',
               '3. 在下方具体观察点停住；F10 跨过当前语句，F11 只进入当前调试目标。异步等待涉及另一进程时，切换调试会话并继续对端。',
               '4. 变量要在所属调用帧查看；看测试局部变量时选测试帧，看 this 和参数时选实现方法帧。', '',
-              '**本节具体断点和预期：** ' + lesson['debug'], '']
+              '<details class="debug-details">', '<summary>展开本节具体断点和预期</summary>', '',
+              lesson['debug'], '', '</details>', '']
     if lesson['id'] == '000':
         lines += ['先安装 Bun 扩展 `oven.bun-vscode`。若找不到 Bun，在 PROJECT 终端执行 `which bun`，将 runtime 换成实际绝对路径。', '']
     if plan['requirements']:
