@@ -91,7 +91,9 @@ def plan_for(lesson):
 
     if number in DEMOS:
         name, program = DEMOS[number]
-        add(bun_launch(name, program), '本节演示', program, '直接运行本节演示；测试框架不介入。')
+        # 005的入口要求显式文件参数，不能只给程序路径后让启动必然报用法错误。
+        arguments = {'args': ['package.json']} if number == '005' else {}
+        add(bun_launch(name, program, **arguments), '本节演示', program, '直接运行本节演示；测试框架不介入。' + ('读取本项目 package.json。' if number == '005' else ''))
         if number != '044':
             primary = name
             reason = '先用本节演示看完整动作，再用固定测试检查断言；演示和它直接导入的模块在同一个 Bun 进程。'

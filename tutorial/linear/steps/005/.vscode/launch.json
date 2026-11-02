@@ -28,7 +28,10 @@
         "--preload",
         "${workspaceFolder}/scripts/vscode-debug.mjs"
       ],
-      "stopOnEntry": false
+      "stopOnEntry": false,
+      "args": [
+        "package.json"
+      ]
     }
   ]
 }
