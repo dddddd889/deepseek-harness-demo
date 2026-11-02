@@ -43,14 +43,25 @@ else {
   }
   ipcMain.handle('desktop:info', () => ({ platform: process.platform, version: app.getVersion() }))
   process.on('SIGTERM', () => app.quit())
+  // 已持有单实例锁，用户再次启动应用时由当前实例接到通知；复用窗口而不另起Host。
+  // openWindow已有窗口时会show/focus；void仅忽略返回的Promise，不表示等待执行完成。
   app.on('second-instance', () => { void openWindow() })
+  // macOS点击Dock等操作会激活应用；address存在说明Host已就绪，才能加载窗口。
   app.on('activate', () => { if (address) void openWindow() })
+  // 所有窗口关闭后：Windows/Linux退出应用，macOS保留应用，允许之后从Dock重新打开。
+  // darwin是process.platform给macOS使用的内部名称；关窗口与退出应用不是一回事。
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+  // 准备退出时先收回本应用启动的Bun Host，避免窗口消失后留下后台业务进程。
   app.on('before-quit', event => {
+    // 清理后再次app.quit会重入这里；stopped允许第二次退出继续完成。
     if (stopped) return
+    // 本次退出先暂停；重复退出请求仍被拦住，但exiting保证清理逻辑只启动一次。
     event.preventDefault(); if (exiting) return; exiting = true
+    // 最多等5秒；超时强制结束Host再退出，不无限等待。强制结束不保证业务已完成落盘。
     const timer = setTimeout(() => { host?.kill('SIGKILL'); stopped = true; app.quit() }, 5000)
+    // 未启动Host或它已经正常报告退出时，无需继续等待。
     if (!host || host.exitCode !== null) { clearTimeout(timer); stopped = true; app.quit(); return }
+    // 先登记退出回调，再发SIGTERM；Host退出后解除保护计时并让Electron真正退出。
     host.once('exit', () => { clearTimeout(timer); stopped = true; app.quit() }); host.kill('SIGTERM')
   })
   app.whenReady().then(async () => { await startHost(); Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: '应用', submenu: [{ role: 'quit' }] }, { label: '调试', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }] }])); await openWindow() }).catch(error => { dialog.showErrorBox('启动失败', error.message); app.quit() })

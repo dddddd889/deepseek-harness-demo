@@ -340,6 +340,60 @@ HARNESS_VSCODE_DEBUG=1 env -u DEEPSEEK_API_KEY bun run desktop
 
 ## 11. 窗口关了，应用为什么还在？
 
+### 为什么要监听这四个事件？
+
+先列用户动作，再选生命周期事件。这些名字由Electron定义，app.on注册的函数在相应时机被调用；不是本项目随意命名的业务通知。可核对 [Electron app事件文档](https://github.com/electron/electron/blob/v44.7.0/docs/api/app.md#events)。
+
+| 事件 | 触发时机 | 本项目为什么监听 | 当前处理 |
+| --- | --- | --- | --- |
+| `second-instance` | 应用持有单实例锁，另一个实例尝试取得锁时，已有实例收到通知 | 避免重复启动两套窗口与Host | openWindow：已有窗口则show/focus |
+| `activate` | macOS激活应用，例如启动、重新打开、点击Dock图标 | 关窗后仍运行的应用需要能再次显示窗口 | address存在，即Host已有页面地址时，再openWindow |
+| `window-all-closed` | 所有窗口都已关闭 | 明确决定关完窗口是否等于退出应用 | 非darwin调用quit；macOS保留应用 |
+| `before-quit` | 常规退出流程准备关闭窗口之前 | 退出前收回自己启动的Bun Host | 暂停退出、清理Host，再发起真正退出 |
+
+这是本项目的产品行为选择，不是每个Electron应用都必须照抄的模板。darwin是Node/Electron给macOS使用的平台名称。
+
+```mermaid
+flowchart TD
+    U["用户动作"] --> S["再次启动应用"]
+    S --> L["单实例锁让新实例退出；已有实例收到second-instance"]
+    L --> O["openWindow：已有窗口显示并聚焦，否则创建窗口"]
+    U --> D["macOS启动或点击Dock激活"]
+    D --> A["activate：Host已有address才openWindow"]
+    A --> O
+    U --> C["关闭最后一个窗口"]
+    C --> W["window-all-closed"]
+    W --> P{"当前平台？"}
+    P -->|"macOS"| K["保留应用；之后可从Dock重新打开"]
+    P -->|"Windows/Linux"| Q["app.quit"]
+    U --> M["菜单退出或Cmd+Q"]
+    M --> Q
+    Q --> B["before-quit：先清理Host，再退出应用"]
+```
+
+second-instance对应前面的 `app.requestSingleInstanceLock()`：未拿到锁的新实例退出，由持锁实例响应。macOS通过Finder或Dock重新打开应用还涉及activate，不能认为所有系统的“启动第二次”只触发同一个事件。
+
+openWindow不是Electron API，是本项目自己的函数。`void openWindow()`会调用它，但不等待Promise；void不是异步错误处理。当前已有窗口分支执行show/focus，未额外实现最小化窗口的restore逻辑。
+
+### 不是每次退出都会先经过 window-all-closed
+
+直接通过app.quit或Cmd+Q退出时，不应期待再收到window-all-closed；不能把它当作所有退出路径的清理入口。本项目把常规清理放在before-quit。
+
+before-quit也不是崩溃保护：强制结束进程不会保证执行回调，Windows关机、重启或注销等情况也有事件限制。它帮助完成正常退出，不能代替业务持久化。自动更新quitAndInstall的退出顺序另有区别，这里解释的是常规quit路径。
+
+### before-quit 为什么又 preventDefault，又 app.quit？
+
+preventDefault先阻止本次默认退出，让Host有机会清理。清理后再次quit会重新进入回调，因此两个状态分别控制“清理只启动一次”和“允许真正退出”。
+
+| 状态 | 含义 | 再次收到退出请求时 |
+| --- | --- | --- |
+| exiting=false、stopped=false | 尚未清理 | 拦住退出，设置exiting并开始清理 |
+| exiting=true、stopped=false | 等待Host退出 | 仍拦住退出，不重复清理 |
+| stopped=true | 可以放行退出 | 直接返回，不再preventDefault |
+
+先注册Host的exit回调，再发SIGTERM，避免漏掉快速退出事件。正常退出回调取消5秒保护计时；超时分支发SIGKILL并放行退出，不保证业务已完成或日志已落盘。
+
+
 窗口关闭和应用退出是两件事。macOS 常见行为是关掉最后一个窗口后应用仍留在 Dock；本项目在 activate 时可以重新打开窗口，菜单“退出”才进入完整清理。
 
 ```mermaid
