@@ -6,6 +6,7 @@ import json
 import re
 from pathlib import Path
 from debugging import plan_for
+from chapter_map import CALLS, render_map, map_files
 
 ROOT = Path(__file__).resolve().parent
 ORIGINAL = ROOT.parents[1] / 'deepseek-harness'
@@ -20,6 +21,7 @@ def main():
     references = set()
     available = set()
     debug_sequences = 0
+    chapter_maps = 0
     for lesson in lessons:
         number = lesson['id']
         available.update(path.relative_to(ROOT / 'steps' / number).as_posix() for path in (ROOT / 'steps' / number).rglob('*') if path.is_file())
@@ -44,6 +46,14 @@ def main():
         if guide != lesson['guide']:
             raise ValueError(number + '说明与lessons.json不同步')
         text = (ROOT / 'lessons' / (number + '.md')).read_text()
+        if number in CALLS:
+            if render_map(lesson).strip() not in text:
+                raise ValueError(number + '缺少目录或文件调用图')
+            if text.index('## 先看目录与调用关系') > text.index('## 在哪里写、写什么'):
+                raise ValueError(number + '目录和调用图必须放在源码之前')
+            if any(path not in available for path in map_files(lesson)):
+                raise ValueError(number + '目录图出现未来文件')
+            chapter_maps += 1
         if '## 本节调试：选什么、为什么、怎么启动' not in text or 'id="lesson-debug-config"' not in text:
             raise ValueError(number + '缺少本节调试入口或配置锚点')
         if any('| ' + row[0] + ' |' not in text for row in plan['rows']):
@@ -100,7 +110,7 @@ def main():
         article = (ROOT / 'lessons' / (row['step'] + '.md')).read_text()
         if '\n' + source + '\n' + fence not in article:
             raise ValueError('教程缺少完整代码：' + str(path))
-    print(json.dumps({'lessons': len(lessons), 'sequenceDiagrams': len(lessons), 'debugLaunchFiles': len(lessons), 'debugStartupSequences': debug_sequences, 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'flowThenSequence': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
+    print(json.dumps({'lessons': len(lessons), 'sequenceDiagrams': len(lessons), 'debugLaunchFiles': len(lessons), 'debugStartupSequences': debug_sequences, 'chapterDirectoryMaps': chapter_maps, 'sourceDeltas': len(manifest), 'originalReferences': len(references), 'allGuideFieldsRendered': True, 'flowThenSequence': True, 'allCodeBlocksMatch': True, 'runtimeTestsExecuted': False}, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

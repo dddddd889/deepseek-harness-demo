@@ -7,6 +7,7 @@ import shlex
 from pathlib import Path
 from harness_links import link_harness_files
 from debugging import write_launch_files, render_debugging
+from chapter_map import render_map
 
 ROOT = Path(__file__).resolve().parent
 
@@ -34,6 +35,11 @@ def main():
                  '需要本章新文件的操作，先按下面代码创建文件，再执行；不要在上一步尚不存在的接口上试错。', '',
                  '## 代码为什么放在这一层', '', lesson['why'], '',
                  '## 在哪里写、写什么', '', '操作地点：终端中的 `$PROJECT`，编辑器打开同一个目录。只创建或替换下列文件，其他文件保留上一步版本。文件目录不存在先创建。']
+        # 复杂章节先给目录和调用图，再读动手步骤、补充场景与逐文件源码。
+        overview = render_map(lesson)
+        if overview:
+            position = lines.index('## 这一步具体做什么')
+            lines[position:position] = [overview, '']
         # 保留先前补充的具体例子；通用场景已放在最前，不再让补充说明挤掉本步用途。
         scenario = ROOT / 'scenarios' / f'{number}.md'
         if scenario.exists():

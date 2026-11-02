@@ -199,10 +199,25 @@ def plan_for(lesson):
             actions = [f'U->>D: 选择 {test_name}', f'D->>P: 启动 {lesson["test"]}',
                        f'P->>C: 启动或调用 {target}', 'Note over D,C: 当前调试器只连接父侧，F11 不跨进程',
                        'C-->>P: 返回结果、输出或退出状态', 'P-->>U: 本节断言与资源清理']
+    sequence = startup_sequence(actions) if actions else None
+    if number == '052':
+        # 桌面必须画出三个真实执行目标，不能把 Renderer 画成 Main 的同一调用栈。
+        sequence = '\n'.join([
+            'sequenceDiagram', '    actor U as 学习者与终端', '    participant D as VS Code 调试器',
+            '    participant M as Electron Main', '    participant H as Bun Host', '    participant R as Renderer 与 preload',
+            '    U->>M: 通过 Bun 启动器创建 Electron，开启 9229 和 9222',
+            '    U->>D: 附加 Electron：Main', '    D->>M: 连接 9229 并继续',
+            '    M->>H: startHost，spawn Bun 并开放 6499', '    H-->>M: 返回本次页面 URL',
+            '    M->>R: 创建窗口并加载 URL 与 preload',
+            '    U->>D: 再附加 Electron：Bun Host 与 Renderer',
+            '    D->>H: 连接 Bun Inspector', '    D->>R: 连接页面调试目标',
+            '    R->>H: Web 业务请求', '    H-->>R: 结果与事件',
+            '    U->>M: 关闭应用', '    M->>H: 等待 Host 清理退出',
+        ])
     return dict(id=number, primary=primary, launch=dict(version='0.2.0', configurations=configurations,
                 **({'inputs': inputs} if inputs else {})), rows=rows, reason=reason,
                 requirements=requirements, commands=commands,
-                sequence=startup_sequence(actions) if actions else None)
+                sequence=sequence)
 
 
 def write_launch_files(lessons):

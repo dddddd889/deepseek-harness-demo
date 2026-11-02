@@ -160,6 +160,8 @@ function linkProjectCode(container, path) {
   for (const code of container.querySelectorAll('code')) {
     if (code.closest('pre, a, .diagram')) continue;
     const reference = code.textContent.trim().replace(/^(?:\$PROJECT\/|\.\/|harness-own\/)/, '');
+    // 教材逐课给出专用调试配置，不把它自动链接到练习工程的累计配置。
+    if (lesson && reference === '.vscode/launch.json') continue;
     const target = aliases[reference] || reference;
     if (!available.has(target)) continue;
     const link = element('a', 'project-file-link');
