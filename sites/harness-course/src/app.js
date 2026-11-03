@@ -230,6 +230,7 @@ function createDiagram(pre, source, sequence) {
         if (sequence !== loadSequence || !canvas.isConnected) return;
         canvas.innerHTML = svg;
         bindFunctions?.(canvas);
+        bindCourseDiagramLinks(canvas, source);
         canvas.dataset.rendered = 'true';
       } catch (error) {
         canvas.textContent = `图表暂时无法渲染，可以展开下方源码。${error.message || ''}`;
@@ -250,6 +251,31 @@ async function copyHeadingUrl(link) {
     setTimeout(() => { if (link.isConnected) link.textContent = '链接'; }, 1600);
   } catch {
     link.title = '已定位到标题，可复制地址栏或右键复制链接地址';
+  }
+}
+
+// 仅把图中的声明映射到已打包课程，不启用Mermaid脚本或外部URL回调。
+function bindCourseDiagramLinks(canvas, source) {
+  const allowed = new Set([...course.chapters, ...course.documents].map((item) => item.path));
+  for (const match of source.matchAll(/^\s*%% course-link ([A-Za-z][A-Za-z0-9_]*) ([^\s]+)\s*$/gm)) {
+    const [, nodeId, destination] = match;
+    const [path, ...fragments] = destination.split('#');
+    if (!allowed.has(path)) continue;
+    // Mermaid严格模式会给SVG ID加图表前缀，按节点类型和稳定后缀查找。
+    const target = [...canvas.querySelectorAll('g.node[id],g.cluster[id]')].find((node) =>
+      node.classList.contains('cluster') ? node.id === nodeId || node.id.endsWith(`-${nodeId}`) : node.id.includes(`flowchart-${nodeId}-`));
+    if (!target) continue;
+    // 领域分组只链接标题，避免整个分组覆盖内部组件的点击目标。
+    const label = target.classList.contains('cluster') ? target.querySelector('.cluster-label') : target;
+    if (!label) continue;
+    const link = document.createElementNS('http://www.w3.org/2000/svg', 'a');
+    link.setAttribute('href', routeUrl(path, fragments.join('#')));
+    link.setAttribute('tabindex', '0');
+    link.setAttribute('aria-label', `打开课程说明：${destination}`);
+    link.classList.add('diagram-course-link');
+    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    title.textContent = `点击打开：${destination}`;
+    label.replaceWith(link); link.append(title, label);
   }
 }
 

@@ -93,7 +93,7 @@ def main():
         markdown = link_harness_files('\n'.join(lines).rstrip('\n') + '\n', number)
         (destination / f'{number}.md').write_text(markdown)
     (ROOT / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
-    index = ['# 连续步骤索引', '', '从000开始，每次只看下一步。所有步骤都在同一个PROJECT内累计，不切换路线。', '', '每页先看具体场景、文本调用链及紧接着的时序图，再看当前接线位置，按文件写代码；运行和VS Code断点都有具体预期。末尾逐项说明与本地固定原版的差距，不把独立模块或测试当成完整产品能力。', '']
+    index = ['# 连续步骤索引', '', '先看[系统总览：领域、组件与课程拼图](ARCHITECTURE.md)。', '', '从000开始，每次只看下一步。所有步骤都在同一个PROJECT内累计，不切换路线。', '', '每页先看具体场景、文本调用链及紧接着的时序图，再看当前接线位置，按文件写代码；运行和VS Code断点都有具体预期。末尾逐项说明与本地固定原版的差距，不把独立模块或测试当成完整产品能力。', '']
     index += [f'- [{row["id"]} · {row["title"]}](lessons/{row["id"]}.md)（{row["phase"]}）' for row in lessons]
     (ROOT / 'INDEX.md').write_text('\n'.join(index) + '\n')
     print(f'已生成 {len(lessons)} 个连续可运行步骤，{len(manifest)} 次文件增量。')

@@ -55,3 +55,8 @@ body[data-theme="dark"] .diagram-canvas{background:#fffefa;color:#344537}
 .markdown-body .heading-permalink{display:inline-block;margin-left:.65em;padding:2px 5px;border-radius:4px;font-size:11px;font-weight:400;letter-spacing:0;vertical-align:middle;white-space:nowrap;text-decoration:none;opacity:.65}
 .markdown-body .heading-permalink:hover,.markdown-body .heading-permalink:focus-visible{opacity:1;background:var(--code);outline:1px solid var(--green)}
 .toc-h5,.toc-h6{padding-left:24px}
+
+/* 图内链接支持鼠标和键盘，边界不覆盖组件文字。 */
+.diagram-course-link{cursor:pointer}
+.diagram-course-link:hover .label,.diagram-course-link:focus .label{text-decoration:underline}
+.diagram-course-link:focus-visible{outline:2px solid var(--green)}
