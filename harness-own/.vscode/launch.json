@@ -19,8 +19,8 @@
       "request": "launch",
       "program": "${file}",
       "runtimeArgs": [
-        "--timeout",
-        "0"
+        "--preload",
+        "${workspaceFolder}/scripts/vscode-debug.mjs"
       ],
       "cwd": "${workspaceFolder}",
       "runtime": "bun"
