@@ -179,3 +179,176 @@ bun --inspect-brk=127.0.0.1:6510/questions-023 tutorial/linear/examples/023-ques
 这是本机单会话、内存状态、轮询页面的教学实验；问题不是模型生成，也没有接入现有Host、Journal或工具权限守卫。刷新页面可以重新看到当前未结算问题，但重启服务不能恢复。持久问答还需要定义重启时未答问题的恢复方式和迟答处理，不能只序列化Promise。生产接入还应补齐认证、输入大小限制、并发与连接故障策略。
 
 固定原版分别提供[user-questions](../../../deepseek-harness/packages/interaction/user-questions/README.zh.md)与[tool-ask-user](../../../deepseek-harness/packages/interaction/tool-ask-user/README.zh.md)，本实验不是其完整协议复刻。
+
+## 9. 持久问答：问题、回答、取消和超时怎样进入eventlog
+
+本节以下内容是接入Journal时的设计教程，不是前面内存示例已经实现的行为。事件名是教程建议，不是固定原版协议。eventlog保存事实，pending中的Promise、resolve/reject、计时器和AbortSignal只属于当前进程，不能直接JSON序列化后恢复。
+
+### 9.1 两类问答事件，加一条工具结果
+
+建议使用question/asked记录问题，用question/settled统一记录四类结算，避免先写answered、再写settled造成两个事件之间的空隙：
+
+| 事件 | 关键字段 | 作用 |
+| --- | --- | --- |
+| question/asked | questionId、toolCallId、turnId、owner、question、deadlineAt | 保存问题全文、稳定选项ID、所属会话、关联调用与绝对截止时间 |
+| question/settled，status=answered | questionId、toolCallId、owner、value | 保存经服务端校验的结构化答案 |
+| question/settled，status=cancelled | questionId、toolCallId、owner、reason | 保存取消问答，无答案值 |
+| question/settled，status=timed_out | questionId、toolCallId、owner | 保存超时，无答案值 |
+| question/settled，status=interrupted | questionId、toolCallId、owner、reason | 保存任务中止或重启后的中断处理 |
+| message/tool | role、callId、name、content | Loop把调用结果交给后续模型请求 |
+
+“用户取消问答”和“取消整个任务”分别用cancelled与interrupted表达。按钮取消不会自动授权工具，超时也不能默认选择第一项。以前示意的question/answered是另一种命名选择；本节统一使用question/settled加status，不要求两种格式同时写。
+
+下面展示事件的type/data部分，实际外层format、sessionId、seq和time仍由Events.append生成：
+
+```javascript
+// 示例数据结构，不是给当前内存Questions增加一个publish回调就能完成持久化。
+const asked = {
+  type: 'question/asked',
+  data: {
+    questionId: 'question_123',
+    toolCallId: 'call_456',
+    turnId: 'turn_789',
+    owner: 'session_owner',
+    deadlineAt: 1900000120000, // 绝对毫秒时间示意，不能每次重启重新加两分钟。
+    question: {
+      kind: 'single',
+      title: '选择数据库',
+      options: [
+        { id: 'sqlite', label: 'SQLite' },
+        { id: 'postgres', label: 'PostgreSQL' },
+      ],
+    },
+  },
+}
+
+// 单选值是ID，多选是ID数组，文本是字符串；都先校验再保存。
+const answered = {
+  type: 'question/settled',
+  data: {
+    questionId: 'question_123', toolCallId: 'call_456',
+    owner: 'session_owner', status: 'answered', value: 'sqlite',
+  },
+}
+```
+
+owner不是信任浏览器发来的字符串，而是接入层依据会话权限确定的身份。服务端要用已记录的question验证答案，不用客户端随答案附带的选项替换原问题。
+
+### 9.2 顺序：先写成功事实，再让用户或调用方看到成功
+
+```mermaid
+sequenceDiagram
+    participant T as ask_user工具调用
+    participant Q as 持久问答服务
+    participant J as Events与Journal
+    participant U as 页面
+    participant L as Loop
+    T->>Q: request问题、所属会话与取消信号
+    Q->>Q: 登记本进程等待对象
+    Q->>J: append question/asked，含deadlineAt
+    J->>J: 追加JSONL并fsync
+    J-->>U: 落盘成功后推送问题
+    Note over T,Q: 原工具调用等待；问题正文已可从日志重建
+    alt 用户提交有效答案
+        U->>Q: questionId与结构化答案
+        Q->>Q: 校验归属、选项、截止时间、未结算状态
+        Q->>J: append settled，status为answered
+    else 用户取消问答
+        U->>Q: 取消指定questionId
+        Q->>J: append settled，status为cancelled
+    else 截止时间到达
+        Q->>Q: 依据持久deadlineAt判断
+        Q->>J: append settled，status为timed_out
+    else 整个任务中止
+        Q->>J: append settled，status为interrupted
+    end
+    J->>J: fsync结算事实
+    J-->>Q: 确认已提交
+    Q->>Q: 清理pending、计时器与取消监听
+    Q-->>T: 返回状态或抛任务中止错误
+    J-->>U: 更新问题状态并关闭旧卡
+    T-->>L: 返回结构化结果，或交由错误路径处理
+    L->>J: 写message/tool或相应工具失败结果
+    Note over L,J: 取消任务时也可能直接结束回合，不保证一定再请求模型
+```
+
+这里的重点是：结算事件持久化成功后，才能确认HTTP/RPC答复成功、清除等待状态并唤醒调用者。页面重复提交、用户回答与计时器竞争，都必须在同一会话写入者中串行判定，只允许第一个合法终态提交。截止后才送达的答案不能因为计时器回调尚未运行而被接受；处理答案时也要比较deadlineAt。
+
+对可能由发布监听器同步触发的重复回答，还要有“正在结算”保护，避免第一次append尚未返回时重入。单进程Map检查不等于多进程并发控制；本教程Journal的独占锁只是阻止两个写入者同时打开该日志，不提供分布式事务。
+
+**不能把当前示例的publish直接换成写盘函数就宣称完成。** questions.mjs的finish先删除pending，而且会捕获结算publish异常后继续返回答案；这对内存展示容错适用，却不能保证结算落盘。持久版本需要单独的提交步骤，提交失败不得按成功继续。若写入或fsync失败导致提交状态不确定，应暂停该会话写入并重读确认，不盲目追加第二份答案。
+
+### 9.3 message/tool与问答结算为何都需要
+
+question/asked与question/settled用于恢复页面状态、审计和拒绝迟答；message/tool用于模型历史。它们关联同一次工具调用，但不是同一条记录：问答事件在这里命名为toolCallId，当前教程Loop的message/tool字段名实际是callId，值必须对应。不要把模型提供方协议里的tool_call_id误写成教程内部字段。
+
+```javascript
+// 回答已经持久提交后，工具返回值才可进入Loop的工具结果路径。
+const result = { status: 'answered', value: 'sqlite' }
+
+// 示意当前教程的模型消息结构；工具调用记录必须能关联同一个ID。
+session.append('message/tool', {
+  role: 'tool',
+  callId: 'call_456',
+  name: 'ask_user',
+  content: result,
+})
+```
+
+仅记录question/settled不会自动让模型看到答案：当前messages投影只接受message/user、message/assistant与message/tool。模型可见路径参考[031的Skill补充](../lessons/031.md)，同样要区分日志事实与请求消息。
+
+## 10. 重启后恢复什么：先恢复状态，再决定怎样继续任务
+
+### 10.1 从日志投影待答问题
+
+重开会话后，先由Journal读取有效的完整事件，再按seq从前到后建立问题状态：遇到asked创建待答项；遇到settled将其改成终态。可保留已结算记录用于显示和审计，待答索引中只放尚未结算的问题。重复终态或引用不存在问题的结算应明确报告数据异常，不默默用后一条覆盖前一条。
+
+恢复时检查原deadlineAt：已过期的未结算问题由拥有写权限的恢复流程追加timed_out事件，不能只在页面上隐藏；尚未过期才有资格按所选恢复策略继续。不要每次启动重新给完整等待时长。已回答、取消、超时和中断的问题，都不能再次作为新问题接受回答。
+
+```mermaid
+flowchart TD
+    Start[重开持久会话] --> Read[Journal读取完整事件，检查序号]
+    Read --> State[按asked与settled重建问题投影]
+    State --> Ended{问题已经结算吗}
+    Ended -->|是| Keep[保留终态，不重开原等待]
+    Ended -->|否| Expired{原deadlineAt已过期吗}
+    Expired -->|是| Timeout[追加timed_out并关闭旧问题]
+    Expired -->|否| Policy{采用哪种恢复策略}
+    Policy -->|本教程建议的初始方案| Interrupt[记录interrupted，旧轮次不自动继续]
+    Policy -->|另行实现可恢复问答| Reattach[重建新等待对象，绑定原问题ID与剩余时间]
+    Reattach --> Revalidate[验证会话、工具调用与轮次状态后，允许重新展示和答复]
+```
+
+### 10.2 第一版建议：中断旧调用，显式重新开始
+
+当前041 Host发现未结束回合时会记录interrupted，且不自动重放工具；因此最容易与已有实现保持一致的方案是：先处理到期问题，其余未结算问题记录interrupted，页面显示“服务重启，原问题已中断”。用户明确继续后，由新一轮创建新问题ID，旧卡答案被拒绝。
+
+这不等于恢复原任务，但能明确告诉用户发生了什么，也不把上次已经执行的其他工具再运行一遍。要采用“保持原问题等待”的策略，需要改变Host目前的恢复行为，不能只恢复Questions.pending就宣称支持。
+
+### 10.3 进阶方案：可恢复问答需要显式续接，不是恢复旧Promise
+
+若产品要求重启后继续原问题，需要把等待点设计成可恢复状态机：记录关联调用、轮次与截止时间；启动时重新创建等待对象并绑定原questionId；确认该工具调用仍被允许继续；答案提交后通过明确的恢复入口交给执行器。新的Promise可以承接新建立的等待，但旧进程中的函数调用栈已经不存在。
+
+已经落盘的答案也不保证Loop来得及记录message/tool。必须检查关联工具结果是否已经提交，并按恢复协议补交或报告中断；不能只根据pending里没有记录就重新运行整个工具。
+
+| 崩溃发生的位置 | 日志可能有什么 | 恢复时应判断什么 |
+| --- | --- | --- |
+| asked落盘前 | 没有问题事实 | 不显示一张仅在内存中出现过的旧卡 |
+| asked落盘后、用户未回答 | 只有asked | 检查deadlineAt，再按中断或续接策略处理 |
+| settled落盘后、旧Promise未唤醒 | 已有答案或其他终态 | 终态有效，不允许用户再回答，不依赖旧resolve是否执行 |
+| answered落盘后、message/tool未落盘 | 有用户答案，无模型工具结果 | 通过明确恢复逻辑处理关联调用，不重放已有副作用 |
+| message/tool已经落盘 | 问答终态与工具结果都有 | 不重复写结果、不重复注入答案，按Host恢复策略继续或中断 |
+
+本方案中asked、settled和message/tool是不同提交，不假设存在跨事件原子事务。若恢复代码可能多次运行，需要用questionId与toolCallId检查已提交事实，并限制会话写入所有权；只靠前端隐藏按钮无法实现。
+
+### 10.4 日志文件损坏、锁文件与“刷新页面”也要区分
+
+浏览器刷新只丢页面内存，服务未退出时原Promise仍在；服务重启才需要重建投影和决定调用恢复。本实验仍是内存版本，实际运行它重启不会保留上述记录。
+
+持久方案还依赖[006日志恢复](../lessons/006.md)：Journal只截断末尾无完整换行的残留，不自动修复中间坏行。崩溃可能留下独占锁文件，必须核实原写入者已经退出后再处理，不能为重开问答直接删除仍在使用的锁。
+
+### 10.5 与原版事件语义的边界
+
+本节question/asked与question/settled是建议格式。固定原版user-questions/tool-ask-user具有自己的工具结果和持续待答机制；正常同步回答可以进入工具结果，已转为持续待答问题的后续答案可由user/message、source.kind=user-question-reply及callId关联。不要把本节事件名、超时即关闭或重启中断策略套成原版现有协议。
+
+本次新增内容没有给内存示例实现Journal、事件回放或进程崩溃测试；上文是下一步持久化设计与应补验收场景。后续实现至少应覆盖四种结算、迟答与竞争、两次重启不延长截止时间，以及“答案已落盘而工具结果未落盘”的故障窗口。
