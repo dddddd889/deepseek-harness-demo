@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><title>023 用户问答演示</title>
+<style>body{font:16px/1.7 system-ui;max-width:720px;margin:50px auto;padding:16px}button{padding:8px 14px;margin:6px}dialog{min-width:320px;border:1px solid #aaa;border-radius:12px}label{display:block;padding:8px}pre{white-space:pre-wrap}#error{color:#b42318}</style>
+<h1>023：问答与权限审批分开</h1><p>启动任务后，调用方等待你的答案。此示例不调用模型。</p>
+<button data-kind="single">单选问答</button><button data-kind="multiple">多选问答</button><button data-kind="text">文本问答</button><button id="abort">取消整个任务</button>
+<pre id="result">尚未开始</pre>
+<dialog id="question"><h2 id="title"></h2><form id="form"><div id="fields"></div><p id="error" role="alert"></p><button type="submit">提交回答</button><button type="button" id="cancel">取消问答</button></form></dialog>
+<script>
+// 本页仅使用文本节点绘制服务端问题，不把问题内容当HTML执行。
+const dialog = document.querySelector('#question'), fields = document.querySelector('#fields')
+let current
+/** 发起同源请求，并把错误留在页面供学习者观察。 */
+async function post(path, data) {
+  const response = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
+  const result = await response.json()
+  if (!response.ok) throw Error(result.error)
+  return result
+}
+/** 轮询用于压低演示复杂度，实际产品可换成会话事件推送。 */
+async function refresh() {
+  const state = await (await fetch('/state')).json()
+  document.querySelector('#result').textContent = JSON.stringify(state.result ?? { running: state.running }, null, 2)
+  if (!state.question) { if (dialog.open) dialog.close(); current = undefined; return }
+  if (current?.id === state.question.id) return
+  current = state.question
+  fields.replaceChildren(); document.querySelector('#error').textContent = ''
+  document.querySelector('#title').textContent = current.title
+  if (current.kind === 'text') {
+    const input = document.createElement('input'); input.name = 'answer'; input.required = true; input.maxLength = 2000; input.setAttribute('aria-label', '项目名称'); fields.append(input)
+  } else for (const option of current.options) {
+    const label = document.createElement('label'), input = document.createElement('input')
+    input.type = current.kind === 'single' ? 'radio' : 'checkbox'; input.name = 'answer'; input.value = option.id
+    label.append(input, document.createTextNode(option.label)); fields.append(label)
+  }
+  if (!dialog.open) dialog.showModal()
+}
+/** 提交结构化答案；取消问答不会伪装成某个选项。 */
+async function answer(value) {
+  try { await post('/answer', { id: current.id, answer: value }); await refresh() }
+  catch (error) { document.querySelector('#error').textContent = error.message }
+}
+document.querySelector('#form').addEventListener('submit', event => {
+  event.preventDefault()
+  const values = new FormData(event.target).getAll('answer')
+  void answer({ status: 'answered', value: current.kind === 'multiple' ? values : values[0] })
+})
+document.querySelector('#cancel').onclick = () => answer({ status: 'cancelled' })
+dialog.addEventListener('cancel', event => { event.preventDefault(); void answer({ status: 'cancelled' }) })
+for (const button of document.querySelectorAll('[data-kind]')) button.onclick = async () => {
+  try { await post('/tasks', { kind: button.dataset.kind }); await refresh() }
+  catch (error) { document.querySelector('#result').textContent = error.message }
+}
+document.querySelector('#abort').onclick = async () => { await post('/cancel-task', {}); await refresh() }
+setInterval(() => { void refresh().catch(error => { document.querySelector('#result').textContent = error.message }) }, 300)
+void refresh()
+</script></html>
