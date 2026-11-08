@@ -31,7 +31,7 @@ flowchart TD
     Start[页面点击单选、多选或文本按钮] --> Task[HTTP启动runTask并提交Agent]
     Task --> Tool[固定模型请求ask_user，Loop调用Tools.execute]
     Tool --> Q[工具run调用Questions.request先登记pending]
-    Q --> Wait[runTask暂停在await]
+    Q --> Wait[ask_user工具暂停在await]
     Q --> State[发布question/request，保存演示状态]
     State --> Dialog[页面轮询state并打开dialog]
     Dialog --> Answer[POST答案，携带问题ID]
@@ -39,7 +39,7 @@ flowchart TD
     Check -->|合法| Finish[删除pending，清理计时器和监听]
     Check -->|非法| Retry[保留原问题，页面显示错误]
     Retry --> Dialog
-    Finish --> Continue[resolve答案，runTask继续]
+    Finish --> Continue[resolve答案，工具返回，Loop继续]
 ```
 
 ## 3. 直接运行，看到真实弹窗
@@ -99,7 +99,7 @@ if (answer.status === 'answered') {
 
 ```mermaid
 sequenceDiagram
-    participant T as 任务runTask
+    participant T as ask_user工具run
     participant Q as Questions
     participant H as 本机HTTP服务
     participant P as 浏览器dialog
