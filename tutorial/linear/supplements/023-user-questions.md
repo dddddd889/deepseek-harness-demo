@@ -352,3 +352,123 @@ flowchart TD
 本节question/asked与question/settled是建议格式。固定原版user-questions/tool-ask-user具有自己的工具结果和持续待答机制；正常同步回答可以进入工具结果，已转为持续待答问题的后续答案可由user/message、source.kind=user-question-reply及callId关联。不要把本节事件名、超时即关闭或重启中断策略套成原版现有协议。
 
 本次新增内容没有给内存示例实现Journal、事件回放或进程崩溃测试；上文是下一步持久化设计与应补验收场景。后续实现至少应覆盖四种结算、迟答与竞争、两次重启不延长截止时间，以及“答案已落盘而工具结果未落盘”的故障窗口。
+
+## 11. await等待时，谁接收回答？pending与resolve怎样关联？
+
+### 11.1 两条执行链，共用同一个Questions实例
+
+await只暂停当前异步函数，等待尚未完成的Promise时会交还执行权。它不会把整个Bun进程、HTTP服务或JS事件循环一起暂停。因此任务可以等待，而服务继续处理页面的回答请求。
+
+| 执行链 | 入口 | 等待与继续的位置 |
+| --- | --- | --- |
+| A：任务提出问题 | server.mjs的runTask | await questions.request暂停；Promise结算后继续 |
+| B：用户提交回答 | HTTP的POST /answer | 调用同一个questions.answer，通过问题ID找到等待者 |
+
+本例不是一个线程强行打断另一个线程，也不是轮询某个answered变量。页面轮询/state只是刷新显示；服务端恢复任务依靠Promise结算。两个入口必须访问同一份pending；每个HTTP请求都new Questions会导致查不到原问题。跨进程部署时也不能把resolve函数随网络发送，要把回答路由回拥有该等待对象的进程，或使用第10节明确的恢复协议。
+
+### 11.2 questionId是钥匙，finish闭包保留resolve与reject
+
+实际questions.mjs没有把resolve直接放进Map，而是保存一个包装它的finish：
+
+```text
+本次request创建的Promise
+    ├── resolve：使等待成功结束
+    └── reject：使等待以错误结束
+              ↑ 被finish闭包引用
+pending[questionId] = { owner, question, finish }
+              ↑
+answer(owner, questionId, answer)按ID找到这一项
+              ↓
+finish → 清理 → resolve(answer)或reject(error)
+```
+
+不同问题各有自己的Promise和闭包，不能只保存一个全局resolve，否则后来的问题会覆盖前一个等待。owner校验负责回答“谁可以答”，questionId负责回答“答哪一次问题”，选项校验负责回答“这个答案是否合法”。
+
+下面摘取实际内存实现的关键部分，省略问题结构检查、计时器和发布异常处理；完整可运行版本仍是[questions.mjs](../examples/023-questions/questions.mjs)：
+
+```javascript
+// request内部：每调用一次，创建属于本次问题的Promise。
+return new Promise((resolve, reject) => {
+  // finish闭包持有本次resolve/reject，之后HTTP回调仍可通过Map间接调用。
+  const finish = (answer, error) => {
+    // 先删除保证重复回答不能再次进入结算；完整实现还清理计时器与取消监听。
+    if (!this.pending.delete(id)) return
+    if (error) reject(error)
+    else resolve(answer)
+  }
+
+  // 先登记，再发布；即使publish同步触发回答，也能找到本次等待。
+  this.pending.set(id, { owner, question: snapshot, finish })
+  this.publish({ type: 'question/request', id, owner, question: snapshot })
+})
+```
+
+回答入口的关键部分：
+
+```javascript
+// answer内部：这是HTTP回调触发的另一条执行链，不需要原任务先结束。
+const pending = this.pending.get(id)
+if (!pending || pending.owner !== owner) {
+  throw Error('问题不存在或不属于当前会话')
+}
+
+// 完整实现还检查status、单选ID、多选数组和文本长度。
+// 调用保存的finish，即调用了原request闭包里的resolve。
+pending.finish({ status: 'answered', value: structuredClone(answer.value) })
+```
+
+上面是内存版的清理顺序，不是第9节持久化提交算法。持久版本需要先提交答案事实、确认成功，再结束等待；不能照搬先删除pending的顺序就声称已经可靠落盘。
+
+### 11.3 双向响应时序
+
+```mermaid
+sequenceDiagram
+    participant T as 链路A：runTask或工具调用
+    participant Q as 共享Questions与pending
+    participant E as JS事件循环
+    participant H as 链路B：HTTP回答回调
+    participant P as 浏览器
+    T->>Q: request创建Promise
+    Q->>Q: 创建finish闭包，保留resolve与reject
+    Q->>Q: pending按questionId保存finish
+    Q-->>P: 发布问题后由页面显示
+    T-->>E: await未完成Promise，任务暂停并交还执行权
+    P->>H: POST /answer，questionId与答案
+    E->>H: 调度回答请求处理
+    H->>Q: answer校验owner与答案
+    Q->>Q: 按ID取finish，清理并resolve答案
+    Note over Q,H: 若采用持久方案，必须先成功提交结算事实
+    H-->>E: 当前同步调用栈结束
+    E->>T: 调度Promise后续，执行await后代码
+    T->>T: 获得结构化答案，继续任务
+    H-->>P: HTTP回执确认接收处理结果
+    Note over T,P: 任务继续和页面看到回执的先后不作为保证
+```
+
+resolve不会同步跳进原任务执行栈，它使Promise结算，await后续由微任务调度执行。对于本例返回普通答案对象的resolve，当前同步调用栈先完成，任务后续才恢复。因此不需要让工具主动跳出循环，再通过特殊跳转进入answered处理。
+
+在真实Agent中，被等待的是Loop里的某次工具执行；外部HTTP或RPC接收循环必须仍然独立接收回答。若把接收循环写成“读到提问请求后同步等整个工具执行完，才读下一条回答”，会造成双方互等。单独的Questions登记簿不能修复这个传输层阻塞，需要让消息接收继续运转。
+
+### 11.4 JS写法中，什么才会把回答卡住？
+
+```javascript
+// 正确：Promise未完成时，当前函数等待，但服务可以继续处理请求。
+const answer = await questions.request(owner, question, signal)
+
+// 错误示意：不要在示例中运行，会持续占用JS线程。
+// while (!answered) {}
+```
+
+长时间同步计算、同步阻塞或死循环都可能使HTTP回调、超时和取消处理无法及时执行。await并不把任意代码自动变成后台线程；只有执行到异步等待并交还控制后，其他回调才有机会运行。
+
+事件与唤醒也要区分：session.append('question/settled', ...)只记录事实，除非另有明确订阅接线，否则不会自动resolve。反过来，resolve只恢复本进程的等待，不会自动把答案写入Journal。持久问答服务必须显式组织这两个动作。
+
+### 11.5 跟着现有示例验证
+
+1. 启动server.mjs并打开页面，在questions.mjs的pending.set处断点，观察id及本次finish。
+2. 在server.mjs的await questions.request之后设断点，发起单选问题。提交答案前，这个断点不应命中；页面仍能通过/state取得待答问题。
+3. 在answer的pending.get与pending.finish处断点，页面提交后确认使用的是同一个questionId和Questions对象。
+4. 继续执行finish，看到pending删除，然后才命中原任务await后的代码。调试时如果整个服务被断点暂停，HTTP也会等待，需继续服务；这与普通await暂停任务不同。
+5. 再次提交旧ID会被拒绝；取消、超时通过同一finish清理。已有questions.test.mjs覆盖同步回答、重复回答、取消、超时，以及HTTP回答后runTask继续。
+
+本节没有新增第二套问答实现，也没有改动实际工具或持久化行为；它解释当前可运行示例如何关联等待与答案。服务重启后Map和闭包均消失，仍须按第10节处理，而不是从eventlog中反序列化resolve。
