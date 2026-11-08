@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><meta charset="utf-8"><title>023 用户问答演示</title>
 <style>body{font:16px/1.7 system-ui;max-width:720px;margin:50px auto;padding:16px}button{padding:8px 14px;margin:6px}dialog{min-width:320px;border:1px solid #aaa;border-radius:12px}label{display:block;padding:8px}pre{white-space:pre-wrap}#error{color:#b42318}</style>
-<h1>023：问答与权限审批分开</h1><p>启动任务后，调用方等待你的答案。此示例不调用模型。</p>
+<h1>023：问答与权限审批分开</h1><p>启动任务后，固定演示模型调用ask_user工具；回答作为工具结果送回第二次模型请求。不调用外部API。</p>
 <button data-kind="single">单选问答</button><button data-kind="multiple">多选问答</button><button data-kind="text">文本问答</button><button id="abort">取消整个任务</button>
 <pre id="result">尚未开始</pre>
 <dialog id="question"><h2 id="title"></h2><form id="form"><div id="fields"></div><p id="error" role="alert"></p><button type="submit">提交回答</button><button type="button" id="cancel">取消问答</button></form></dialog>

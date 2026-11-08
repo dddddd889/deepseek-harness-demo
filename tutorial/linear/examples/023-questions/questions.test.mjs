@@ -63,9 +63,46 @@ test('真实HTTP启动任务、提交答案并观察调用方继续', async () =
     const state = await (await fetch(new URL('/state', base))).json()
     assert.equal(state.running, true)
     assert.equal((await post('/answer', { id: state.question.id, answer: { status: 'answered', value: 'sqlite' } })).status, 200)
+    // 回答HTTP成功与Agent完成不要求同一时刻；等待真实执行收敛后检查模型历史。
+    await app.runtime.agent.idle()
     const finished = await (await fetch(new URL('/state', base))).json()
     assert.equal(finished.running, false)
     assert.equal(finished.result.answer.value, 'sqlite')
+    assert.equal(finished.result.toolResult.name, 'ask_user')
+    assert.equal(finished.result.toolResult.content.ok, true)
+    assert.equal(finished.result.modelRequests, 2)
+    assert.equal(finished.result.reason, 'completed')
+    const requests = app.runtime.session.read().filter(event => event.type === 'request/start')
+    assert.ok(requests[0].data.tools.some(tool => tool.name === 'ask_user'))
+    const toolMessage = requests[1].data.messages.findLast(message => message.role === 'tool')
+    assert.equal(toolMessage.callId, finished.result.toolResult.callId)
+    assert.equal(toolMessage.content.value.value, 'sqlite')
+    assert.match(finished.result.message, /sqlite/)
     assert.equal((await post('/answer', { id: state.question.id, answer: { status: 'answered', value: 'pg' } })).status, 400)
+  } finally { await app.close() }
+})
+
+test('取消Agent中止工具等待，下一轮取消问答则作为工具结果回传模型', async () => {
+  const app = startDemo(), base = app.server.url
+  const post = (path, body) => fetch(new URL(path, base), { method: 'POST', headers: { origin: base.origin, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  try {
+    await post('/tasks', { kind: 'single' })
+    // HTTP读取state确认工具已经进入待答阶段，再中止整个Agent回合。
+    assert.ok((await (await fetch(new URL('/state', base))).json()).question)
+    await post('/cancel-task', {})
+    await app.runtime.agent.idle()
+    const cancelled = await (await fetch(new URL('/state', base))).json()
+    assert.equal(cancelled.question, null)
+    assert.equal(cancelled.result.reason, 'cancelled')
+    assert.equal(cancelled.result.modelRequests, 1)
+    // 单独取消问答是正常工具结果，Agent仍能发第二次模型请求。
+    await post('/tasks', { kind: 'text' })
+    const pending = await (await fetch(new URL('/state', base))).json()
+    await post('/answer', { id: pending.question.id, answer: { status: 'cancelled' } })
+    await app.runtime.agent.idle()
+    const finished = await (await fetch(new URL('/state', base))).json()
+    assert.equal(finished.result.answer.status, 'cancelled')
+    assert.equal(finished.result.modelRequests, 2)
+    assert.equal(finished.result.reason, 'completed')
   } finally { await app.close() }
 })

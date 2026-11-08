@@ -1,6 +1,6 @@
 # 023补充：从单选弹窗到调用方继续执行
 
-返回[023 · 一次审批只唤醒一次调用](../lessons/023.md)。本教程在Approvals基础上增加一个独立问答实验：用本机页面实际回答问题，观察原来停在await处的函数继续执行。示例没有调用模型、没有接真实Host，也不改变023基础测试。
+返回[023 · 一次审批只唤醒一次调用](../lessons/023.md)。本教程在Approvals基础上增加一个独立问答实验：用本机页面实际回答问题，观察原来停在await处的函数继续执行。示例现在复用真实Agent、Loop、Tools与固定演示模型；没有接Host、Journal或外部模型API，也不改变023基础测试。
 
 ## 1. 先确定需要哪种用户交互
 
@@ -18,17 +18,19 @@
 ```text
 examples/023-questions/
 ├── questions.mjs       # Questions登记簿：等待、校验、回答、取消与超时
-├── server.mjs          # Bun HTTP入口，启动演示任务
+├── ask-user-tool.mjs   # 注册ask_user工具，装配真实Agent与固定模型
+├── server.mjs          # Bun HTTP入口，提交任务给Agent
 ├── index.html          # 原生dialog；单选radio、多选checkbox、文本input
 └── questions.test.mjs  # 生命周期测试与真实HTTP集成测试
 ```
 
-完整源码：[Questions](../examples/023-questions/questions.mjs)、[本机服务](../examples/023-questions/server.mjs)、[页面](../examples/023-questions/index.html)、[测试](../examples/023-questions/questions.test.mjs)。这些是补充实验文件，已经有中文注释；没有把它们加入累计工程的Agent工具表。
+完整源码：[工具注册与Agent装配](../examples/023-questions/ask-user-tool.mjs)、[Questions](../examples/023-questions/questions.mjs)、[本机服务](../examples/023-questions/server.mjs)、[页面](../examples/023-questions/index.html)、[测试](../examples/023-questions/questions.test.mjs)。这些是补充实验文件，已经有中文注释；它们在独立演示的Tools中注册ask_user，没有自动修改累计Host的工具表。
 
 ```mermaid
 flowchart TD
-    Start[页面点击单选、多选或文本按钮] --> Task[HTTP启动runTask]
-    Task --> Q[Questions.request先登记pending]
+    Start[页面点击单选、多选或文本按钮] --> Task[HTTP启动runTask并提交Agent]
+    Task --> Tool[固定模型请求ask_user，Loop调用Tools.execute]
+    Tool --> Q[工具run调用Questions.request先登记pending]
     Q --> Wait[runTask暂停在await]
     Q --> State[发布question/request，保存演示状态]
     State --> Dialog[页面轮询state并打开dialog]
@@ -53,7 +55,7 @@ bun tutorial/linear/examples/023-questions/server.mjs
 1. 点击“单选问答”，选择SQLite并提交，页面结果应为status:answered、value:sqlite。
 2. 点击“多选问答”，勾选两个选项，结果value应是数组。
 3. 点击“文本问答”，输入项目名称并提交，结果value是字符串。
-4. 再启动一个问题，点“取消问答”或按Escape，结果为cancelled，调用方结束等待并决定后续动作。
+4. 再启动一个问题，点“取消问答”或按Escape，答案status为cancelled，工具返回后固定模型收到该状态，回合正常结束。
 5. 超过默认两分钟不答，结果为timed_out；需要观察快速超时，用测试中的短预算。
 6. 在没有弹窗阻挡时可点击“取消整个任务”；自动测试直接验证任务AbortSignal中止。模态弹窗打开时，外层按钮不可点击，这是dialog的正常行为。
 7. 终端Ctrl+C退出。服务先中止等待，再关闭监听；演示数据仅在内存，重启不会恢复问题。
@@ -77,7 +79,7 @@ const question = {
 const answer = { status: 'answered', value: 'sqlite' }
 ```
 
-调用方使用await等待结果。示例server.mjs的runTask执行的就是这条路径：
+工具处理函数使用await等待结果。示例ask-user-tool.mjs中的run执行这条路径，server.mjs的runTask则提交Agent并等待agent.idle()：
 
 ```javascript
 // questions和signal由任务拥有者提供；这里展示接入方式。
@@ -125,30 +127,57 @@ sequenceDiagram
 
 登记必须先于发布：如果publish回调立即答复，pending和清理函数应已经准备好。合法答复后先删除pending，再通知页面，旧页面或另一客户端的重复答复无法唤醒第二次。
 
-## 6. 将来怎样接入真正的Agent
+## 6. 已接通的工具链：注册、模型调用、回答后再请求模型
+
+这部分已在独立示例实际实现，不只是Questions.request的函数演示。服务启动时createQuestionAgent创建Scope、Tools、内存Events、Settings与真实Agent，然后注册ask_user。源码依赖同仓harness-own中的基础组件，请在完整仓库中运行，不能只把示例文件复制到空目录。
+
+```javascript
+// 实际工具注册的核心结构；完整Schema和装配见ask-user-tool.mjs。
+tools.register(scope, {
+  name: 'ask_user',
+  description: '向用户提问，等待结构化答案后继续任务。',
+  schema: questionSchema, // 完整定义校验kind、title和options。
+  async run(args, context) {
+    // context.signal由Tools.execute从当前Agent回合传入。
+    return await questions.request(owner, args, context.signal)
+  },
+})
+
+// HTTP入口不直接调用Questions，而是给真实Agent提交任务。
+agent.submit(JSON.stringify(question))
+await agent.idle()
+```
+
+questionSchema在上面是完整源码中schema对象的简称。Tools.catalog只把名称、描述、Schema交给模型；模型输出工具调用后，Loop才用Tools.execute找到run函数。页面回答不是直接交给模型，而是先唤醒这个run，之后由Loop记录message/tool并再次请求模型。
 
 ```mermaid
 sequenceDiagram
-    participant M as 模型
-    participant L as Loop与Tools
-    participant Q as 问答服务
-    participant S as Session事件与Remote
+    participant H as HTTP服务
+    participant A as 真实Agent与Loop
+    participant M as 固定演示模型
+    participant T as Tools中的ask_user.run
+    participant Q as Questions
     participant P as 页面弹窗
-    M->>L: 调用ask_user工具
-    L->>Q: await request，会话身份与取消信号
-    Q->>S: 发布问题事件
-    S-->>P: 推送问题与ID
-    P->>S: 提交答案RPC
-    S->>Q: 校验当前会话后answer
-    Q-->>L: 结构化答案
-    L->>S: 保存工具结果
-    L->>M: 下一模型请求携带工具结果
-    Note over M,P: 这是后续接线设计，当前独立示例没有实现这条模型链
+    H->>A: agent.submit任务
+    A->>M: 第一次stream，含ask_user目录Schema
+    M-->>A: tool调用，名称ask_user与问题参数
+    A->>T: Tools.execute，校验参数后调用run
+    T->>Q: await request，传入回合signal
+    Q-->>P: HTTP状态中出现问题，页面打开dialog
+    P->>H: 提交questionId和答案
+    H->>Q: answer，使用服务端会话身份
+    Q-->>T: finish调用resolve，返回结构化答案
+    T-->>A: 工具返回，Loop包装ok与value
+    A->>A: 内存Events记录message/tool及callId
+    A->>M: 第二次stream，历史含工具结果
+    M-->>A: 根据真实工具结果生成最终文字
+    A-->>H: agent.idle结束，返回演示状态
+    Note over H,P: 未调用外部模型API；问答状态与Session事件仍未持久化
 ```
 
-接到现有工程时，需要增加ask_user工具、Host拥有的Questions实例、Remote回答方法、页面状态投影与弹窗，以及问题和回答事件的持久化。模型拿到的是工具结果，不需要把答案另塞一份进系统提示词。
+固定模型第一次明确产生ask_user调用，第二次读取last.role=tool的结果生成文字；它是可重复验证协议链的模型替身，不证明模型已学会何时自主提问。用户回答后的页面应显示modelRequests:2、toolResult.name:ask_user、answer及reason:completed。取消整个Agent任务时，应观察cancelled回合，而不是要求第二次模型请求一定执行。
 
-Questions可以参考Approvals的一次性等待方式，但不能直接调用Approvals.answer传字符串：本章allowed === true会把字符串变成false。先把两条真实功能链跑通，再考虑提炼公共等待组件，比先设计通用框架更容易理解和验证。
+当前演示使用Tools默认空守卫，仅注册问答工具，没有接024权限守卫。真实Host接入还需明确问答工具的交互策略、Remote答复方法、问题状态投影与持久化；不能因此绕过文件或命令工具的权限守卫，也不能把问答选择当作操作授权。
 
 ## 7. 验证与调试
 
@@ -164,7 +193,7 @@ bun test ./tutorial/linear/examples/023-questions/questions.test.mjs
 | 多选与文本 | 多选拒绝重复ID，文本拒绝空白，答案保持原类型 |
 | 取消与超时 | cancelled、timed_out、任务Abort不同，pending最终清空 |
 | 发布边界 | 同步回答不丢失，发布失败清理等待 |
-| 真实HTTP | 启动任务、接收答案、runTask继续、迟答拒绝 |
+| 真实HTTP | 注册工具、两次真实Loop模型请求、工具结果回传、迟答拒绝 |
 
 在VS Code仓库根目录的终端可以这样先等待附加：
 
@@ -172,11 +201,11 @@ bun test ./tutorial/linear/examples/023-questions/questions.test.mjs
 bun --inspect-brk=127.0.0.1:6510/questions-023 tutorial/linear/examples/023-questions/server.mjs
 ```
 
-使用Bun附加配置连接本次终端打印的完整ws地址，继续到“打开页面”后再开浏览器。先在questions.mjs的pending.set、answer校验和finish断点；再在server.mjs的await questions.request之后设断点。浏览器选择后，服务端先结算、再命中await之后。这里只给启动命令，不覆盖现有launch.json；023基础测试配置不会运行这份独立示例。长暂停会影响两分钟超时，观察后应继续并关闭服务。
+使用Bun附加配置连接本次终端打印的完整ws地址，继续到“打开页面”后再开浏览器。先在questions.mjs的pending.set、answer校验和finish断点；再在ask-user-tool.mjs的run和server.mjs的await runtime.agent.idle()之后设断点。浏览器选择后，服务端先结算，再返回工具结果，模型第二次收到结果，最后agent.idle结束。这里只给启动命令，不覆盖现有launch.json；023基础测试配置不会运行这份独立示例。长暂停会影响两分钟超时，观察后应继续并关闭服务。
 
 ## 8. 本示例的边界
 
-这是本机单会话、内存状态、轮询页面的教学实验；问题不是模型生成，也没有接入现有Host、Journal或工具权限守卫。刷新页面可以重新看到当前未结算问题，但重启服务不能恢复。持久问答还需要定义重启时未答问题的恢复方式和迟答处理，不能只序列化Promise。生产接入还应补齐认证、输入大小限制、并发与连接故障策略。
+这是本机单会话、内存状态、轮询页面的教学实验；问题由固定演示模型按测试任务发出，已复用现有Agent/Loop/Tools；未接现有Host、Journal或工具权限守卫。刷新页面可以重新看到当前未结算问题，但重启服务不能恢复。持久问答还需要定义重启时未答问题的恢复方式和迟答处理，不能只序列化Promise。生产接入还应补齐认证、输入大小限制、并发与连接故障策略。
 
 固定原版分别提供[user-questions](../../../deepseek-harness/packages/interaction/user-questions/README.zh.md)与[tool-ask-user](../../../deepseek-harness/packages/interaction/tool-ask-user/README.zh.md)，本实验不是其完整协议复刻。
 
@@ -361,7 +390,7 @@ await只暂停当前异步函数，等待尚未完成的Promise时会交还执�
 
 | 执行链 | 入口 | 等待与继续的位置 |
 | --- | --- | --- |
-| A：任务提出问题 | server.mjs的runTask | await questions.request暂停；Promise结算后继续 |
+| A：工具提出问题 | ask-user-tool.mjs的run | await questions.request暂停；工具返回后Loop继续 |
 | B：用户提交回答 | HTTP的POST /answer | 调用同一个questions.answer，通过问题ID找到等待者 |
 
 本例不是一个线程强行打断另一个线程，也不是轮询某个answered变量。页面轮询/state只是刷新显示；服务端恢复任务依靠Promise结算。两个入口必须访问同一份pending；每个HTTP请求都new Questions会导致查不到原问题。跨进程部署时也不能把resolve函数随网络发送，要把回答路由回拥有该等待对象的进程，或使用第10节明确的恢复协议。
@@ -423,7 +452,7 @@ pending.finish({ status: 'answered', value: structuredClone(answer.value) })
 
 ```mermaid
 sequenceDiagram
-    participant T as 链路A：runTask或工具调用
+    participant T as 链路A：ask_user工具run
     participant Q as 共享Questions与pending
     participant E as JS事件循环
     participant H as 链路B：HTTP回答回调
@@ -466,9 +495,22 @@ const answer = await questions.request(owner, question, signal)
 ### 11.5 跟着现有示例验证
 
 1. 启动server.mjs并打开页面，在questions.mjs的pending.set处断点，观察id及本次finish。
-2. 在server.mjs的await questions.request之后设断点，发起单选问题。提交答案前，这个断点不应命中；页面仍能通过/state取得待答问题。
+2. 在ask-user-tool.mjs的run返回处及Loop记录message/tool处设断点，发起单选问题。提交答案前，这个断点不应命中；页面仍能通过/state取得待答问题。
 3. 在answer的pending.get与pending.finish处断点，页面提交后确认使用的是同一个questionId和Questions对象。
 4. 继续执行finish，看到pending删除，然后才命中原任务await后的代码。调试时如果整个服务被断点暂停，HTTP也会等待，需继续服务；这与普通await暂停任务不同。
-5. 再次提交旧ID会被拒绝；取消、超时通过同一finish清理。已有questions.test.mjs覆盖同步回答、重复回答、取消、超时，以及HTTP回答后runTask继续。
+5. 再次提交旧ID会被拒绝；取消、超时通过同一finish清理。已有questions.test.mjs覆盖同步回答、重复回答、取消、超时，以及HTTP回答后工具结果进入第二次模型请求。
 
-本节没有新增第二套问答实现，也没有改动实际工具或持久化行为；它解释当前可运行示例如何关联等待与答案。服务重启后Map和闭包均消失，仍须按第10节处理，而不是从eventlog中反序列化resolve。
+Questions仍是一套问答实现，示例在外层增加真实工具注册与Agent装配；本节解释工具等待如何与答案关联，未改变持久化边界。服务重启后Map和闭包均消失，仍须按第10节处理，而不是从eventlog中反序列化resolve。
+
+
+## 12. 从哪几个断点验证“确实作为tool调用”
+
+1. 启动前断在ask-user-tool.mjs的tools.register。先完成注册，再由Agent开始模型请求。
+2. 断在QuestionDemoModel.stream，第一次检查request.tools含ask_user，返回kind:tool、name:ask_user和本次call ID。
+3. 断在harness-own/src/loop.mjs的tools.execute与harness-own/src/tools.mjs的tool.run，确认不是HTTP处理器直接调用Questions。
+4. 断在ask-user-tool.mjs的run，观察args与context.signal；此时await会让出执行权，HTTP回答仍可接收。
+5. 页面提交后断在Questions.answer和finish，继续到Loop追加message/tool，检查callId与模型第一次发出的ID相同，content为{ok:true,value:答案}。
+6. 第二次进入QuestionDemoModel.stream，检查request.messages末项role为tool，正文包含用户实际答案；模型最终文字也应包含它。
+7. agent.idle结束后，页面显示两次模型请求和completed。这个实验需要现有仓库的Agent/Loop代码，但无需另起Host、Electron或外部模型服务。
+
+这就是实际工具链与仅await一个函数的区别：工具必须有注册、目录Schema、模型产生的调用、执行器分发、关联ID的工具结果，以及消费结果的后续模型请求。
